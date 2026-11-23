@@ -2,6 +2,17 @@
 
 All notable changes to this project will be documented in this file.
 
+## [4.3.0](https://github.com/orchard-suite/vantage/compare/v4.2.0...v4.3.0) (2026-11-23)
+
+### Features
+
+* **vantage:** let an item wait on another ([f4ff88b](https://github.com/orchard-suite/vantage/commit/f4ff88b8152f61cb6020ca06a68cb04aa3ba4bef))
+* **vantage:** add the roadmap planning skill ([59d601c](https://github.com/orchard-suite/vantage/commit/59d601ca491db56222c615d25a9bf6aa6c848b9f))
+
+### Bug Fixes
+
+* **vantage:** name its roadmap kind in vantage.yaml ([47da34c](https://github.com/orchard-suite/vantage/commit/47da34c08b6cd54db58995deb245870913180987))
+
 ## [4.2.0](https://github.com/orchard-suite/vantage/compare/v4.1.0...v4.2.0) (2026-11-23)
 
 ### Features
