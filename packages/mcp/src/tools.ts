@@ -9,10 +9,11 @@ import { z } from 'zod';
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { formatDiagnostic } from '@vantage/model';
-import { formatReport, importFile, render, searchIcons, type TitleBlock, type Validation } from '@vantage/server';
+import { formatReport, importFile, searchIcons, type TitleBlock, type Validation } from '@vantage/server';
 import { DOCUMENT_ADDRESS, OUTLINE, READ } from './verbs.ts';
 import { guideOutline, guidePart, schemaOutline, schemaPart } from './guide-text.ts';
 import { inlineEngine, type LocalEngine } from './engine.ts';
+import { drawnContent, type DocumentArgs, type Drawn, type DrawOutcome, type ViewArgs } from './draw.ts';
 
 export interface LocalToolOptions {
   /** Allow `file` and `out` arguments that touch the local filesystem. */
@@ -23,14 +24,18 @@ export interface LocalToolOptions {
   readonly saved?: SavedDocuments;
 }
 
-type ToolAnswer = { content: ({ type: 'text'; text: string } | { type: 'image'; data: string; mimeType: string })[]; isError?: boolean };
+type ToolAnswer = { content: ({ type: 'text'; text: string } | { type: 'image'; data: string; mimeType: string } | { type: 'resource'; resource: { uri: string; mimeType: string; blob: string } })[]; isError?: boolean };
 
-/** How the tools that draw and check reach a saved document. */
+/** A saved document drawn, or the hub's refusal as it answered it. */
+export type SavedDrawing = { readonly drawn: Drawn } | { readonly refused: ToolAnswer };
+
+/** How the tools that draw and check reach a saved document: the hub draws its own copy, with its imports, pictures, and workspace icons. */
 export interface SavedDocuments {
   /** Its YAML, for a tool that only lays it out. */
   text(address: string): Promise<string>;
   validate(address: string): Promise<ToolAnswer>;
-  render(address: string, args: { view?: string | undefined; format: 'png' | 'svg'; theme?: 'light' | 'dark' | 'print' | 'colorblind' | undefined; scale?: number | undefined }): Promise<ToolAnswer>;
+  drawView(address: string, args: ViewArgs): Promise<SavedDrawing>;
+  drawDocument(address: string, args: DocumentArgs): Promise<SavedDrawing>;
 }
 
 const TOPIC = 'For anything else at an address, sign in to a hub: vantage login <hub url>.';
@@ -105,6 +110,17 @@ export function registerLocalTools(server: McpServer, opts: LocalToolOptions): v
     mkdirSync(dirname(resolve(path)), { recursive: true });
     writeFileSync(resolve(path), data);
   };
+  const sourceOf = (args: { file?: string | undefined; text?: string | undefined }): { file?: string; text?: string } => ({ ...(args.file !== undefined ? { file: args.file } : {}), ...(args.text !== undefined ? { text: args.text } : {}) });
+  /** A drawn file as the answer: written to `out` with only its notes answered, or sent in the answer. */
+  const present = (r: DrawOutcome | SavedDrawing, path: string | undefined): ToolAnswer => {
+    if ('refused' in r) return r.refused;
+    if (!r.drawn) return fail('diagnostics' in r ? r.diagnostics : []);
+    if (path && opts.files) {
+      write(path, r.drawn.bytes);
+      return { content: [{ type: 'text', text: `${r.drawn.notes}\nwrote ${resolve(path)}` }] };
+    }
+    return { content: drawnContent(r.drawn) };
+  };
 
   server.registerTool(
     'vantage_validate',
@@ -137,30 +153,9 @@ export function registerLocalTools(server: McpServer, opts: LocalToolOptions): v
       },
     },
     async (args) => {
-      if (saved && args.address) {
-        if (args.format !== 'png' && args.format !== 'svg') return { content: [{ type: 'text', text: `a saved document draws as png or svg here; for ${args.format}, check it out to a folder and render the file` }], isError: true };
-        const r = await saved.render(args.address, { view: args.view, format: args.format, theme: args.theme, scale: args.scale });
-        const picture = r.content.find((c) => c.type === 'image');
-        if (!args.out || !opts.files || !picture || picture.type !== 'image') return r;
-        write(args.out, Buffer.from(picture.data, 'base64'));
-        return { content: [...r.content.filter((c) => c.type !== 'image'), { type: 'text', text: `wrote ${resolve(args.out)}` }] };
-      }
-      if (args.format === 'pdf' || args.format === 'drawio' || args.format === 'vsdx') {
-        const views = args.view ? [args.view] : undefined;
-        const d = await engine.exportDocument({ ...args, format: args.format, views, titleBlock: compactBlock(args.titleBlock) });
-        if (!d.result) return fail(d.diagnostics);
-        write(args.out, d.result.bytes);
-        if (args.format === 'drawio') return { content: [{ type: 'text', text: Buffer.from(d.result.bytes).toString('utf8') }] };
-        return { content: [{ type: 'resource', resource: { uri: `vantage://${d.result.viewIds[0] ?? 'view'}.${d.result.extension}`, mimeType: d.result.contentType, blob: Buffer.from(d.result.bytes).toString('base64') } }] };
-      }
-      const r = await engine.render({ ...args, format: args.format, scale: args.scale ?? 1.5, titleBlock: compactBlock(args.titleBlock), embedFonts: args.format === 'svg' });
-      if (!r.result) return fail(r.diagnostics);
-      const m = r.result.metrics;
-      const notes = `view ${r.result.viewId}: ${r.result.width}x${r.result.height}, score ${m.score}` + (m.notes.length ? `\n- ${m.notes.join('\n- ')}` : '');
-      write(args.out, args.format === 'svg' ? r.result.svg : r.result.png!);
-      if (args.out && opts.files) return { content: [{ type: 'text', text: `${notes}\nwrote ${resolve(args.out)}` }] };
-      if (args.format === 'svg') return { content: [{ type: 'text', text: r.result.svg }, { type: 'text', text: notes }] };
-      return { content: [{ type: 'image', data: Buffer.from(r.result.png!).toString('base64'), mimeType: 'image/png' }, { type: 'text', text: notes }] };
+      const req: ViewArgs = { view: args.view, format: args.format, theme: args.theme, scale: args.scale, titleBlock: compactBlock(args.titleBlock), transparent: args.transparent };
+      if (saved && args.address) return present(await saved.drawView(args.address, req), args.out);
+      return present(await engine.drawView({ ...sourceOf(args), ...req }), args.out);
     },
   );
 
@@ -187,38 +182,29 @@ export function registerLocalTools(server: McpServer, opts: LocalToolOptions): v
     },
   );
 
-  if (opts.files) {
-    server.registerTool(
-      'vantage_export',
-      {
-        description: 'Write the whole document to one file: html (interactive viewer with every view, the picker, hover, focus, and walkthroughs), pdf (one view per page), drawio, or vsdx.',
-        inputSchema: {
-          ...source,
-          out: z.string().describe('Absolute path of the file to write'),
-          format: z.enum(['html', 'pdf', 'drawio', 'vsdx']).default('html'),
-          views: z.array(z.string()).optional().describe('View ids to include, in order; default every view (pdf, drawio, vsdx)'),
-          theme: themeSchema.optional(),
-          titleBlock: z.union([z.literal(true), titleBlockSchema]).optional().describe('Title block on every page; true fills it from the document (pdf)'),
-          page: z.enum(['A4', 'Letter', 'A3', 'fit']).optional().describe('PDF page size; default A4'),
-          orientation: z.enum(['auto', 'portrait', 'landscape']).optional().describe('PDF orientation; default auto'),
-        },
+  server.registerTool(
+    'vantage_export',
+    {
+      description: opts.files
+        ? 'Write the whole document to one file: html (interactive viewer with every view, the picker, hover, focus, and walkthroughs), pdf (one view per page), drawio, or vsdx.'
+        : 'The whole document as one file: html (interactive viewer with every view), pdf (one view per page), drawio, or vsdx.',
+      inputSchema: {
+        ...source,
+        ...(opts.files ? { out: z.string().describe('Absolute path of the file to write') } : {}),
+        format: z.enum(['html', 'pdf', 'drawio', 'vsdx']).default('html'),
+        views: z.array(z.string()).optional().describe('View ids to include, in order; default every view (pdf, drawio, vsdx)'),
+        theme: themeSchema.optional(),
+        titleBlock: z.union([z.literal(true), titleBlockSchema]).optional().describe('Title block on every page; true fills it from the document (pdf)'),
+        page: z.enum(['A4', 'Letter', 'A3', 'fit']).optional().describe('PDF page size; default A4'),
+        orientation: z.enum(['auto', 'portrait', 'landscape']).optional().describe('PDF orientation; default auto'),
       },
-      async (args) => {
-        if (args.format === 'html') {
-          const { titleBlock: _ignored, ...rest } = args;
-          const r = render({ ...rest, format: 'html' });
-          if (!r.result) return fail(r.diagnostics);
-          write(args.out, r.result.html!);
-          return { content: [{ type: 'text', text: `wrote ${resolve(args.out)}` }] };
-        }
-        const titleBlock = args.titleBlock === true ? true : compactBlock(args.titleBlock);
-        const d = await engine.exportDocument({ ...args, format: args.format, titleBlock });
-        if (!d.result) return fail(d.diagnostics);
-        write(args.out, d.result.bytes);
-        return { content: [{ type: 'text', text: `wrote ${resolve(args.out)} (${d.result.viewIds.length} views, ${d.result.bytes.byteLength} bytes)` }] };
-      },
-    );
-  }
+    },
+    async (args) => {
+      const req: DocumentArgs = { format: args.format, views: args.views, theme: args.theme, titleBlock: args.titleBlock === true ? true : compactBlock(args.titleBlock), page: args.page, orientation: args.orientation };
+      if (saved && args.address) return present(await saved.drawDocument(args.address, req), args.out);
+      return present(await engine.drawDocument({ ...sourceOf(args), ...req }), args.out);
+    },
+  );
 
   if (opts.files) {
     server.registerTool(

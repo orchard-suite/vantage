@@ -10,7 +10,8 @@ import { loadOverlaid, loadStored, type ImportMap } from '../documents/model.ts'
 import { drawRange, kitOf, planDocument, type DocumentInput, type PlanInput, type PlanOutput, type RangeInput, type RangeView } from './document-task.ts';
 import { viewSvg, type ViewSvgInput } from './view-svg.ts';
 import { NO_RESOURCES, resourcesFrom, type ResourceData } from './resources.ts';
-import { inlineEngine, type LocalEngine } from '@vantage/mcp';
+import { inlineEngine, type DrawOutcome, type LocalEngine } from '@vantage/mcp';
+import { savedDraw, type SavedDrawInput } from './saved-draw-task.ts';
 import { produce, type ProduceInput, type ProduceOutput } from './produce-task.ts';
 import { reviewDocument, type ReviewInput, type ReviewOutput } from './review-task.ts';
 import { checkPush, type PushInput, type PushOutput } from './push-task.ts';
@@ -84,10 +85,12 @@ export interface Tasks {
   preview: [PreviewInput, PreviewOutput];
   check: [CheckInput, CheckOutput];
   /** The hub's local MCP tools, one task each. */
-  localRender: [Parameters<LocalEngine['render']>[0], Awaited<ReturnType<LocalEngine['render']>>];
+  localDrawView: [Parameters<LocalEngine['drawView']>[0], DrawOutcome];
+  localDrawDocument: [Parameters<LocalEngine['drawDocument']>[0], DrawOutcome];
+  /** A saved version drawn with its imports, pictures, and workspace icons, in every format a file draws in. */
+  savedDraw: [SavedDrawInput, DrawOutcome];
   localExplore: [Parameters<LocalEngine['explore']>[0], Awaited<ReturnType<LocalEngine['explore']>>];
   localValidate: [Parameters<LocalEngine['validate']>[0], Awaited<ReturnType<LocalEngine['validate']>>];
-  localExport: [Parameters<LocalEngine['exportDocument']>[0], Awaited<ReturnType<LocalEngine['exportDocument']>>];
   produce: [ProduceInput, ProduceOutput];
   review: [ReviewInput, ReviewOutput];
   push: [PushInput, PushOutput];
@@ -225,10 +228,11 @@ const RUNNERS: { [K in TaskKind]: (input: TaskInput<K>) => TaskOutput<K> | Promi
   diff,
   preview,
   check,
-  localRender: (i) => inlineEngine.render(i),
+  localDrawView: (i) => inlineEngine.drawView(i),
+  localDrawDocument: (i) => inlineEngine.drawDocument(i),
+  savedDraw,
   localExplore: (i) => inlineEngine.explore(i),
   localValidate: (i) => inlineEngine.validate(i),
-  localExport: (i) => inlineEngine.exportDocument(i),
   produce,
   review: reviewDocument,
   push: checkPush,

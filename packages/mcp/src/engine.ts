@@ -1,39 +1,32 @@
 /**
  * The drawing work behind the local tools, as an interface so the hub can
  * run it on its render threads. Results are plain data that cross a
- * thread: the layout itself stays behind, its size and score come along.
+ * thread: the layout itself stays behind, the drawn file and its notes
+ * come along.
  */
 import type { Diagnostic } from '@vantage/model';
-import { explore, exportDocument, render, validate, type ExploreRequest, type ExploreResult, type ExportRequest, type ExportResult, type RenderRequest, type Source, type Validation } from '@vantage/server';
-
-export interface RenderOutcome {
-  readonly result?: {
-    readonly viewId: string;
-    readonly svg: string;
-    readonly png?: Uint8Array;
-    readonly width: number;
-    readonly height: number;
-    readonly metrics: { readonly score: number; readonly notes: readonly string[] };
-  };
-  readonly diagnostics: readonly Diagnostic[];
-}
+import { explore, load, resourcesFor, validate, type ExploreRequest, type ExploreResult, type Source, type Validation } from '@vantage/server';
+import { drawDocument, drawView, type DocumentArgs, type DrawOutcome, type ViewArgs } from './draw.ts';
 
 export interface LocalEngine {
-  render(req: RenderRequest): Promise<RenderOutcome>;
+  /** One view of a file or of text, as one file. */
+  drawView(req: Source & ViewArgs): Promise<DrawOutcome>;
+  /** The whole document, or the views named, as one file. */
+  drawDocument(req: Source & DocumentArgs): Promise<DrawOutcome>;
   explore(req: ExploreRequest): Promise<{ result?: ExploreResult; diagnostics: readonly Diagnostic[] }>;
   validate(src: Source): Promise<Validation>;
-  exportDocument(req: ExportRequest): Promise<{ result?: ExportResult; diagnostics: readonly Diagnostic[] }>;
+}
+
+/** Loads a file or text with the icons and pictures on this machine, then draws it. */
+async function loaded(src: Source, draw: (m: NonNullable<ReturnType<typeof load>['model']>, d: readonly Diagnostic[]) => Promise<DrawOutcome>): Promise<DrawOutcome> {
+  const { model, diagnostics } = load(src);
+  return model ? draw(model, diagnostics) : { diagnostics };
 }
 
 /** Runs the work in this process. */
 export const inlineEngine: LocalEngine = {
-  async render(req) {
-    const r = render(req);
-    if (!r.result) return { diagnostics: r.diagnostics };
-    const { viewId, svg, png, layout } = r.result;
-    return { result: { viewId, svg, ...(png ? { png } : {}), width: layout.width, height: layout.height, metrics: { score: layout.metrics.score, notes: layout.metrics.notes } }, diagnostics: r.diagnostics };
-  },
+  drawView: (req) => loaded(req, (m, d) => drawView(m, resourcesFor(m), req, d)),
+  drawDocument: (req) => loaded(req, (m, d) => drawDocument(m, resourcesFor(m), req, d)),
   explore: async (req) => explore(req),
   validate: async (src) => validate(src),
-  exportDocument: (req) => exportDocument(req),
 };

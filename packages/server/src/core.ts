@@ -11,7 +11,7 @@ export type Theme = 'light' | 'dark' | 'print' | 'colorblind';
 export type Format = 'svg' | 'png' | 'html' | 'json';
 /** Whole-document formats: every view (or a chosen list) in one file. */
 export type DocumentFormat = 'pdf' | 'drawio' | 'vsdx';
-export type { TitleBlock, PageSize, Orientation };
+export type { TitleBlock, PageSize, Orientation, Resources };
 
 export interface Source {
   readonly text?: string | undefined;
@@ -100,9 +100,17 @@ export interface RenderResult {
 export function render(req: RenderRequest): { result?: RenderResult; diagnostics: readonly Diagnostic[] } {
   const { model, diagnostics } = load(req);
   if (!model) return { diagnostics };
+  return renderModel(model, resourcesFor(model), req, diagnostics);
+}
+
+/** What a render or an export draws once its source is loaded: the options, without the text or the file. */
+export type DrawOptions<R> = Omit<R, keyof Source>;
+
+/** Draws a loaded model with the icons and pictures it was given: a file's from disk, a saved document's from its hub. */
+export function renderModel(model: Model, res: Resources, req: DrawOptions<RenderRequest>, diagnostics: readonly Diagnostic[] = []): { result?: RenderResult; diagnostics: readonly Diagnostic[] } {
   const theme = req.theme ?? (model.theme === 'auto' ? 'light' : model.theme);
   if (req.format === 'html') {
-    const bundle = buildBundle(model, { theme, ...resourcesFor(model), diagnostics });
+    const bundle = buildBundle(model, { theme, ...res, diagnostics });
     const first = model.views.find((v) => !v.hidden) ?? model.views[0];
     if (!first) return { diagnostics: [...diagnostics, { severity: 'error', code: 'no-views', message: 'the document has no views' }] };
     const layout = layoutView(model, first);
@@ -115,7 +123,7 @@ export function render(req: RenderRequest): { result?: RenderResult; diagnostics
   const layout = layoutView(model, view);
   const svg = renderSvg(layout, {
     theme,
-    ...resourcesFor(model),
+    ...res,
     ...(req.titleBlock ? { titleBlock: req.titleBlock } : {}),
     ...(req.transparent ? { background: false } : {}),
     ...(req.embedFonts ? { fontCss: fontCss() } : {}),
@@ -165,6 +173,11 @@ export function documentTitleBlock(model: Model, tb: TitleBlock | true | undefin
 export async function exportDocument(req: ExportRequest): Promise<{ result?: ExportResult; diagnostics: readonly Diagnostic[] }> {
   const { model, diagnostics } = load(req);
   if (!model) return { diagnostics };
+  return exportModel(model, resourcesFor(model), req, diagnostics);
+}
+
+/** Exports a loaded model with the icons and pictures it was given. */
+export async function exportModel(model: Model, res: Resources, req: DrawOptions<ExportRequest>, diagnostics: readonly Diagnostic[] = []): Promise<{ result?: ExportResult; diagnostics: readonly Diagnostic[] }> {
   const pictures = pictureViews(model.views);
   const wanted = req.views?.length ? req.views.filter((id) => !model.views.some((v) => v.id === id && v.kind === 'doc')) : pictures.filter((v) => !v.hidden).map((v) => v.id);
   const missing = wanted.filter((id) => !model.views.some((v) => v.id === id));
@@ -173,7 +186,6 @@ export async function exportDocument(req: ExportRequest): Promise<{ result?: Exp
   const theme = req.theme ?? (model.theme === 'dark' ? 'dark' : 'light');
   const layouts = wanted.map((id) => layoutView(model, model.views.find((v) => v.id === id)!));
   const block = documentTitleBlock(model, req.titleBlock);
-  const res = resourcesFor(model);
   let bytes: Uint8Array<ArrayBuffer>;
   if (req.format === 'pdf') {
     const pages = layouts.map((layout) => ({ layout, ...(block ? { titleBlock: { ...block, subtitle: block.subtitle ?? layout.title } } : {}) }));

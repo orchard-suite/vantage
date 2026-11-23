@@ -33,10 +33,10 @@ export const MCP_SERVER_VERSION = '1.0.0';
 /** The local tools' drawing, on the render pool. */
 function poolEngine(ctx: AppContext): LocalEngine {
   return {
-    render: (args) => ctx.render.run('localRender', args),
+    drawView: (args) => ctx.render.run('localDrawView', args),
+    drawDocument: (args) => ctx.render.run('localDrawDocument', args),
     explore: (args) => ctx.render.run('localExplore', args),
     validate: (args) => ctx.render.run('localValidate', args),
-    exportDocument: (args) => ctx.render.run('localExport', args),
   };
 }
 

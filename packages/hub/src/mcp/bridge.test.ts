@@ -57,7 +57,7 @@ describe('the laptop bridge', () => {
     expect(await call('vantage_validate', { file: yamlPath })).toContain('ok');
     // A saved document draws by its address, and its picture goes to a file, not into the conversation.
     const drawn = await call('vantage_render', { address: `${ws}/sample`, view: 'context', out: join(dir, 'context.png') });
-    expect(drawn).toContain('view context: score');
+    expect(drawn).toMatch(/view context: \d+x\d+, score/);
     expect(drawn).toContain(`wrote ${join(dir, 'context.png')}`);
     expect(readFileSync(join(dir, 'context.png')).subarray(1, 4).toString()).toBe('PNG');
 

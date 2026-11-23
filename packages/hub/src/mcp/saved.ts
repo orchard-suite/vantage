@@ -3,7 +3,9 @@
  * its imports, its pictures, and its workspace's icons, so an agent never
  * sends back text the hub already has.
  */
-import type { SavedDocuments } from '@vantage/mcp';
+import type { SavedDocuments, SavedDrawing } from '@vantage/mcp';
+import { formatDiagnostic } from '@vantage/model';
+import type { SavedDrawInput } from '../render/saved-draw-task.ts';
 import type { AppContext } from '../context.ts';
 import type { Principal } from '../auth/principal.ts';
 import { checkDocument, describeFinding } from '../documents/check.ts';
@@ -26,6 +28,16 @@ export function savedDocuments(ctx: AppContext, p: Principal): SavedDocuments {
       return text(refusalText(err), true);
     }
   };
+  const draw = async (address: string, what: SavedDrawInput['draw']): Promise<SavedDrawing> => {
+    try {
+      const { doc, head } = await at(address);
+      const resources = await resourceInputs(ctx, { orgId: doc.org_id, workspaceId: doc.workspace_id, attachments: head.attachments });
+      const out = await ctx.render.run('savedDraw', { yaml: head.yaml, imports: head.imports, resources, draw: what });
+      return out.drawn ? { drawn: out.drawn } : { refused: text(out.diagnostics.map(formatDiagnostic).join('\n') || `${address} drew nothing`, true) };
+    } catch (err) {
+      return { refused: text(refusalText(err), true) };
+    }
+  };
   return {
     text: async (address) => (await at(address)).head.yaml,
     validate: (address) =>
@@ -41,17 +53,7 @@ export function savedDocuments(ctx: AppContext, p: Principal): SavedDocuments {
         ];
         return text(lines.join('\n'), out.errors.length > 0);
       }),
-    render: (address, args) =>
-      guarded(async () => {
-        const { ws, doc, head } = await at(address);
-        const resources = await resourceInputs(ctx, { orgId: doc.org_id, workspaceId: doc.workspace_id, attachments: head.attachments });
-        const theme = args.theme === 'dark' ? 'dark' : 'light';
-        const out = await ctx.render.run('preview', { yaml: head.yaml, imports: head.imports, resources, view: args.view, theme });
-        if (out.svg === null) return text(`${ws.slug}/${doc.slug} has no view ${args.view ?? ''} to draw; its views: ${out.views.map((v) => v.id).join(', ') || 'none'}\n${out.diagnostics.map((d) => `${d.severity}: ${d.message}`).join('\n')}`, true);
-        const notes = `view ${out.view}: score ${out.metrics?.score ?? 'none'}${out.metrics?.notes.length ? `\n- ${out.metrics.notes.join('\n- ')}` : ''}`;
-        if (args.format === 'svg') return { content: [{ type: 'text', text: out.svg }, { type: 'text', text: notes }] };
-        const png = await ctx.render.run('png', { svg: out.svg, scale: args.scale ?? 1.5 });
-        return { content: [{ type: 'image', data: Buffer.from(png).toString('base64'), mimeType: 'image/png' }, { type: 'text', text: notes }] };
-      }),
+    drawView: (address, view) => draw(address, { view }),
+    drawDocument: (address, document) => draw(address, { document }),
   };
 }

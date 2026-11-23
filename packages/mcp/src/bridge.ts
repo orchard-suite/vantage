@@ -20,7 +20,8 @@ import type { HubLink } from './hub.ts';
 import { CORE, LAPTOP_CORE } from './catalog.ts';
 import { createFront, firstOf, inProcess, type Backend, type CallMeasure } from './front.ts';
 import { agentInstructions } from './instructions.ts';
-import { registerGuideDoor, registerLocalTools, type SavedDocuments } from './tools.ts';
+import { registerGuideDoor, registerLocalTools, type SavedDocuments, type SavedDrawing } from './tools.ts';
+import { drawnFrom } from './draw.ts';
 import { WRITE, WRITE_SHAPE_FILES } from './verbs.ts';
 import { checkout, sync, type Listed, type Result, type TextApi } from './workcopy.ts';
 
@@ -111,10 +112,17 @@ export async function createBridge(link: HubLink, opts: BridgeOptions = {}): Pro
     write: async (body) => ((await (await rest('POST', '/text/write', body)).json()) as { results: Result[] }).results,
   };
 
+  /** The hub draws its own copy and answers the file; the bridge takes the bytes, so a path on this machine can receive them. */
+  const drawnBy = async (tool: string, address: string, args: object, extension: string): Promise<SavedDrawing> => {
+    const r = await callHub(tool, { address, ...args });
+    const drawn = r.isError ? undefined : drawnFrom(r.content, extension);
+    return drawn ? { drawn } : { refused: reply(r) };
+  };
   const saved: SavedDocuments = {
     text: async (address) => (await api.read(address)).text,
     validate: async (address) => reply(await callHub('vantage_validate', { address })),
-    render: async (address, args) => reply(await callHub('vantage_render', { address, ...args })),
+    drawView: (address, args) => drawnBy('vantage_render', address, args, args.format),
+    drawDocument: (address, args) => drawnBy('vantage_export', address, args, args.format),
   };
 
   const laptop = new McpServer({ name: 'vantage-laptop', version: BRIDGE_VERSION });

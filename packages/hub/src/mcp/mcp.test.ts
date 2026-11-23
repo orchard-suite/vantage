@@ -25,7 +25,7 @@ describe('the agent door over http', () => {
     const all = (await (await agent(t, me.headers, '?tools=all')).client.listTools()).tools.map((x) => x.name);
     expect(all).toContain('vantage_history');
     expect(all).not.toContain(TOOL_DOOR);
-    expect(all).not.toContain('vantage_export');
+    expect(all).toContain('vantage_export');
     // Every tool is in the core or in exactly one group, so none is listed under "other".
     const grouped = Object.values(GROUPS).flatMap((g) => g.tools);
     expect(all.filter((n) => !CORE.includes(n) && grouped.filter((g) => g === n).length !== 1)).toEqual([]);
