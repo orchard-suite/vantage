@@ -12,10 +12,12 @@
 import type { Model, ResolvedTimelineView, TimelineItem } from '@vantage/model';
 import type { Point } from './geometry.ts';
 import { textWidth, wrapText } from './text/measure.ts';
-import { DEFAULT_STYLE, type LayoutStyle } from './style.ts';
+import { DEFAULT_STYLE, type LayoutStyle, RULES } from './style.ts';
 import type { Extra, Layout, LayoutBox, LayoutEdge, TextBlock } from './types.ts';
 import { syntheticNode } from './synthetic.ts';
 import { measureQuality } from './metrics.ts';
+
+const TT = RULES.timelineText;
 
 const DAY = 86400000;
 /** Spans up to this many days get a tick every day, then every Monday, then every month. */
@@ -98,15 +100,15 @@ export function layoutTimelineView(model: Model, view: ResolvedTimelineView, sty
   const extras: Extra[] = [];
   lanes.forEach((lane, li) => {
     const { y, h } = placed.lanes[li]!;
-    const title: TextBlock = { lines: wrapText(lane, style.nameSize, 'semibold', T.laneTitleWidth - 20, 2).lines, size: style.nameSize, weight: 'semibold', x: 12, y: h / 2 - style.nameSize * 0.7, lineHeight: style.nameSize * 1.25, anchor: 'start' };
+    const title: TextBlock = { lines: wrapText(lane, style.nameSize, 'semibold', T.laneTitleWidth - TT.titleInset, 2).lines, size: style.nameSize, weight: 'semibold', x: TT.titleX, y: h / 2 - style.nameSize * 0.7, lineHeight: style.nameSize * 1.25, anchor: 'start' };
     extras.push({ kind: 'lane', id: `lane-${li}`, rect: { x: style.canvasPad, y, w: width - style.canvasPad * 2, h }, title });
   });
   const ticks = ordinal ? labels.map((l, i) => ({ id: l, at: i, text: l })) : dateTicks(minV, maxV);
   for (const t of ticks) {
     const x = xAt(t.at);
     if (x < x0 - T.trackInset || x > x0 + trackW + T.trackInset) continue;
-    extras.push({ kind: 'line', id: `tick-${t.id}`, from: { x, y: style.canvasPad + T.axisHeight - 6 }, to: { x, y: placed.bottom }, style: 'divider' });
-    extras.push({ kind: 'text', id: `tick-label-${t.id}`, role: 'axis', text: { lines: [t.text], size: style.subtitleSize, weight: 'medium', x, y: style.canvasPad + 10, lineHeight: style.subtitleSize * 1.25, anchor: 'middle' } });
+    extras.push({ kind: 'line', id: `tick-${t.id}`, from: { x, y: style.canvasPad + T.axisHeight - TT.tickRise }, to: { x, y: placed.bottom }, style: 'divider' });
+    extras.push({ kind: 'text', id: `tick-label-${t.id}`, role: 'axis', text: { lines: [t.text], size: style.subtitleSize, weight: 'medium', x, y: style.canvasPad + TT.tickLabelTop, lineHeight: style.subtitleSize * 1.25, anchor: 'middle' } });
   }
 
   const boxes: LayoutBox[] = shapes.map((s) => {
@@ -140,8 +142,8 @@ function shapeOf(item: TimelineItem, id: string, lane: number, a: number, b: num
     };
   }
   const w = Math.max(b - a, T.minBarWidth), h = T.barHeight;
-  const fits = textWidth(item.text, style.nameSize, 'medium') + 20 <= w;
-  const label = wrapText(item.text, style.nameSize, 'medium', fits ? w - 16 : T.labelMaxWidth, fits ? 1 : 2);
+  const fits = textWidth(item.text, style.nameSize, 'medium') + TT.labelRoom <= w;
+  const label = wrapText(item.text, style.nameSize, 'medium', fits ? w - TT.labelInset : T.labelMaxWidth, fits ? 1 : 2);
   const labelW = Math.max(...label.lines.map((l) => textWidth(l, style.nameSize, 'medium')));
   return {
     item, id, lane, milestone: false, x: a, w, h, outside: !fits, labelW, labelH: label.height, startKey: a,
@@ -194,16 +196,16 @@ function routeOf(d: Dep, p: Placement, shapes: Shape[], style: LayoutStyle): Poi
   const a = p.boxes.get(d.from)!, b = p.boxes.get(d.to)!;
   const aMs = shapes.find((s) => s.id === d.from)!.milestone, bMs = shapes.find((s) => s.id === d.to)!.milestone;
   const down = b.y > a.y;
-  const exitX = aMs ? a.x + a.w / 2 : a.x + a.w - Math.min(12, a.w / 2);
+  const exitX = aMs ? a.x + a.w / 2 : a.x + a.w - Math.min(TT.exitMax, a.w / 2);
   const aEdge = down ? a.y + a.h : a.y;
   const bEdge = down ? b.y : b.y + b.h;
   const exit = { x: exitX, y: aEdge };
-  if (!bMs && exitX >= b.x + 6 && exitX <= b.x + b.w - 6) return [exit, { x: exitX, y: bEdge }];
+  if (!bMs && exitX >= b.x + TT.entryClear && exitX <= b.x + b.w - TT.entryClear) return [exit, { x: exitX, y: bEdge }];
   if (b.x - exitX >= T.elbowRun) {
     const cy = b.y + b.h / 2;
     return [exit, { x: exitX, y: cy }, { x: b.x, y: cy }];
   }
-  const inset = bMs ? b.w / 2 : Math.min(10, b.w / 2);
+  const inset = bMs ? b.w / 2 : Math.min(TT.entryInset, b.w / 2);
   const tx = exitX < b.x + inset ? b.x + inset : b.x + b.w - inset;
   if (Math.abs(tx - exitX) < 1) return [exit, { x: exitX, y: bEdge }];
   const top = p.rowTop.get(d.to)!;
@@ -221,7 +223,7 @@ function crossingCount(points: Point[], d: Dep, p: Placement): number {
 
 /** Two arrows cross, or run along each other closer than a hand's width, anywhere but a shared end. */
 function tangled(p: Point[], q: Point[]): boolean {
-  const near = 6;
+  const near = TT.near;
   for (let i = 1; i < p.length; i++) {
     for (let j = 1; j < q.length; j++) {
       const a = p[i - 1]!, b = p[i]!, c = q[j - 1]!, d = q[j]!;

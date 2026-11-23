@@ -14,9 +14,11 @@ import { placeLabel } from './labels.ts';
 import { measureQuality } from './metrics.ts';
 import { wrapText } from './text/measure.ts';
 import { syntheticNode } from './synthetic.ts';
-import { DEFAULT_STYLE, type LayoutStyle } from './style.ts';
+import { DEFAULT_STYLE, type LayoutStyle, RULES } from './style.ts';
 import type { Extra, Layout, LayoutBox, LayoutEdge, TextBlock } from './types.ts';
 import type { Rect } from './geometry.ts';
+
+const FL = RULES.flow;
 
 const SHAPE_OF: Record<NonNullable<FlowStep['shape']>, LayoutBox['shape']> = {
   start: 'pill',
@@ -56,15 +58,15 @@ export function layoutFlowView(model: Model, view: ResolvedFlowView, style: Layo
   for (const e of view.edges) {
     if (!e.label) continue;
     const l = Math.min(flow.layer.get(e.from)!, flow.layer.get(e.to)!);
-    const lw = wrapText(e.label, style.labelSize, 'regular', 120, 2);
-    labelRoom.set(l, Math.max(labelRoom.get(l) ?? 0, horizontal ? lw.width + 24 : lw.height + 16));
+    const lw = wrapText(e.label, style.labelSize, 'regular', FL.labelWrap, 2);
+    labelRoom.set(l, Math.max(labelRoom.get(l) ?? 0, horizontal ? lw.width + FL.roomX : lw.height + FL.roomY));
   }
   const sizes = view.steps.map((s) => ({ id: s.id, size: { w: sized.get(s.id)!.w, h: sized.get(s.id)!.h } }));
   if (!lanes.length) {
-    ({ placed, size } = placeLayers(flow, sizes, edges, { direction, siblingGap: style.siblingGap, layerGap: style.layerGap - 8, labelRoom, align: 'center' }));
+    ({ placed, size } = placeLayers(flow, sizes, edges, { direction, siblingGap: style.siblingGap, layerGap: style.layerGap - FL.layerTrim, labelRoom, align: 'center' }));
   } else {
     // Lane bands along the cross axis; inside a band, stack by layer order.
-    const laneTitle = 36;
+    const laneTitle = FL.laneTitle;
     const laneGap = 0;
     const bandSize: number[] = lanes.map(() => 0);
     const laneLayerItems = new Map<string, string[]>();
@@ -84,19 +86,19 @@ export function layoutFlowView(model: Model, view: ResolvedFlowView, style: Layo
     let c = 0;
     for (let i = 0; i < lanes.length; i++) {
       bandStart.push(c);
-      bandSize[i] = Math.max(bandSize[i]!, 80) + 48;
+      bandSize[i] = Math.max(bandSize[i]!, FL.laneMin) + FL.lanePad;
       c += bandSize[i]! + laneGap;
     }
     const layerStart: number[] = [];
     const layerThick: number[] = [];
-    let m = laneTitle + 24;
+    let m = laneTitle + FL.laneLead;
     for (const [li, layer] of flow.layers.entries()) {
       const thick = Math.max(0, ...layer.map((id) => (horizontal ? sized.get(id)!.w : sized.get(id)!.h)));
       layerStart.push(m);
       layerThick.push(thick);
-      m += thick + style.layerGap - 8 + (labelRoom.get(li) ?? 0);
+      m += thick + style.layerGap - FL.layerTrim + (labelRoom.get(li) ?? 0);
     }
-    const mainTotal = m - (style.layerGap - 8) + 12;
+    const mainTotal = m - (style.layerGap - FL.layerTrim) + FL.laneTail;
     placed = [];
     for (const [k, ids] of laneLayerItems) {
       const [laneS, layerS] = k.split('|');
@@ -116,8 +118,8 @@ export function layoutFlowView(model: Model, view: ResolvedFlowView, style: Layo
         ? { x: style.canvasPad, y: style.canvasPad + bandStart[i]!, w: mainTotal, h: bandSize[i]! }
         : { x: style.canvasPad + bandStart[i]!, y: style.canvasPad, w: bandSize[i]!, h: mainTotal };
       const title: TextBlock = horizontal
-        ? { lines: [lane], size: style.nameSize, weight: 'semibold', x: 14, y: rect.h / 2 - style.nameSize * 0.6, lineHeight: style.nameSize * 1.25, anchor: 'start' }
-        : { lines: [lane], size: style.nameSize, weight: 'semibold', x: rect.w / 2, y: 10, lineHeight: style.nameSize * 1.25, anchor: 'middle' };
+        ? { lines: [lane], size: style.nameSize, weight: 'semibold', x: FL.laneTitleX, y: rect.h / 2 - style.nameSize * 0.6, lineHeight: style.nameSize * 1.25, anchor: 'start' }
+        : { lines: [lane], size: style.nameSize, weight: 'semibold', x: rect.w / 2, y: FL.laneTitleY, lineHeight: style.nameSize * 1.25, anchor: 'middle' };
       extras.push({ kind: 'lane', id: `lane-${i}`, rect, title });
     }
   }
@@ -165,7 +167,7 @@ export function layoutFlowView(model: Model, view: ResolvedFlowView, style: Layo
     const points = routes[i]!;
     const others = routes.flatMap((r, j) => (j === i ? [] : r.slice(1).map((q, k) => ({ a: r[k]!, b: q }))));
     const span = (outgoing.get(e.from) ?? 0) > 1 && decisions.has(e.from) ? points.slice(0, 3) : points;
-    const label = e.label ? placeLabel(e.label, span, boxes, labelRects, { size: style.labelSize, pad: style.labelPad, maxWidth: 120 }, others) : undefined;
+    const label = e.label ? placeLabel(e.label, span, boxes, labelRects, { size: style.labelSize, pad: style.labelPad, maxWidth: FL.labelWrap }, others) : undefined;
     if (label) labelRects.push(label);
     return {
       id,

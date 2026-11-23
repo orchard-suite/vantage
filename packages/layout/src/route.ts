@@ -8,6 +8,7 @@ import type { Point, Rect } from './geometry.ts';
 import type { Side } from './ports.ts';
 import { sideNormal } from './ports.ts';
 import { directRoute, simplify } from './path.ts';
+import { RULES } from './style.ts';
 
 export { directRoute, simplify } from './path.ts';
 
@@ -67,7 +68,7 @@ export interface RouterOptions {
   readonly lane: number;
 }
 
-export const DEFAULT_ROUTER: RouterOptions = { margin: 14, bendCost: 60, softCost: 400, hardCost: 4000, sharedCost: 250, crossCost: 90, insideFactor: 0.6, outsideFactor: 3, channelCost: 1, ringFactor: 2.5, lane: 16, crowdFactor: 4, borderFactor: 2, borderGap: 8, frameFactor: 1.2, frameGap: 28, stub: 8, heuristicWeight: 1.3 };
+export const DEFAULT_ROUTER: RouterOptions = { margin: RULES.router.margin, bendCost: 60, softCost: 400, hardCost: 4000, sharedCost: 250, crossCost: 90, insideFactor: 0.6, outsideFactor: 3, channelCost: 1, ringFactor: 2.5, lane: RULES.router.lane, crowdFactor: 4, borderFactor: 2, borderGap: RULES.router.borderGap, frameFactor: 1.2, frameGap: RULES.router.frameGap, stub: RULES.router.stub, heuristicWeight: 1.3 };
 
 /** What earlier routes hold, by grid cell (`xi * ys.length + yi`). */
 interface Occupancy {

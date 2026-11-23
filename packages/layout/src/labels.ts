@@ -12,6 +12,8 @@ import { wrapText } from './text/measure.ts';
 import type { EdgeLabel } from './types.ts';
 import { RULES } from './style.ts';
 
+const EL = RULES.edgeLabel;
+
 export interface LabelOptions {
   readonly size: number;
   readonly pad: number;
@@ -31,7 +33,7 @@ function balancedWrap(text: string, size: number, maxWidth: number): ReturnType<
   const first = wrapText(text, size, 'regular', maxWidth, 3);
   if (first.lines.length < 2) return first;
   let best = first;
-  for (let w = maxWidth - 6; w >= 48; w -= 6) {
+  for (let w = maxWidth - EL.narrowStep; w >= EL.minWidth; w -= EL.narrowStep) {
     const next = wrapText(text, size, 'regular', w, 3);
     if (next.lines.length !== first.lines.length || next.lines.some((l) => l.endsWith('…'))) break;
     best = next;
@@ -59,8 +61,8 @@ export function placeLabel(text: string, points: readonly Point[], obstacles: re
       const cy = s.a.y + (s.b.y - s.a.y) * t;
       // Snug against the line first; a little farther off when snug would crowd a neighbour.
       const candidates: Rect[] = horizontal
-        ? [{ x: cx - w / 2, y: cy - h - 2, w, h }, { x: cx - w / 2, y: cy + 3, w, h }, { x: cx - w / 2, y: cy - h - 8, w, h }, { x: cx - w / 2, y: cy + 9, w, h }]
-        : [{ x: cx + 6, y: cy - h / 2, w, h }, { x: cx - w - 6, y: cy - h / 2, w, h }, { x: cx + 11, y: cy - h / 2, w, h }, { x: cx - w - 11, y: cy - h / 2, w, h }];
+        ? [{ x: cx - w / 2, y: cy - h - EL.nearAbove, w, h }, { x: cx - w / 2, y: cy + EL.nearBelow, w, h }, { x: cx - w / 2, y: cy - h - EL.farAbove, w, h }, { x: cx - w / 2, y: cy + EL.farBelow, w, h }]
+        : [{ x: cx + EL.nearSide, y: cy - h / 2, w, h }, { x: cx - w - EL.nearSide, y: cy - h / 2, w, h }, { x: cx + EL.farSide, y: cy - h / 2, w, h }, { x: cx - w - EL.farSide, y: cy - h / 2, w, h }];
       candidates.forEach((rect, k) => {
         const side = k % 2, far = k >= 2 ? 12 : 0;
         let score = Math.abs(t - 0.5) * 10 + (s.len < w ? 50 : 0) + segments.indexOf(s) * 5 + side * 3 + far + (horizontal ? 0 : 14);
@@ -91,7 +93,7 @@ export function placeLabel(text: string, points: readonly Point[], obstacles: re
     const horizontal = s.a.y === s.b.y;
     const cx = (s.a.x + s.b.x) / 2;
     const cy = (s.a.y + s.b.y) / 2;
-    for (let d = 16; d <= 200 && bestScore >= 700; d += 12) {
+    for (let d = EL.nudgeStart; d <= EL.nudgeMax && bestScore >= 700; d += EL.nudgeStep) {
       const tries: Rect[] = horizontal ? [{ x: cx - w / 2, y: cy - h - d, w, h }, { x: cx - w / 2, y: cy + d, w, h }] : [{ x: cx + d, y: cy - h / 2, w, h }, { x: cx - w - d, y: cy - h / 2, w, h }];
       for (const rect of tries) {
         let score = 200 + d;

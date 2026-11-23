@@ -10,6 +10,9 @@ import { rectsOverlap, segmentCrossesRect, union, inflate } from './geometry.ts'
 import type { LayoutStyle } from './style.ts';
 import type { Extra, LayoutBox, LayoutEdge, LegendItem, TextBlock } from './types.ts';
 import { textWidth, wrapText } from './text/measure.ts';
+import { RULES } from './style.ts';
+
+const NT = RULES.notes, B = RULES.badges, O = RULES.overlay, P = RULES.prose, LGD = RULES.legend;
 
 export interface NoteRequest {
   readonly id: string;
@@ -55,9 +58,9 @@ export function placeNotes(notes: readonly NoteRequest[], boxes: readonly Layout
     const target = byId.get(n.at);
     if (!target) continue;
     const wrapped = wrapText(n.text, style.factSize, 'regular', style.noteWidth, 8);
-    const pad = n.kind === 'note' ? 10 : 6;
+    const pad = n.kind === 'note' ? NT.pad : NT.captionPad;
     const w = Math.ceil(wrapped.width + pad * 2), h = Math.ceil(wrapped.height + pad * 2);
-    const gap = n.kind === 'note' ? 10 : 22;
+    const gap = n.kind === 'note' ? NT.gap : NT.captionGap;
     const up = ancestors(n.at);
     const order = n.side ? [n.side, ...SIDES.filter((s) => s !== n.side)] : SIDES;
     let best: Rect | undefined, bestScore = Infinity;
@@ -65,13 +68,13 @@ export function placeNotes(notes: readonly NoteRequest[], boxes: readonly Layout
       for (const t of [0.5, 0.25, 0.75, 0, 1]) {
         const r = candidate(target, side, t, w, h, gap);
         let score = pref * 10 + Math.abs(t - 0.5) * 6;
-        for (const l of leaves) if (l.id !== target.id && rectsOverlap(r, l, 4)) score += 100;
+        for (const l of leaves) if (l.id !== target.id && rectsOverlap(r, l, NT.clearance)) score += 100;
         for (const c of containers) {
           if (!up.has(c.id) && c.id !== target.id && rectsOverlap(r, c, 0)) score += 30;
           // Inside an ancestor, the title bar is still off limits.
           if (up.has(c.id) && rectsOverlap(r, { x: c.x, y: c.y, w: c.w, h: style.containerHeader }, 0)) score += 40;
         }
-        for (const p of placed) if (rectsOverlap(r, p, 4)) score += 80;
+        for (const p of placed) if (rectsOverlap(r, p, NT.clearance)) score += 80;
         // A note on an arrow's direct path makes the arrow detour around it; another side is better.
         const clear = inflate(r, style.edgeMargin);
         for (const a of arrows) if (a.some((q, i) => i > 0 && segmentCrossesRect(a[i - 1]!, q, clear))) score += 60;
@@ -120,8 +123,8 @@ export function highlightExtras(view: ResolvedRelationView, boxes: readonly Layo
   return view.highlights.flatMap((h, i) => {
     const members = h.nodes.map((id) => byId.get(id)).filter((b): b is LayoutBox => b !== undefined);
     if (!members.length) return [];
-    const rect = inflate(union(members), 8);
-    const label: TextBlock | undefined = h.label ? { lines: [h.label], size: style.subtitleSize, weight: 'medium', x: rect.x + 8, y: rect.y - style.subtitleSize - 4, lineHeight: style.subtitleSize * 1.25, anchor: 'start' } : undefined;
+    const rect = inflate(union(members), O.setPad);
+    const label: TextBlock | undefined = h.label ? { lines: [h.label], size: style.subtitleSize, weight: 'medium', x: rect.x + O.setPad, y: rect.y - style.subtitleSize - O.setLabelRise, lineHeight: style.subtitleSize * 1.25, anchor: 'start' } : undefined;
     return [{ kind: 'highlight', id: `hl-${i}`, rect, ...(label ? { label } : {}), color: h.color ?? 'red', style: h.style ?? 'frame' }];
   });
 }
@@ -183,7 +186,7 @@ function labelFractions(points: readonly Point[], label: Rect, r: number): numbe
   }
   if (!total) return [];
   // Just past either end of the label first, then further along the same run, never past its corners.
-  const reach = (label.w > label.h ? label.w : label.h) / 2 + r + 6;
+  const reach = (label.w > label.h ? label.w : label.h) / 2 + r + B.labelClear;
   let start = 0, end = total, walked2 = 0;
   for (let i = 0; i + 1 < points.length; i++) {
     const len = Math.abs(points[i + 1]!.x - points[i]!.x) + Math.abs(points[i + 1]!.y - points[i]!.y);
@@ -191,7 +194,7 @@ function labelFractions(points: readonly Point[], label: Rect, r: number): numbe
     walked2 += len;
   }
   const out: number[] = [];
-  for (let k = 0; k < 6; k++) for (const d of [-(reach + k * 14), reach + k * 14]) if (at + d > start + r && at + d < end - r) out.push((at + d) / total);
+  for (let k = 0; k < 6; k++) for (const d of [-(reach + k * B.step), reach + k * B.step]) if (at + d > start + r && at + d < end - r) out.push((at + d) / total);
   return out.filter((f) => f > 0.02 && f < 0.98);
 }
 
@@ -218,8 +221,8 @@ function alongEdge(points: readonly Point[], t: number, avoid: readonly Rect[], 
   };
   for (const f of [...preferred, t, t - 0.08, t + 0.08, t - 0.16, t + 0.16, t - 0.24, t + 0.24, t - 0.32, t + 0.32]) {
     const p = at(Math.max(0.04, Math.min(0.96, f)));
-    const disc = { x: p.x - r - 3, y: p.y - r - 3, w: 2 * r + 6, h: 2 * r + 6 };
-    if (!avoid.some((a) => rectsOverlap(disc, a, 6)) && !lines.some((l) => segmentCrossesRect(l.a, l.b, disc))) return p;
+    const disc = { x: p.x - r - B.discPad, y: p.y - r - B.discPad, w: 2 * r + B.discPad * 2, h: 2 * r + B.discPad * 2 };
+    if (!avoid.some((a) => rectsOverlap(disc, a, B.clearance)) && !lines.some((l) => segmentCrossesRect(l.a, l.b, disc))) return p;
   }
   // No spot clear of other lines: settle for one clear of labels and badges.
   for (const f of [t, t - 0.08, t + 0.08, t - 0.16, t + 0.16, t - 0.24, t + 0.24, t - 0.32, t + 0.32]) {
@@ -240,13 +243,13 @@ export interface Footer {
 export function footer(view: ResolvedRelationView, edges: readonly LayoutEdge[], width: number, top: number, style: LayoutStyle): Footer {
   const extras: Extra[] = [];
   const x = style.canvasPad;
-  const maxW = Math.max(240, Math.min(style.proseWidth, width - style.canvasPad * 2));
+  const maxW = Math.max(P.minWidth, Math.min(style.proseWidth, width - style.canvasPad * 2));
   let y = top;
   let right = 0;
   const para = (text: string, role: 'heading' | 'prose', id: string, color?: string): void => {
     const size = role === 'heading' ? style.headingSize : style.proseSize;
     const w = wrapText(text, size, role === 'heading' ? 'semibold' : 'regular', maxW, 40, 1.45);
-    y += role === 'heading' ? 14 : 6;
+    y += role === 'heading' ? P.headingTop : P.paragraphGap;
     extras.push({ kind: 'text', id, role, text: { lines: w.lines, size, weight: role === 'heading' ? 'semibold' : 'regular', x, y, lineHeight: w.lineHeight, anchor: 'start' }, ...(color ? { color } : {}) });
     right = Math.max(right, x + w.width);
     y += w.height;
@@ -258,14 +261,14 @@ export function footer(view: ResolvedRelationView, edges: readonly LayoutEdge[],
   if (view.narrative) {
     for (const p of view.paths) {
       if (p.title) para(p.title, 'heading', `narr-${p.id}`, p.color);
-      else y += 8;
+      else y += P.pathGap;
       for (const s of p.steps) {
         if (s.text === undefined) continue;
-        y += 6;
-        const w = wrapText(s.text, style.proseSize, 'regular', maxW - 28, 6, 1.45);
+        y += P.paragraphGap;
+        const w = wrapText(s.text, style.proseSize, 'regular', maxW - P.badgeColumn, 6, 1.45);
         extras.push({ kind: 'badge', id: `narr-${p.id}-${s.badge}`, at: { x: x + style.badgeRadius, y: y + style.proseSize * 0.62 }, text: s.badge, color: p.color });
-        extras.push({ kind: 'text', id: `narr-${p.id}-${s.badge}-text`, role: 'prose', text: { lines: w.lines, size: style.proseSize, weight: 'regular', x: x + 28, y, lineHeight: w.lineHeight, anchor: 'start' } });
-        right = Math.max(right, x + 28 + w.width);
+        extras.push({ kind: 'text', id: `narr-${p.id}-${s.badge}-text`, role: 'prose', text: { lines: w.lines, size: style.proseSize, weight: 'regular', x: x + P.badgeColumn, y, lineHeight: w.lineHeight, anchor: 'start' } });
+        right = Math.max(right, x + P.badgeColumn + w.width);
         y += w.height;
       }
     }
@@ -276,10 +279,10 @@ export function footer(view: ResolvedRelationView, edges: readonly LayoutEdge[],
     const items = auto ? kindItems(edges) : legendItems(view, edges);
     if (items.length) {
       // Columns as wide as the longest entry (swatch, gap, text, and room), as many as fit across the picture.
-      const colW = Math.max(150, ...items.map((it) => 36 + textWidth(it.label, style.legendTextSize, 'regular') + 18));
-      const cols = Math.max(1, Math.min(3, items.length, Math.floor((width - 2 * x - 16) / colW)));
+      const colW = Math.max(LGD.minColumn, ...items.map((it) => LGD.swatch + textWidth(it.label, style.legendTextSize, 'regular') + LGD.room));
+      const cols = Math.max(1, Math.min(LGD.maxColumns, items.length, Math.floor((width - 2 * x - LGD.inset) / colW)));
       const rows = Math.ceil(items.length / cols);
-      const rect: Rect = { x, y: y + 14, w: cols * colW + 16, h: rows * 20 + 16 };
+      const rect: Rect = { x, y: y + LGD.top, w: cols * colW + LGD.inset, h: rows * LGD.row + LGD.inset };
       extras.push({ kind: 'legend', id: 'legend', rect, items, cols });
       right = Math.max(right, rect.x + rect.w);
       y = rect.y + rect.h;

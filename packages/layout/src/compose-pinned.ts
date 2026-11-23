@@ -13,6 +13,7 @@ import { containerHeader, sizeLeaf, sizeLeafFixed, type Sized } from './compose-
 import { arrangeGrid } from './arrange/grid.ts';
 import type { ComposeResult } from './compose.ts';
 import type { VisibleSet } from './visible.ts';
+import { RULES } from './style.ts';
 
 interface Placed {
   readonly id: string;
@@ -104,7 +105,7 @@ export function composePinned(model: Model, view: ResolvedRelationView, visible:
     if (rects.has(r)) continue;
     const size = sizeOf(r);
     const anchors = [...(related.get(r) ?? [])].map((x) => rects.get(x)?.rect).filter((x): x is Rect => x !== undefined);
-    const canvas: Rect = placedRoots.length ? inflate(union(placedRoots), 400) : { x: style.canvasPad, y: style.canvasPad, w: 4000, h: 4000 };
+    const canvas: Rect = placedRoots.length ? inflate(union(placedRoots), RULES.pinned.canvasMargin) : { x: style.canvasPad, y: style.canvasPad, w: RULES.pinned.emptyCanvas, h: RULES.pinned.emptyCanvas };
     const rect = freeSpot(size, canvas, placedRoots, anchors, style.layerGap);
     rects.set(r, { id: r, rect, pinned: false });
     placedRoots.push(rect);
@@ -150,7 +151,7 @@ export function freeSpot(size: Size, area: Rect, taken: readonly Rect[], anchors
     candidates.push({ x: a.x - gap - size.w, y: a.y, ...size });
     candidates.push({ x: a.x, y: a.y - gap - size.h, ...size });
   }
-  const step = Math.max(24, gap);
+  const step = Math.max(RULES.pinned.searchStep, gap);
   for (let y = area.y; y + size.h <= area.y + area.h + step; y += step) for (let x = area.x; x + size.w <= area.x + area.w + step; x += step) candidates.push({ x, y, ...size });
   const cx = anchors.length ? anchors.reduce((s, a) => s + a.x + a.w / 2, 0) / anchors.length : area.x;
   const cy = anchors.length ? anchors.reduce((s, a) => s + a.y + a.h / 2, 0) / anchors.length : area.y;
@@ -158,7 +159,7 @@ export function freeSpot(size: Size, area: Rect, taken: readonly Rect[], anchors
   for (const c of candidates) {
     if (taken.some((t) => rectsOverlap(c, t, gap - 1))) continue;
     const inside = c.x >= area.x && c.y >= area.y && c.x + c.w <= area.x + area.w && c.y + c.h <= area.y + area.h;
-    const d = Math.hypot(c.x + c.w / 2 - cx, c.y + c.h / 2 - cy) + (inside ? 0 : 600);
+    const d = Math.hypot(c.x + c.w / 2 - cx, c.y + c.h / 2 - cy) + (inside ? 0 : RULES.pinned.outsideCost);
     if (d < bestScore) {
       bestScore = d;
       best = c;

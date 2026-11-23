@@ -11,6 +11,8 @@ import { textWidth } from './text/measure.ts';
 import { chipWidth, RULES } from './style.ts';
 import type { Extra, LayoutBox, LayoutEdge } from './types.ts';
 
+const LEG = RULES.legibility;
+
 export interface Legibility {
   /** Labels farther than LABEL_REACH from their own line, or as near another edge's line as their own. */
   readonly labelDrift: number;
@@ -83,10 +85,10 @@ export function onFrame(r: Rect, c: Rect, slack = 1): boolean {
 }
 
 function sideOf(p: Point, b: Rect): string | undefined {
-  if (Math.abs(p.x - b.x) < 1.5) return 'left';
-  if (Math.abs(p.x - b.x - b.w) < 1.5) return 'right';
-  if (Math.abs(p.y - b.y) < 1.5) return 'top';
-  if (Math.abs(p.y - b.y - b.h) < 1.5) return 'bottom';
+  if (Math.abs(p.x - b.x) < LEG.onSide) return 'left';
+  if (Math.abs(p.x - b.x - b.w) < LEG.onSide) return 'right';
+  if (Math.abs(p.y - b.y) < LEG.onSide) return 'top';
+  if (Math.abs(p.y - b.y - b.h) < LEG.onSide) return 'bottom';
   return undefined;
 }
 
@@ -109,12 +111,12 @@ export function headerText(b: LayoutBox): (Rect & { id: string })[] {
     y1 = Math.max(y1, t.y + t.lines.length * t.lineHeight);
   }
   if (!Number.isFinite(x0)) return [];
-  const pad = 4;
+  const pad = LEG.headerPad;
   const text = { id: `${b.id}#header`, x: b.x + x0 - pad, y: b.y + y0 - pad, w: x1 - x0 + pad * 2, h: y1 - y0 + pad * 2 };
   // The count chip ("+3 more") sits at the header's right end.
   if (!b.badge) return [text];
   const w = chipWidth(b.badge);
-  return [text, { id: `${b.id}#chip`, x: b.x + b.w - 10 - w - pad, y: b.y + 9 - pad, w: w + pad * 2, h: 18 + pad * 2 }];
+  return [text, { id: `${b.id}#chip`, x: b.x + b.w - LEG.chipInset - w - pad, y: b.y + LEG.chipTop - pad, w: w + pad * 2, h: RULES.chip.height + pad * 2 }];
 }
 
 export function measureLegibility(boxes: readonly LayoutBox[], edges: readonly LayoutEdge[], extras: readonly Extra[] = []): Legibility {
@@ -152,7 +154,7 @@ export function measureLegibility(boxes: readonly LayoutBox[], edges: readonly L
       const [t0, t1] = t.h ? [Math.min(t.a.x, t.b.x), Math.max(t.a.x, t.b.x)] : [Math.min(t.a.y, t.b.y), Math.max(t.a.y, t.b.y)];
       const along = Math.min(s1, t1) - Math.max(s0, t0);
       if (gap < 1 && along > SHARED) sharedRuns++;
-      else if (gap >= 1 && along > 24) hugging++;
+      else if (gap >= 1 && along > LEG.hugRun) hugging++;
     }
   }
 
@@ -166,7 +168,7 @@ export function measureLegibility(boxes: readonly LayoutBox[], edges: readonly L
       if (!lines.some((l) => Math.abs(l - at) < BORDER)) continue;
       const [s0, s1] = s.h ? [Math.min(s.a.x, s.b.x), Math.max(s.a.x, s.b.x)] : [Math.min(s.a.y, s.b.y), Math.max(s.a.y, s.b.y)];
       const [b0, b1] = s.h ? [b.x, b.x + b.w] : [b.y, b.y + b.h];
-      if (Math.min(s1, b1) - Math.max(s0, b0) > 30) borderRuns++;
+      if (Math.min(s1, b1) - Math.max(s0, b0) > LEG.borderRun) borderRuns++;
     }
   }
   let frameRuns = 0;
@@ -194,7 +196,7 @@ export function measureLegibility(boxes: readonly LayoutBox[], edges: readonly L
     return at.some((a, i) => at.some((b, j) => j > i && Math.abs(a[0] - b[0]) + Math.abs(a[1] - b[1]) < CROWD));
   }).length;
 
-  const badgeRects = extras.flatMap((x) => (x.kind === 'badge' ? [{ x: x.at.x - 10, y: x.at.y - 10, w: 20, h: 20 }] : []));
+  const badgeRects = extras.flatMap((x) => (x.kind === 'badge' ? [{ x: x.at.x - LEG.badgeHalf, y: x.at.y - LEG.badgeHalf, w: LEG.badgeHalf * 2, h: LEG.badgeHalf * 2 }] : []));
   const labels = edges.flatMap((e) => (e.label ? [e.label] : []));
   let badgeOverlaps = 0;
   badgeRects.forEach((r, i) => {
@@ -211,7 +213,7 @@ export function measureLegibility(boxes: readonly LayoutBox[], edges: readonly L
     if (!a || !z || e.from === e.to) continue;
     const direct = Math.abs(a.x - z.x) + Math.abs(a.y - z.y);
     const len = pathLength(e.points);
-    if (len > 320 && len > direct * DETOUR) detours++;
+    if (len > LEG.detourMin && len > direct * DETOUR) detours++;
   }
   const headers = boxes.flatMap((b) => (b.kind === 'container' ? headerText(b) : []));
   let throughText = 0;

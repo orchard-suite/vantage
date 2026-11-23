@@ -17,6 +17,8 @@ import { shiftLayout } from './shift.ts';
 import { rectsOverlap, segmentCrossesRect, segmentsCross, type Point, type Rect } from './geometry.ts';
 import { applyPaths, collectNotes, footer, highlightExtras, placeNotes } from './story.ts';
 
+const RL = RULES.relation, EL = RULES.edgeLabel, CH = RULES.chip;
+
 interface Bundle {
   readonly id: string;
   readonly from: string;
@@ -256,7 +258,7 @@ export function layoutRelationView(baseModel: Model, authored: ResolvedRelationV
     const old = routed.get(id)!;
     const direct = Math.abs(req.from.x - req.to.x) + Math.abs(req.from.y - req.to.y);
     // Also a route that winds (four bends or more) and runs well past the distance it covers, to reach a box it could meet more simply from another side.
-    if (lengthOf(old) <= Math.max(320, direct * DETOUR) && (old.length < 6 || lengthOf(old) < direct * 1.4)) continue;
+    if (lengthOf(old) <= Math.max(RULES.legibility.detourMin, direct * DETOUR) && (old.length < 6 || lengthOf(old) < direct * 1.4)) continue;
     const b = bundles.find((x) => x.id === id)!;
     const target = byId.get(b.to)!;
     let best = old, bestLen = lengthOf(old), bestConflicts = conflictsOf(id, old);
@@ -273,7 +275,7 @@ export function layoutRelationView(baseModel: Model, authored: ResolvedRelationV
       const len = lengthOf(next), c = conflictsOf(id, next);
       // A route the router could not find comes back as a straight line through whatever is in the way: never take it.
       // The new port must keep clear of every other line's end, or arrowheads pile up.
-      const crowded = [...routed.entries()].some(([k, pts]) => k !== id && [pts[0]!, pts[pts.length - 1]!].some((q) => Math.abs(q.x - to.x) + Math.abs(q.y - to.y) < 16));
+      const crowded = [...routed.entries()].some(([k, pts]) => k !== id && [pts[0]!, pts[pts.length - 1]!].some((q) => Math.abs(q.x - to.x) + Math.abs(q.y - to.y) < RL.crowdedEnd));
       const bad = crowded || frameCrossings(next) > frameCrossings(old) || next.slice(1).some((q, i) => {
         const p0 = next[i]!;
         if (p0.x !== q.x && p0.y !== q.y) return true;
@@ -297,7 +299,7 @@ export function layoutRelationView(baseModel: Model, authored: ResolvedRelationV
   for (const [id, pts] of straight) routed.set(id, pts);
   // Two relations on one line read as one stroke: slide an inner run of the later one a lane aside.
   separate(routed, new Map([...routedBy].map(([id, req]) => [id, req.transparent])), leaves);
-  for (const b of loops) routed.set(b.id, selfLoop(byId.get(b.from)!, style.edgeMargin + 6));
+  for (const b of loops) routed.set(b.id, selfLoop(byId.get(b.from)!, style.edgeMargin + RL.loopMargin));
   // Labels are placed after every route is known so they can avoid other edges too.
   const segmentsExcept = (id: string): Segment[] =>
     [...routed.entries()].filter(([k]) => k !== id).flatMap(([, pts]) => pts.slice(1).map((p, i) => ({ a: pts[i]!, b: p })));
@@ -312,7 +314,7 @@ export function layoutRelationView(baseModel: Model, authored: ResolvedRelationV
     const others = edges.filter((o) => o !== e && o.label).map((o) => o.label!);
     const collides = others.some((o) => rectsOverlap(e.label!, o, 2)) || leafRects.some((r) => rectsOverlap(e.label!, r));
     if (!collides) continue;
-    const label = placeLabel(e.label.text, e.points, leafRects, others, { size: style.labelSize, pad: style.labelPad, maxWidth: 160 }, segmentsExcept(e.id), frameRects);
+    const label = placeLabel(e.label.text, e.points, leafRects, others, { size: style.labelSize, pad: style.labelPad, maxWidth: EL.maxWidth }, segmentsExcept(e.id), frameRects);
     edges[i] = { ...e, label };
   }
   // Last pass: a label still as near another line as its own is moved, whole route open, if that leaves it unambiguous and colliding with nothing.
@@ -325,7 +327,7 @@ export function layoutRelationView(baseModel: Model, authored: ResolvedRelationV
     const crossed = (r: Rect): boolean => edges.some((o) => o.id !== e.id && o.points.slice(1).some((q, k) => segmentCrossesRect(o.points[k]!, q, r)));
     if (!e.label || (!ambiguous(e.label, e.id) && !crossed(e.label))) continue;
     const others = edges.filter((o) => o !== e && o.label).map((o) => o.label!);
-    const label = placeLabel(e.label.text, e.points, leafRects, others, { size: style.labelSize, pad: style.labelPad, maxWidth: 160 }, segmentsExcept(e.id), frameRects);
+    const label = placeLabel(e.label.text, e.points, leafRects, others, { size: style.labelSize, pad: style.labelPad, maxWidth: EL.maxWidth }, segmentsExcept(e.id), frameRects);
     const clean = !others.some((o) => rectsOverlap(label, o, 2)) && !leafRects.some((r) => rectsOverlap(label, r));
     const better = (!ambiguous(label, e.id) || ambiguous(e.label, e.id)) && (!crossed(label) || crossed(e.label));
     if (clean && better && (label.x !== e.label.x || label.y !== e.label.y)) edges[i] = { ...e, label };
@@ -359,7 +361,7 @@ export function layoutRelationView(baseModel: Model, authored: ResolvedRelationV
 function leafChip(b: LayoutBox): (Rect & { id: string })[] {
   if (!b.badge || b.kind === 'container') return [];
   const w = chipWidth(b.badge);
-  return [{ id: `${b.id}#chip`, x: b.x + b.w + 6 - w, y: b.y - 9, w, h: 18 }];
+  return [{ id: `${b.id}#chip`, x: b.x + b.w + CH.overhang - w, y: b.y - CH.rise, w, h: CH.height }];
 }
 
 /** An edge lifted to a container leaves it opposite the boxes it stands for: the middle of its members at that end. */
@@ -376,20 +378,20 @@ function focusOf(b: Bundle, byId: ReadonlyMap<string, LayoutBox>): { fromFocus?:
 
 /** How far the count chip ("3 inside") on a leaf's top-right corner reaches back along its top side; it hangs 6 pixels past the corner. */
 function chips(from: LayoutBox, to: LayoutBox): { fromChip?: number; toChip?: number } {
-  const w = (b: LayoutBox): number | undefined => (b.badge && b.kind !== 'container' ? chipWidth(b.badge) - 6 : undefined);
+  const w = (b: LayoutBox): number | undefined => (b.badge && b.kind !== 'container' ? chipWidth(b.badge) - CH.overhang : undefined);
   const f = w(from), t = w(to);
   return { ...(f ? { fromChip: f } : {}), ...(t ? { toChip: t } : {}) };
 }
 
 /** A container's header band: title, subtitle, and facts, however many lines they wrap to. A label must not cover it. */
 export function containerHeaderBand(b: LayoutBox, style: LayoutStyle): Rect {
-  return { x: b.x, y: b.y, w: b.w, h: b.inner ? Math.max(style.containerHeader, b.inner.y - b.y - 4) : style.containerHeader };
+  return { x: b.x, y: b.y, w: b.w, h: b.inner ? Math.max(style.containerHeader, b.inner.y - b.y - RULES.container.headerInset) : style.containerHeader };
 }
 
 /** A drawn container's four frame lines as thin strips: a label on one hides only a line, so it is a softer miss than covering words. */
 export function frameLines(b: LayoutBox): Rect[] {
   if (b.frame === 'none') return [];
-  const t = 3;
+  const t = RL.frameStrip;
   return [{ x: b.x - t, y: b.y - t, w: b.w + t * 2, h: t * 2 }, { x: b.x - t, y: b.y + b.h - t, w: b.w + t * 2, h: t * 2 }, { x: b.x - t, y: b.y - t, w: t * 2, h: b.h + t * 2 }, { x: b.x + b.w - t, y: b.y - t, w: t * 2, h: b.h + t * 2 }];
 }
 
@@ -404,7 +406,7 @@ function makeEdge(b: Bundle, points: Point[], reversed: Set<string>, leafRects: 
   const first = b.hops[0]!;
   const rel: ModelRelation = first.relation;
   const labelText = bundleLabel(b.hops);
-  const label = labelText ? placeLabel(labelText, points, leafRects, labelRects, { size: style.labelSize, pad: style.labelPad, maxWidth: 160 }, others, frameRects) : undefined;
+  const label = labelText ? placeLabel(labelText, points, leafRects, labelRects, { size: style.labelSize, pad: style.labelPad, maxWidth: EL.maxWidth }, others, frameRects) : undefined;
   if (label) labelRects.push(label);
   const kinds = new Set(b.hops.map((h) => h.relation.kind));
   return {

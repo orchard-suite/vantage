@@ -8,6 +8,9 @@ import type { Rect, Size } from './geometry.ts';
 import type { LayoutStyle } from './style.ts';
 import type { LayoutBox, TextBlock } from './types.ts';
 import { textWidth, wrapText, type WrappedText } from './text/measure.ts';
+import { RULES } from './style.ts';
+
+const N = RULES.node, C = RULES.container;
 
 export interface Sized {
   readonly id: string;
@@ -45,14 +48,14 @@ function detailBlocks(node: ModelNode, maxText: number, x: number, y: number, an
   const blocks: TextBlock[] = [];
   let width = 0, cy = y;
   const push = (text: string, weight: TextBlock['weight']): void => {
-    const w = wrapText(text, style.factSize, weight, Math.max(maxText, 140), 3);
+    const w = wrapText(text, style.factSize, weight, Math.max(maxText, N.factWrapMin), 3);
     blocks.push(block(w, style.factSize, weight, x, cy, anchor));
     width = Math.max(width, w.width);
     cy += w.height + 1;
   };
-  if (node.facts.length) cy += 4;
+  if (node.facts.length) cy += N.blockGap;
   for (const f of node.facts) push(f.label ? `${f.label}: ${f.value}` : f.value, 'medium');
-  if (node.bullets.length) cy += 4;
+  if (node.bullets.length) cy += N.blockGap;
   for (const b of node.bullets) push(`• ${b}`, 'regular');
   return { blocks, width, height: cy - y };
 }
@@ -107,18 +110,18 @@ function fittedText(node: ModelNode, maxText: number, nameSize: number, style: L
   const fits = (m: number): boolean =>
     !cut(wrapText(node.name, nameSize, 'semibold', m, 2)) &&
     !(node.subtitle && cut(wrapText(node.subtitle, style.subtitleSize, 'regular', m, 2))) &&
-    !node.facts.some((f) => cut(wrapText(f.label ? `${f.label}: ${f.value}` : f.value, style.factSize, 'medium', Math.max(m, 140), 3))) &&
-    !node.bullets.some((b) => cut(wrapText(`• ${b}`, style.factSize, 'regular', Math.max(m, 140), 3)));
-  for (let m = maxText; m <= maxText * 2; m += 20) if (fits(m)) return m;
+    !node.facts.some((f) => cut(wrapText(f.label ? `${f.label}: ${f.value}` : f.value, style.factSize, 'medium', Math.max(m, N.factWrapMin), 3))) &&
+    !node.bullets.some((b) => cut(wrapText(`• ${b}`, style.factSize, 'regular', Math.max(m, N.factWrapMin), 3)));
+  for (let m = maxText; m <= maxText * 2; m += N.widthStep) if (fits(m)) return m;
   return maxText * 2;
 }
 
 function sizeLeafPlain(node: ModelNode, kind: 'leaf' | 'collapsed', hidden: number, style: LayoutStyle): Sized {
-  const scaled = node.typeName === 'text' ? { ...scaleFor(node, style), maxText: 340, minWidth: 0 } : scaleFor(node, style);
+  const scaled = node.typeName === 'text' ? { ...scaleFor(node, style), maxText: N.textMaxText, minWidth: 0 } : scaleFor(node, style);
   const sc = node.typeName === 'text' ? scaled : { ...scaled, maxText: fittedText(node, scaled.maxText, scaled.name, style) };
   const badge = kind === 'collapsed' ? `${hidden} inside` : node.count !== undefined ? `x${node.count}` : undefined;
   const hasIcon = node.icon !== undefined;
-  const name = wrapText(node.name, sc.name, node.typeName === 'text' ? 'regular' : 'semibold', sc.maxText, node.typeName === 'text' ? 8 : 2);
+  const name = wrapText(node.name, sc.name, node.typeName === 'text' ? 'regular' : 'semibold', sc.maxText, node.typeName === 'text' ? N.textMaxLines : 2);
   const subtitle = node.subtitle ? wrapText(node.subtitle, style.subtitleSize, 'regular', sc.maxText, 2) : undefined;
   const base = { id: node.id, kind, depth: node.depth, node, shape: node.shape, frame: node.style.frame ?? (node.style.dashed ? 'dashed' : 'box'), ...(badge ? { badge } : {}) } as const;
 
@@ -127,8 +130,8 @@ function sizeLeafPlain(node: ModelNode, kind: 'leaf' | 'collapsed', hidden: numb
     const img = node.imageSize;
     const textW = Math.max(name.width, subtitle?.width ?? 0);
     const w = Math.ceil(Math.max(img.w, textW) + sc.padX * 2);
-    const h = Math.ceil(sc.padY * 2 + img.h + 6 + name.height + (subtitle ? subtitle.height + 2 : 0));
-    const y = sc.padY + img.h + 6;
+    const h = Math.ceil(sc.padY * 2 + img.h + N.iconGap + name.height + (subtitle ? subtitle.height + 2 : 0));
+    const y = sc.padY + img.h + N.iconGap;
     const box: Sized['box'] = { ...base, w, h, iconOnly: true, name: block(name, sc.name, 'semibold', w / 2, y, 'middle'), ...(subtitle ? { subtitle: block(subtitle, style.subtitleSize, 'regular', w / 2, y + name.height + 2, 'middle') } : {}), image: { href: node.image, x: (w - img.w) / 2, y: sc.padY, w: img.w, h: img.h } };
     return { id: node.id, size: { w, h }, children: [], box };
   }
@@ -137,8 +140,8 @@ function sizeLeafPlain(node: ModelNode, kind: 'leaf' | 'collapsed', hidden: numb
     // A big icon with its caption under it and no shape: the inventory look.
     const details = detailBlocks(node, sc.maxText, 0, 0, 'middle', style);
     const textW = Math.max(name.width, subtitle?.width ?? 0, details.width);
-    const w = Math.ceil(Math.max(sc.icon + 16, textW + sc.padX * 2));
-    const iconH = hasIcon ? sc.icon + 6 : 0;
+    const w = Math.ceil(Math.max(sc.icon + N.iconRoom, textW + sc.padX * 2));
+    const iconH = hasIcon ? sc.icon + N.iconGap : 0;
     const h = Math.ceil(sc.padY * 2 + iconH + name.height + (subtitle ? subtitle.height + 2 : 0) + details.height);
     let y = sc.padY + iconH;
     const nameB = block(name, sc.name, 'semibold', w / 2, y, 'middle');
@@ -152,15 +155,15 @@ function sizeLeafPlain(node: ModelNode, kind: 'leaf' | 'collapsed', hidden: numb
 
   if (node.value !== undefined) {
     // A sticky with one big figure: value on top, name as its caption, details under.
-    const value = wrapText(node.value, style.valueSize, 'semibold', 220, 2);
+    const value = wrapText(node.value, style.valueSize, 'semibold', N.valueWrap, 2);
     const details = detailBlocks(node, sc.maxText, 0, 0, 'middle', style);
     const textW = Math.max(value.width, name.width, subtitle?.width ?? 0, details.width);
-    const w = Math.ceil(Math.max(sc.minWidth, textW + sc.padX * 2 + (hasIcon ? sc.icon + 8 : 0)));
-    const h = Math.ceil(sc.padY * 2 + value.height + 4 + name.height + (subtitle ? subtitle.height + 2 : 0) + details.height);
-    const cx = w / 2 + (hasIcon ? (sc.icon + 8) / 2 : 0);
+    const w = Math.ceil(Math.max(sc.minWidth, textW + sc.padX * 2 + (hasIcon ? sc.icon + N.iconTextGap : 0)));
+    const h = Math.ceil(sc.padY * 2 + value.height + N.blockGap + name.height + (subtitle ? subtitle.height + 2 : 0) + details.height);
+    const cx = w / 2 + (hasIcon ? (sc.icon + N.iconTextGap) / 2 : 0);
     let y = sc.padY;
     const texts: TextBlock[] = [block(value, style.valueSize, 'semibold', cx, y, 'middle')];
-    y += value.height + 4;
+    y += value.height + N.blockGap;
     const nameB = block(name, sc.name, 'semibold', cx, y, 'middle');
     y += name.height + 2;
     const subB = subtitle ? block(subtitle, style.subtitleSize, 'regular', cx, y, 'middle') : undefined;
@@ -173,11 +176,11 @@ function sizeLeafPlain(node: ModelNode, kind: 'leaf' | 'collapsed', hidden: numb
   const details = detailBlocks(node, sc.maxText, 0, 0, 'start', style);
   const textW = Math.max(name.width, subtitle?.width ?? 0, details.width);
   const textH = name.height + (subtitle ? subtitle.height + 2 : 0) + details.height;
-  const iconW = hasIcon ? sc.icon + 10 : 0;
+  const iconW = hasIcon ? sc.icon + N.sideIconGap : 0;
   const w = Math.max(sc.minWidth, Math.ceil(sc.padX * 2 + iconW + textW));
-  const h = Math.ceil(Math.max(hasIcon ? sc.icon : 0, textH) + sc.padY * 2 + (node.shape === 'cylinder' ? 10 : 0));
+  const h = Math.ceil(Math.max(hasIcon ? sc.icon : 0, textH) + sc.padY * 2 + (node.shape === 'cylinder' ? N.cylinderLip : 0));
   const textX = sc.padX + iconW;
-  const top = (h - textH) / 2 + (node.shape === 'cylinder' ? 5 : 0);
+  const top = (h - textH) / 2 + (node.shape === 'cylinder' ? N.cylinderLip / 2 : 0);
   const det = detailBlocks(node, sc.maxText, textX, top + name.height + (subtitle ? subtitle.height + 2 : 0), 'start', style);
   const box: Sized['box'] = {
     ...base,
@@ -209,22 +212,22 @@ export function containerHeader(node: ModelNode, hidden: number, outline: boolea
   const nameW = textWidth(node.name, style.containerNameSize, 'semibold');
   const subW = node.subtitle ? textWidth(node.subtitle, style.subtitleSize, 'regular') : 0;
   const badge = hidden > 0 ? `+${hidden} more` : node.count !== undefined ? `x${node.count}` : undefined;
-  const badgeW = badge ? textWidth(badge, style.subtitleSize, 'medium') + 16 : 0;
-  const pad = frame === 'none' ? (outline ? 0 : 6) : style.containerPad;
-  const textX = pad + (hasIcon ? style.containerIconSize + 8 : 0);
-  const headerTextW = textX + nameW + (subW ? subW + 10 : 0) + (badgeW ? badgeW + 10 : 0);
+  const badgeW = badge ? textWidth(badge, style.subtitleSize, 'medium') + C.badgeRoom : 0;
+  const pad = frame === 'none' ? (outline ? 0 : C.unframedPad) : style.containerPad;
+  const textX = pad + (hasIcon ? style.containerIconSize + C.iconGap : 0);
+  const headerTextW = textX + nameW + (subW ? subW + C.headerGap : 0) + (badgeW ? badgeW + C.headerGap : 0);
   // Facts wrap no narrower than the title row, so a wide container's facts do not wrap early.
-  const details = detailBlocks(node, Math.max(260, headerTextW - textX), textX, style.containerHeader - 8, 'start', style);
-  const header = style.containerHeader + details.height + (details.height ? 4 : 0);
+  const details = detailBlocks(node, Math.max(C.detailsMinWidth, headerTextW - textX), textX, style.containerHeader - C.detailsInset, 'start', style);
+  const header = style.containerHeader + details.height + (details.height ? C.detailsGap : 0);
   return {
     frame,
     pad,
     header,
     minWidth: Math.max(headerTextW + pad, details.width + textX + pad),
     parts: {
-      name: { lines: [node.name], size: style.containerNameSize, weight: 'semibold', x: textX, y: 10, lineHeight: style.containerNameSize * 1.25, anchor: 'start' },
-      ...(node.subtitle ? { subtitle: { lines: [node.subtitle], size: style.subtitleSize, weight: 'regular', x: textX + nameW + 10, y: 10 + (style.containerNameSize - style.subtitleSize) / 2 + 1, lineHeight: style.subtitleSize * 1.25, anchor: 'start' } as TextBlock } : {}),
-      ...(hasIcon ? { icon: { id: node.icon!, x: pad, y: 9, size: style.containerIconSize } } : {}),
+      name: { lines: [node.name], size: style.containerNameSize, weight: 'semibold', x: textX, y: C.nameTop, lineHeight: style.containerNameSize * 1.25, anchor: 'start' },
+      ...(node.subtitle ? { subtitle: { lines: [node.subtitle], size: style.subtitleSize, weight: 'regular', x: textX + nameW + C.headerGap, y: C.nameTop + (style.containerNameSize - style.subtitleSize) / 2 + 1, lineHeight: style.subtitleSize * 1.25, anchor: 'start' } as TextBlock } : {}),
+      ...(hasIcon ? { icon: { id: node.icon!, x: pad, y: C.iconTop, size: style.containerIconSize } } : {}),
       ...(badge ? { badge } : {}),
       ...(details.blocks.length ? { texts: details.blocks } : {}),
     },
@@ -238,7 +241,7 @@ export function sizeContainer(node: ModelNode, children: Sized[], placed: { plac
   const innerH = placed.size.h;
   const w = Math.ceil(Math.max(innerW + pad * 2, hd.minWidth));
   const h = Math.ceil(header + innerH + pad * (frame === 'none' ? 1 : 2));
-  const inner: Rect = { x: outline ? pad : (w - innerW) / 2, y: header + (frame === 'none' ? 4 : style.containerPad), w: innerW, h: innerH };
+  const inner: Rect = { x: outline ? pad : (w - innerW) / 2, y: header + (frame === 'none' ? C.unframedInnerTop : style.containerPad), w: innerW, h: innerH };
   const byId = new Map(placed.placed.map((p) => [p.id, p.rect]));
   const childPlacements: Placement[] = children.map((c) => {
     const r = byId.get(c.id)!;

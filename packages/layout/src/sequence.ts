@@ -11,6 +11,8 @@ import type { Extra, Layout, LayoutBox, TextBlock } from './types.ts';
 import { measureQuality } from './metrics.ts';
 import { syntheticNode } from './synthetic.ts';
 
+const SQ = RULES.sequence;
+
 interface Row {
   kind: 'message' | 'fragment-open' | 'fragment-else' | 'fragment-close' | 'note' | 'activation-end' | 'destroy';
   participant?: string;
@@ -64,7 +66,7 @@ export function layoutSequenceView(model: Model, view: ResolvedSequenceView, sty
   const createdAt = new Map<string, number>();
   const destroyedAt = new Map<string, number>();
   let fragN = 0;
-  let y = HEADER_H + 30;
+  let y = HEADER_H + SQ.headerGap;
   const emit = (r: Omit<Row, 'y'>): void => {
     rows.push({ ...r, y });
     y += r.height;
@@ -74,33 +76,33 @@ export function layoutSequenceView(model: Model, view: ResolvedSequenceView, sty
       const op = s.alt !== undefined ? 'alt' : s.opt !== undefined ? 'opt' : s.loop !== undefined ? 'loop' : s.par !== undefined ? 'par' : undefined;
       if (op) {
         const id = `frag-${fragN++}`;
-        emit({ kind: 'fragment-open', height: FRAG_HEAD + 6, op, condition: (s.alt ?? s.opt ?? s.loop ?? s.par) as string, fragmentId: id });
+        emit({ kind: 'fragment-open', height: FRAG_HEAD + SQ.fragmentOpenPad, op, condition: (s.alt ?? s.opt ?? s.loop ?? s.par) as string, fragmentId: id });
         walk(s.steps ?? []);
         if (s.else) {
-          emit({ kind: 'fragment-else', height: 22, fragmentId: id, condition: 'else' });
+          emit({ kind: 'fragment-else', height: SQ.elseRow, fragmentId: id, condition: 'else' });
           walk(s.else);
         }
-        emit({ kind: 'fragment-close', height: 14, fragmentId: id });
+        emit({ kind: 'fragment-close', height: SQ.closeRow, fragmentId: id });
         continue;
       }
       if (s.note !== undefined) {
-        const w = wrapText(s.note, style.labelSize, 'regular', 220, 4);
-        emit({ kind: 'note', height: w.height + 22, label: s.note, over: s.over ?? (s.from !== undefined ? [s.from] : [order[0]!]) });
+        const w = wrapText(s.note, style.labelSize, 'regular', SQ.noteWrap, 4);
+        emit({ kind: 'note', height: w.height + SQ.notePad, label: s.note, over: s.over ?? (s.from !== undefined ? [s.from] : [order[0]!]) });
         continue;
       }
       if (s.destroy !== undefined) {
-        emit({ kind: 'destroy', height: 26, participant: s.destroy });
-        destroyedAt.set(s.destroy, y - 13);
+        emit({ kind: 'destroy', height: SQ.destroyRow, participant: s.destroy });
+        destroyedAt.set(s.destroy, y - SQ.destroyRow / 2);
         if (s.from === undefined || s.to === undefined) continue;
       }
       if (s.from === undefined || s.to === undefined) continue;
       const lbl = s.label ?? '';
-      const wrapped = wrapText(lbl, style.labelSize, 'regular', 240, 2);
+      const wrapped = wrapText(lbl, style.labelSize, 'regular', SQ.labelWrap, 2);
       const self = s.from === s.to;
-      const h = Math.max(ROW, wrapped.height + 20) + (self ? 14 : 0);
+      const h = Math.max(ROW, wrapped.height + SQ.messagePad) + (self ? SQ.selfExtra : 0);
       const kindStyle = s.kind === 'reply' ? 'reply' : s.kind === 'async' ? 'async' : 'sync';
       const created = s.create === true;
-      emit({ kind: 'message', height: created ? Math.max(h, HEADER_H + 12) : h, step: s, from: s.from, to: s.to, label: lbl, style: kindStyle, depthFrom: depth.get(s.from)!, depthTo: depth.get(s.to)!, ...(created ? { create: true } : {}) });
+      emit({ kind: 'message', height: created ? Math.max(h, HEADER_H + SQ.createdExtra) : h, step: s, from: s.from, to: s.to, label: lbl, style: kindStyle, depthFrom: depth.get(s.from)!, depthTo: depth.get(s.to)!, ...(created ? { create: true } : {}) });
       if (created) createdAt.set(s.to, rows[rows.length - 1]!.y + rows[rows.length - 1]!.height / 2);
       const activate = !created && (kindStyle === 'sync' || (kindStyle === 'async' && (s.steps?.length ?? 0) > 0));
       if (activate) {
@@ -109,11 +111,11 @@ export function layoutSequenceView(model: Model, view: ResolvedSequenceView, sty
         activations.push({ id: s.to, start: rows[rows.length - 1]!.y + h / 2, depth: d });
         walk(s.steps ?? []);
         if (s.reply !== undefined) {
-          const rw = wrapText(s.reply, style.labelSize, 'regular', 240, 2);
-          emit({ kind: 'message', height: Math.max(ROW, rw.height + 20), from: s.to, to: s.from, label: s.reply, style: 'reply', depthFrom: d, depthTo: depth.get(s.from)! });
+          const rw = wrapText(s.reply, style.labelSize, 'regular', SQ.labelWrap, 2);
+          emit({ kind: 'message', height: Math.max(ROW, rw.height + SQ.messagePad), from: s.to, to: s.from, label: s.reply, style: 'reply', depthFrom: d, depthTo: depth.get(s.from)! });
         }
         const act = activations.filter((a) => a.id === s.to && a.end === undefined).pop()!;
-        act.end = y - 6;
+        act.end = y - SQ.activationTail;
         depth.set(s.to, d - 1);
       } else if (s.steps) {
         walk(s.steps);
@@ -121,21 +123,21 @@ export function layoutSequenceView(model: Model, view: ResolvedSequenceView, sty
     }
   };
   walk(view.steps);
-  const bottom = y + 24;
+  const bottom = y + SQ.tail;
 
   // Column positions: solve minimum gaps from labels that must fit between lifelines.
   const headW = order.map((id) => {
     const n = model.nodes.get(id);
     const name = n?.name ?? id;
     const sub = n?.subtitle;
-    return Math.max(120, textWidth(name, style.nameSize, 'semibold') + 32, sub ? textWidth(sub, style.subtitleSize, 'regular') + 32 : 0);
+    return Math.max(SQ.headMinWidth, textWidth(name, style.nameSize, 'semibold') + SQ.headPad, sub ? textWidth(sub, style.subtitleSize, 'regular') + SQ.headPad : 0);
   });
-  const minGap: number[] = order.map((_, i) => (i === 0 ? 0 : (headW[i - 1]! + headW[i]!) / 2 + 36));
+  const minGap: number[] = order.map((_, i) => (i === 0 ? 0 : (headW[i - 1]! + headW[i]!) / 2 + SQ.headGap));
   const need: { a: number; b: number; w: number }[] = [];
   for (const r of rows) {
     if (r.kind === 'message' && r.from !== r.to && r.label) {
       const a = index.get(r.from!)!, b = index.get(r.to!)!;
-      need.push({ a: Math.min(a, b), b: Math.max(a, b), w: wrapText(r.label, style.labelSize, 'regular', 240, 2).width + 36 });
+      need.push({ a: Math.min(a, b), b: Math.max(a, b), w: wrapText(r.label, style.labelSize, 'regular', SQ.labelWrap, 2).width + SQ.labelRoom });
     }
   }
   const x: number[] = [];
@@ -158,8 +160,8 @@ export function layoutSequenceView(model: Model, view: ResolvedSequenceView, sty
     const n = model.nodes.get(id);
     const name = n?.name ?? id;
     const w = headW[i]!;
-    const nameBlock: TextBlock = { lines: [name], size: style.nameSize, weight: 'semibold', x: w / 2, y: n?.subtitle ? 10 : 15, lineHeight: style.nameSize * 1.25, anchor: 'middle' };
-    const sub: TextBlock | undefined = n?.subtitle ? { lines: [n.subtitle], size: style.subtitleSize, weight: 'regular', x: w / 2, y: 28, lineHeight: style.subtitleSize * 1.25, anchor: 'middle' } : undefined;
+    const nameBlock: TextBlock = { lines: [name], size: style.nameSize, weight: 'semibold', x: w / 2, y: n?.subtitle ? SQ.nameTop : SQ.nameAloneTop, lineHeight: style.nameSize * 1.25, anchor: 'middle' };
+    const sub: TextBlock | undefined = n?.subtitle ? { lines: [n.subtitle], size: style.subtitleSize, weight: 'regular', x: w / 2, y: SQ.subtitleTop, lineHeight: style.subtitleSize * 1.25, anchor: 'middle' } : undefined;
     const node = n ?? syntheticNode(id, name, { typeName: 'node', color: 'slate' });
     const top = createdAt.has(id) ? createdAt.get(id)! - HEADER_H / 2 : style.canvasPad;
     return { id, kind: 'leaf', depth: 0, node, shape: n?.role === 'actor' ? 'person' : 'rounded', frame: 'box', iconOnly: false, x: x[i]! - w / 2, y: top, w, h: HEADER_H, name: nameBlock, ...(sub ? { subtitle: sub } : {}) };
@@ -172,13 +174,13 @@ export function layoutSequenceView(model: Model, view: ResolvedSequenceView, sty
     extras.push({ kind: 'lifeline', id, x: x[i]!, y0, y1 });
     if (destroyedAt.has(id)) {
       const cx = x[i]!, cy = y1;
-      extras.push({ kind: 'line', id: `destroy-${id}-a`, from: { x: cx - 9, y: cy - 9 }, to: { x: cx + 9, y: cy + 9 }, style: 'leader' });
-      extras.push({ kind: 'line', id: `destroy-${id}-b`, from: { x: cx - 9, y: cy + 9 }, to: { x: cx + 9, y: cy - 9 }, style: 'leader' });
+      extras.push({ kind: 'line', id: `destroy-${id}-a`, from: { x: cx - SQ.cross, y: cy - SQ.cross }, to: { x: cx + SQ.cross, y: cy + SQ.cross }, style: 'leader' });
+      extras.push({ kind: 'line', id: `destroy-${id}-b`, from: { x: cx - SQ.cross, y: cy + SQ.cross }, to: { x: cx + SQ.cross, y: cy - SQ.cross }, style: 'leader' });
     }
   }
   const fragStack: { id: string; y: number; op: string; condition: string; dividers: number[]; lo: number; hi: number }[] = [];
-  const participantsBetween = (lo: number, hi: number): [number, number] => [x[lo]! - headW[lo]! / 2 - 10, x[hi]! + headW[hi]! / 2 + 10];
-  const activationOffset = (d: number): number => (d - 1) * 8;
+  const participantsBetween = (lo: number, hi: number): [number, number] => [x[lo]! - headW[lo]! / 2 - SQ.fragmentReach, x[hi]! + headW[hi]! / 2 + SQ.fragmentReach];
+  const activationOffset = (d: number): number => (d - 1) * SQ.activationStep;
   for (const r of rows) {
     switch (r.kind) {
       case 'fragment-open':
@@ -191,8 +193,8 @@ export function layoutSequenceView(model: Model, view: ResolvedSequenceView, sty
         const f = fragStack.pop()!;
         const lo = Math.min(f.lo, order.length - 1), hi = Math.max(f.hi, 0);
         const [x0, x1] = participantsBetween(Math.min(lo, hi), Math.max(lo, hi));
-        const inset = fragStack.length * 10;
-        extras.push({ kind: 'fragment', id: f.id, rect: { x: x0 - 12 + inset, y: f.y, w: x1 - x0 + 24 - inset * 2, h: r.y + r.height - f.y }, op: f.op, condition: f.condition, dividers: f.dividers });
+        const inset = fragStack.length * SQ.fragmentInset;
+        extras.push({ kind: 'fragment', id: f.id, rect: { x: x0 - SQ.fragmentOverhang + inset, y: f.y, w: x1 - x0 + SQ.fragmentOverhang * 2 - inset * 2, h: r.y + r.height - f.y }, op: f.op, condition: f.condition, dividers: f.dividers });
         for (const outer of fragStack) {
           outer.lo = Math.min(outer.lo, lo);
           outer.hi = Math.max(outer.hi, hi);
@@ -202,13 +204,13 @@ export function layoutSequenceView(model: Model, view: ResolvedSequenceView, sty
       case 'note': {
         const ids = r.over!;
         const lo = Math.min(...ids.map((o) => index.get(o)!)), hi = Math.max(...ids.map((o) => index.get(o)!));
-        const w = wrapText(r.label!, style.labelSize, 'regular', 220, 4);
+        const w = wrapText(r.label!, style.labelSize, 'regular', SQ.noteWrap, 4);
         // Over several participants the note spans them; over one it sits beside the lifeline, clear of activations.
         const single = lo === hi;
         const cx = (x[lo]! + x[hi]!) / 2;
-        const rw = single ? w.width + 24 : Math.max(w.width + 24, x[hi]! - x[lo]! + 40);
-        const nx = single ? x[lo]! + 18 : cx - rw / 2;
-        extras.push({ kind: 'note', id: `note-${r.y}`, rect: { x: nx, y: r.y + 4, w: rw, h: r.height - 8 }, text: { lines: w.lines, size: style.labelSize, weight: 'regular', x: 12, y: 8, lineHeight: w.lineHeight, anchor: 'start' } });
+        const rw = single ? w.width + SQ.noteRoom : Math.max(w.width + SQ.noteRoom, x[hi]! - x[lo]! + SQ.noteSpan);
+        const nx = single ? x[lo]! + SQ.noteBeside : cx - rw / 2;
+        extras.push({ kind: 'note', id: `note-${r.y}`, rect: { x: nx, y: r.y + SQ.noteInset, w: rw, h: r.height - SQ.noteInset * 2 }, text: { lines: w.lines, size: style.labelSize, weight: 'regular', x: SQ.noteTextX, y: SQ.noteTextY, lineHeight: w.lineHeight, anchor: 'start' } });
         for (const f of fragStack) {
           f.lo = Math.min(f.lo, lo);
           f.hi = Math.max(f.hi, hi);
@@ -221,16 +223,16 @@ export function layoutSequenceView(model: Model, view: ResolvedSequenceView, sty
           f.lo = Math.min(f.lo, a, b);
           f.hi = Math.max(f.hi, a, b);
         }
-        const w = wrapText(r.label ?? '', style.labelSize, 'regular', 240, 2);
+        const w = wrapText(r.label ?? '', style.labelSize, 'regular', SQ.labelWrap, 2);
         const yc = r.y + r.height / 2;
         const self = a === b;
         const dir = b > a ? 1 : -1;
-        const fx = x[a]! + (self ? activationOffset(r.depthFrom!) + 4 : dir * (r.depthFrom! > 0 ? 4 + activationOffset(r.depthFrom!) : 0));
-        const tx = r.create ? x[b]! - dir * (headW[b]! / 2) : x[b]! - (self ? -activationOffset(r.depthTo! + 1) - 4 : dir * (r.depthTo! > 0 ? 4 + activationOffset(r.depthTo!) : 0));
+        const fx = x[a]! + (self ? activationOffset(r.depthFrom!) + SQ.activationWidth / 2 : dir * (r.depthFrom! > 0 ? SQ.activationWidth / 2 + activationOffset(r.depthFrom!) : 0));
+        const tx = r.create ? x[b]! - dir * (headW[b]! / 2) : x[b]! - (self ? -activationOffset(r.depthTo! + 1) - SQ.activationWidth / 2 : dir * (r.depthTo! > 0 ? SQ.activationWidth / 2 + activationOffset(r.depthTo!) : 0));
         const label: TextBlock = self
-          ? { lines: w.lines, size: style.labelSize, weight: 'regular', x: fx + 22, y: r.y + 6, lineHeight: w.lineHeight, anchor: 'start' }
-          : { lines: w.lines, size: style.labelSize, weight: 'regular', x: (fx + tx) / 2, y: yc - w.height - 3, lineHeight: w.lineHeight, anchor: 'middle' };
-        extras.push({ kind: 'message', id: `msg-${r.y}`, from: { x: fx, y: self ? r.y + 8 : yc }, to: { x: tx, y: self ? r.y + r.height - 10 : yc }, label, style: r.style!, selfCall: self });
+          ? { lines: w.lines, size: style.labelSize, weight: 'regular', x: fx + SQ.selfLabelX, y: r.y + SQ.selfLabelY, lineHeight: w.lineHeight, anchor: 'start' }
+          : { lines: w.lines, size: style.labelSize, weight: 'regular', x: (fx + tx) / 2, y: yc - w.height - SQ.labelLift, lineHeight: w.lineHeight, anchor: 'middle' };
+        extras.push({ kind: 'message', id: `msg-${r.y}`, from: { x: fx, y: self ? r.y + SQ.selfTop : yc }, to: { x: tx, y: self ? r.y + r.height - SQ.selfBottom : yc }, label, style: r.style!, selfCall: self });
         break;
       }
       case 'activation-end':
@@ -239,7 +241,7 @@ export function layoutSequenceView(model: Model, view: ResolvedSequenceView, sty
   }
   for (const [i, a] of activations.entries()) {
     const xi = x[index.get(a.id)!]! + activationOffset(a.depth);
-    extras.push({ kind: 'activation', id: `act-${i}`, rect: { x: xi - 4, y: a.start, w: 8, h: (a.end ?? bottom) - a.start }, depth: a.depth });
+    extras.push({ kind: 'activation', id: `act-${i}`, rect: { x: xi - SQ.activationWidth / 2, y: a.start, w: SQ.activationWidth, h: (a.end ?? bottom) - a.start }, depth: a.depth });
   }
   const width = Math.ceil(Math.max(...boxes.map((b) => b.x + b.w), ...extras.map((e) => ('rect' in e ? e.rect.x + e.rect.w : 0))) + style.canvasPad);
   const height = Math.ceil(bottom + style.canvasPad);

@@ -17,6 +17,9 @@ import { placeLayers } from './arrange/place.ts';
 import { arrangeMatrix, arrangeMirror, arrangeOutline, arrangeRing, type LocalExtra } from './arrange/gesture.ts';
 import { liftTo, type VisibleSet } from './visible.ts';
 import { composePinned } from './compose-pinned.ts';
+import { RULES } from './style.ts';
+
+const EL = RULES.edgeLabel, OL = RULES.outline;
 
 export interface ComposeResult {
   readonly boxes: LayoutBox[];
@@ -142,7 +145,7 @@ function arrangeChildren(
   const sorted = keepTogether([...items].sort((a, b) => rank(a.id, explicit, order) - rank(b.id, explicit, order)), groups);
   const horizontal = direction === 'right' || direction === 'left';
   const traffic: GutterEdge[] = internal.map((e) => {
-    const lw = e.label ? wrapText(e.label, style.labelSize, 'regular', 160, 3) : undefined;
+    const lw = e.label ? wrapText(e.label, style.labelSize, 'regular', EL.maxWidth, 3) : undefined;
     return { from: e.from, to: e.to, label: { w: lw?.width ?? 0, h: lw?.height ?? 0 } };
   });
 
@@ -156,7 +159,7 @@ function arrangeChildren(
     case 'ring':
       return arrangeRing(sorted, hint?.center ?? hub(sorted.map((s) => s.id), internal), gap);
     case 'outline':
-      return arrangeOutline(sorted, style.indent, Math.max(8, gap - 8));
+      return arrangeOutline(sorted, style.indent, Math.max(OL.minGap, gap - OL.gapCut));
     case 'matrix':
       return arrangeMatrix(sorted, hint?.matrix ?? { rows: [] }, gap, hint?.divider ?? true, style.nameSize);
     case 'auto':
@@ -175,8 +178,8 @@ function arrangeChildren(
   for (const e of internal) {
     if (!e.label) continue;
     const l = Math.min(flow.layer.get(e.from)!, flow.layer.get(e.to)!);
-    const lw = wrapText(e.label, style.labelSize, 'regular', 160, 3);
-    const room = horizontal ? lw.width + 36 : lw.height + 28;
+    const lw = wrapText(e.label, style.labelSize, 'regular', EL.maxWidth, 3);
+    const room = horizontal ? lw.width + EL.roomX : lw.height + EL.roomY;
     labelRoom.set(l, Math.max(labelRoom.get(l) ?? 0, room));
   }
   for (let l = 0; l + 1 < flow.layers.length; l++) {

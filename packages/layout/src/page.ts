@@ -10,6 +10,8 @@ import { wrapText } from './text/measure.ts';
 import { shiftLayout } from './shift.ts';
 import { measureQuality } from './metrics.ts';
 
+const PG = RULES.page;
+
 interface PanelSized {
   readonly heading?: ReturnType<typeof wrapText>;
   readonly text?: ReturnType<typeof wrapText>;
@@ -26,11 +28,11 @@ export function layoutPageView(model: Model, view: ResolvedPageView, layoutInner
   const sized: PanelSized[] = view.panels.map((p) => {
     const inner = p.view !== undefined ? model.views.find((v) => v.id === p.view) : undefined;
     const layout = inner && inner.kind !== 'page' ? layoutInner(inner) : undefined;
-    const textW = Math.max(320, Math.min(style.proseWidth, layout?.width ?? 480));
+    const textW = Math.max(PG.textMin, Math.min(style.proseWidth, layout?.width ?? PG.textFallback));
     const heading = p.heading ? wrapText(p.heading, style.headingSize, 'semibold', textW, 3, 1.3) : undefined;
     const text = p.text ? wrapText(p.text, style.proseSize, 'regular', textW, 60, 1.45) : undefined;
     const w = Math.max(layout?.width ?? 0, heading?.width ?? 0, text?.width ?? 0) + pad * 2;
-    const h = pad + (heading ? heading.height + 8 : 0) + (text ? text.height + 12 : 0) + (layout?.height ?? 0) + pad;
+    const h = pad + (heading ? heading.height + PG.headingGap : 0) + (text ? text.height + PG.textGap : 0) + (layout?.height ?? 0) + pad;
     return { ...(heading ? { heading } : {}), ...(text ? { text } : {}), ...(layout ? { layout } : {}), w, h, span: p.span ?? 1 };
   });
   // The author's columns, fewer when that many panels side by side would be too wide to read: a long page scrolls, a wide one shrinks.
@@ -93,11 +95,11 @@ function placePanels(view: ResolvedPageView, sized: readonly PanelSized[], colum
       let cy = y + pad;
       if (p.heading) {
         extras.push({ kind: 'text', id: `panel-${pi}-heading`, role: 'heading', text: { lines: p.heading.lines, size: style.headingSize, weight: 'semibold', x: px + pad, y: cy, lineHeight: p.heading.lineHeight, anchor: 'start' } });
-        cy += p.heading.height + 8;
+        cy += p.heading.height + PG.headingGap;
       }
       if (p.text) {
         extras.push({ kind: 'text', id: `panel-${pi}-text`, role: 'prose', text: { lines: p.text.lines, size: style.proseSize, weight: 'regular', x: px + pad, y: cy, lineHeight: p.text.lineHeight, anchor: 'start' } });
-        cy += p.text.height + 12;
+        cy += p.text.height + PG.textGap;
       }
       if (p.layout) {
         const l = shiftLayout(p.layout, px + pad + (pw - pad * 2 - p.layout.width) / 2, cy);

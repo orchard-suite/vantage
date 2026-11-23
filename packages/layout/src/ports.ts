@@ -39,7 +39,7 @@ function centre(r: Rect): Point {
 }
 
 export function chooseSides(from: Rect, to: Rect, direction: Direction): { fromSide: Side; toSide: Side } {
-  const slack = 8;
+  const slack = RULES.ports.slack;
   // Boxes apart on both axes face each other across the wider gap: a ring's spokes meet the hub on the side they come from.
   const gapX = Math.max(to.x - (from.x + from.w), from.x - (to.x + to.w));
   const gapY = Math.max(to.y - (from.y + from.h), from.y - (to.y + to.h));
@@ -88,7 +88,7 @@ export function assignPorts(requests: readonly PortRequest[], direction: Directi
     // A chip on the top-right corner takes that end of the top side.
     const r0 = slots[0]!.rect;
     const start = vertical ? r0.y : r0.x;
-    const length = side === 'top' && slots[0]!.chip ? Math.max(r0.w * 0.4, r0.w - slots[0]!.chip - 8) : vertical ? r0.h : r0.w;
+    const length = side === 'top' && slots[0]!.chip ? Math.max(r0.w * 0.4, r0.w - slots[0]!.chip - RULES.ports.chipClear) : vertical ? r0.h : r0.w;
     // Each port wants its even share of the side, or its focus when it has one; then they are pushed apart to PORT_GAP and kept on the side.
     const want = slots.map((s, i) => {
       const even = start + length * ((i + 1) / (n + 1));
@@ -166,7 +166,7 @@ function straightPorts(requests: readonly PortRequest[], sides: ReadonlyMap<stri
     const p = points.get(r.edgeId)!;
     const vertical = s.fromSide === 'left' || s.fromSide === 'right';
     const lo = vertical ? Math.max(r.from.y, r.to.y) + PORT_GAP : Math.max(r.from.x, r.to.x) + PORT_GAP;
-    const chipAt = (rect: Rect, side: Side, chip: number | undefined): number => (side === 'top' && chip ? rect.x + rect.w - chip - 8 : Infinity);
+    const chipAt = (rect: Rect, side: Side, chip: number | undefined): number => (side === 'top' && chip ? rect.x + rect.w - chip - RULES.ports.chipClear : Infinity);
     const hi = vertical ? Math.min(r.from.y + r.from.h, r.to.y + r.to.h) - PORT_GAP : Math.min(r.from.x + r.from.w, r.to.x + r.to.w, chipAt(r.from, s.fromSide, r.fromChip), chipAt(r.to, s.toSide, r.toChip)) - PORT_GAP;
     if (hi < lo) continue;
     const at = (q: Point): number => (vertical ? q.y : q.x);

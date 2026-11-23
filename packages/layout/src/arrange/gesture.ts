@@ -11,6 +11,7 @@ import type { Point, Rect, Size } from '../geometry.ts';
 import type { TextBlock } from '../types.ts';
 import { textWidth } from '../text/measure.ts';
 import { arrangeGrid, type Placed } from './grid.ts';
+import { RULES } from '../style.ts';
 
 export type LocalExtra =
   | { readonly kind: 'line'; readonly from: Point; readonly to: Point; readonly style: 'divider' | 'leader' }
@@ -129,7 +130,7 @@ export function arrangeMatrix(items: readonly Item[], spec: MatrixSpec, gap: num
     rowH[ri] = Math.max(rowH[ri]!, g.size.h);
   }));
   // Cells sit well clear of the dividers so a route in the gap never traces a divider.
-  const pad = Math.max(gap, 30);
+  const pad = Math.max(gap, RULES.gesture.matrixPadMin);
   const xs: number[] = [];
   let x = rowHead;
   cols.forEach((_, ci) => { xs.push(x); x += colW[ci]! + pad * 2; });

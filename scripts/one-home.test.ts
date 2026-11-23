@@ -74,6 +74,60 @@ async function hits(pattern: string, re: { test(line: string): boolean }, skip: 
 
 const CHROME = 'packages/*/src/**/*.ts';
 
+/** The code of a file with comments and string text blanked (template expressions kept), so a column still points at the source. */
+function codeOnly(text: string): string[] {
+  let out = '';
+  const stack: ('code' | 'tpl')[] = ['code'];
+  let depth = 0;
+  for (let i = 0; i < text.length; i++) {
+    const c = text[i]!, next = text[i + 1];
+    const top = stack[stack.length - 1];
+    if (top === 'tpl') {
+      if (c === '\\') { out += '  '; i++; continue; }
+      if (c === '`') { stack.pop(); out += c; continue; }
+      if (c === '$' && next === '{') { stack.push('code'); out += '${'; i++; continue; }
+      out += c === '\n' ? '\n' : ' ';
+      continue;
+    }
+    if (c === '/' && next === '/') { while (i < text.length && text[i] !== '\n') { out += ' '; i++; } out += '\n'; continue; }
+    if (c === '/' && next === '*') { const end = text.indexOf('*/', i + 2); const chunk = text.slice(i, end + 2); out += chunk.replace(/[^\n]/g, ' '); i = end + 1; continue; }
+    if (c === "'" || c === '"') { let j = i + 1; while (j < text.length && text[j] !== c) j += text[j] === '\\' ? 2 : 1; out += c + ' '.repeat(j - i - 1) + c; i = j; continue; }
+    if (c === '`') { stack.push('tpl'); out += c; continue; }
+    if (c === '{' && stack.length > 1) depth++;
+    if (c === '}' && stack.length > 1) { if (depth === 0) { stack.pop(); out += c; continue; } depth--; }
+    out += c;
+  }
+  return out.split('\n');
+}
+
+/**
+ * Numbers in the layout engine that are not sizes, by what surrounds them.
+ * Each pattern sees the line with the number under test written as `#`.
+ * A non-integer is never checked: a size is whole pixels, a ratio or a
+ * fraction along a line is not. 0, 1, and 2 are arithmetic.
+ */
+const NOT_A_SIZE: readonly { readonly file?: string; readonly re: RegExp; readonly why: string }[] = [
+  { re: /for \(let \w+ = 0; \w+ <=? #/, why: 'how many times a loop runs' },
+  { re: /\+\+ [<>]=? #/, why: 'a guard on how many times a loop runs' },
+  { re: /\.(?:length|size)\s*(?:[<>]=?|===?|!==?|[-+*])\s*#/, why: 'a count' },
+  { re: /\* #\) \/ \d+|\* \d+\) \/ #/, why: 'rounding to hundredths' },
+  { re: /\b[sS]core\s*(?:[-+]?=)\s*[^;]*#|[sS]core\s*[<>]=?\s*#/, why: 'a placement or quality score' },
+  { re: /\.slice\(0, #\)/, why: 'how many characters or items to keep' },
+  { re: /wrapText\(.*, #(?:, \d+\.\d+)?\)/, why: 'how many lines text may wrap to' },
+  { re: /% #/, why: 'a cycle length' },
+  { re: /\/ #/, why: 'a fraction' },
+  { file: 'arrange/flow.ts', re: /ROLE_RANK|rank >= #/, why: 'the rank of a role' },
+  { file: 'explore.ts', re: /limit = #|internal >= #/, why: 'how many candidates, and how many inside' },
+  { file: 'labels.ts', re: /far = k >= 2 \? #/, why: 'the penalty for a far spot' },
+  { file: 'relation.ts', re: /n \+= #/, why: 'how many conflicts a touch counts as' },
+  { file: 'route.ts', re: /\b\w+(?:Cost|Factor|Weight): #/, why: "the router's costs and factors" },
+  { file: 'route.ts', re: /cells \* #|& #|>> #|> 90000 \? #/, why: 'four directions packed into a cell index, and the search window on a huge grid' },
+  { file: 'ports.ts', re: /^(?=.*(?:atan2|mod\(|v % )).*#/, why: 'angles in degrees' },
+  { file: 'timeline.ts', re: /crossings \* #|tangles \* #/, why: "the row order's costs" },
+  { file: 'timeline.ts', re: /^(?=.*\b(?:step|setUTCDate|getUTCDay)\b).*#/, why: 'days in a week and a month' },
+  { file: 'text/measure.ts', re: /maxLines = #/, why: 'how many lines text may wrap to' },
+];
+
 describe('one home for every look value', () => {
   test('colors live in tokens.ts or theme.ts', async () => {
     expect(await hits(CHROME, COLOR, FOREIGN)).toEqual([]);
@@ -100,6 +154,24 @@ describe('one home for every look value', () => {
           if (m && !NOT_SIZES.has(`${f}:${m[1]}`)) out.push(`${f}:${i + 1} ${m[1]}`);
         });
       }
+    }
+    expect(out).toEqual([]);
+  });
+
+  test('the layout engine writes no size inline', async () => {
+    const out: string[] = [];
+    for (const f of sources('packages/layout/src/**/*.ts')) {
+      const rel = f.replace('packages/layout/src/', '');
+      codeOnly(await Bun.file(join(ROOT, f)).text()).forEach((l, i) => {
+        const declared = /^(?:export )?const ([A-Za-z_]\w*)\s*(?::\s*number)?\s*=\s*-?[0-9][0-9_.]*\s*;/.exec(l);
+        if (declared && NOT_SIZES.has(`${f}:${declared[1]}`)) return;
+        for (const m of l.matchAll(/(?<![\w.$])\d+(?![\w.])/g)) {
+          if (['0', '1', '2'].includes(m[0])) continue;
+          const marked = `${l.slice(0, m.index)}#${l.slice(m.index! + m[0].length)}`;
+          if (NOT_A_SIZE.some((a) => (!a.file || a.file === rel) && a.re.test(marked))) continue;
+          out.push(`${f}:${i + 1} ${m[0]}`);
+        }
+      });
     }
     expect(out).toEqual([]);
   });
