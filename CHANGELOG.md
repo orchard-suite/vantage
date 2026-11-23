@@ -2,6 +2,12 @@
 
 All notable changes to this project will be documented in this file.
 
+## [4.1.0](https://github.com/orchard-suite/vantage/compare/v4.0.2...v4.1.0) (2026-11-23)
+
+### Features
+
+* **vantage:** rename a document through its move ([3448fdb](https://github.com/orchard-suite/vantage/commit/3448fdbd9b13a1916e88469e621d14c2226d30ae))
+
 ## [4.0.2](https://github.com/orchard-suite/vantage/compare/v4.0.1...v4.0.2) (2026-11-23)
 
 ### Bug Fixes
