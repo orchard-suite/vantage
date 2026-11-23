@@ -1030,6 +1030,10 @@ work: SHOPW               # the kind its work items are, when it has one
 watch: [src/, deploy/]    # the code the docs describe; its git connector reads only these paths
 ```
 
+`watch` names folders (`src/`), exact files (`Makefile`), or globs
+matched from the repository root (`packages/**/*.ts`, `*.md`); the git
+connector's `paths` takes the same list.
+
 The hub and workspace are the estate's: `~/.config/vantage/repos.yaml`
 maps a repository's key (its origin remote without scheme, user, port,
 or `.git`, in lower case) to them. The most specific match wins, and a

@@ -22,7 +22,7 @@ export const GitConfigSchema = z
     repositories: z.array(z.string().regex(/^[^/\s]+\/[^/\s]+$/, 'owner/name')).min(1).describe('Repositories as owner/name'),
     branch: z.string().min(1).optional().describe("The branch merges land on; default each repository's own default branch"),
     depth: z.number().int().min(1).max(1000).default(200).describe('How many commits back to read; a tie checked at an older commit is reported as unknown'),
-    paths: z.array(z.string().min(1)).optional().describe('Keep only files under these paths (folders end in /), the way vantage.yaml watch names them'),
+    paths: z.array(z.string().min(1)).optional().describe('Keep only files these paths watch: globs (packages/**, *.md), folders (src/), or exact files, the way vantage.yaml watch names them'),
   })
   .strict()
   .refine(oneSignIn, ONE_SIGN_IN);
@@ -61,8 +61,16 @@ function keptCommit(v: unknown): KeptCommit | undefined {
   return typeof c.sha === 'string' && Array.isArray(c.files) ? (c as KeptCommit) : undefined;
 }
 
-function underPaths(paths: readonly string[] | undefined, file: string): boolean {
-  return !paths?.length || paths.some((p) => (p.endsWith('/') ? file.startsWith(p) : file === p));
+const GLOB = /[*?[{]/;
+
+/**
+ * Whether a repository path is one the paths watch: a glob (`packages/**`,
+ * `*.md`, matched from the root), a folder (`src/` or `src`, and all under
+ * it), or an exact file (`Makefile`). No paths watches everything.
+ */
+export function watches(paths: readonly string[] | undefined, file: string): boolean {
+  if (!paths?.length) return true;
+  return paths.some((p) => (GLOB.test(p) ? new Bun.Glob(p).match(file) : file === p || file.startsWith(p.endsWith('/') ? p : `${p}/`)));
 }
 
 export const gitConnector: Connector<GitConfig> = {
@@ -96,7 +104,7 @@ export const gitConnector: Connector<GitConfig> = {
           ctx.kept?.set(key, c);
           read++;
         }
-        commits.push({ ...c, files: c.files.filter((f) => underPaths(config.paths, f.path)) });
+        commits.push({ ...c, files: c.files.filter((f) => watches(config.paths, f.path)) });
       }
       const head = commits[commits.length - 1]?.sha;
       log.info('git history read', { repository: repo, branch, commits: commits.length, read });

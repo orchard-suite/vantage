@@ -3,7 +3,7 @@ import { generateKeyPairSync } from 'node:crypto';
 import { BatchSchema } from '../../batch.ts';
 import { keptStore } from '../../kept.ts';
 import { drain, fixtureFetch, testContext } from '../../testing.ts';
-import { gitConnector, GitConfigSchema, repositoryHost } from './git.ts';
+import { gitConnector, GitConfigSchema, repositoryHost, watches } from './git.ts';
 
 const detail = (sha: string, date: string, title: string, files: { filename: string; patch?: string }[]) => ({ sha, commit: { message: `${title}\n\nbody`, committer: { date } }, files });
 
@@ -62,6 +62,26 @@ describe('git connector', () => {
     expect(JSON.parse(mint!.body!)).toEqual({ repositories: ['shop'], permissions: { contents: 'read', metadata: 'read' } });
     expect(reads.length).toBeGreaterThan(0);
     expect(reads.every((c) => c.headers.authorization === 'Bearer ghs_shop')).toBe(true);
+  });
+
+  test('paths match as globs, folders, and exact files, the way vantage.yaml watch names them', () => {
+    expect(watches(['packages/**/*.ts'], 'packages/hub/src/main.ts')).toBe(true);
+    expect(watches(['packages/**/*.ts'], 'packages/hub/README.md')).toBe(false);
+    expect(watches(['*.md'], 'README.md')).toBe(true);
+    expect(watches(['*.md'], 'docs/spec.md')).toBe(false);
+    expect(watches(['docs/**'], 'docs/spec.md')).toBe(true);
+    expect(watches(['packages/'], 'packages/hub/src/main.ts')).toBe(true);
+    expect(watches(['packages'], 'packages/hub/src/main.ts')).toBe(true);
+    expect(watches(['packages/'], 'packagesx/main.ts')).toBe(false);
+    expect(watches(['Makefile'], 'Makefile')).toBe(true);
+    expect(watches(['Makefile'], 'src/Makefile')).toBe(false);
+    expect(watches(undefined, 'anything')).toBe(true);
+  });
+
+  test('a glob in paths narrows the files a run keeps', async () => {
+    const config = GitConfigSchema.parse({ repositories: ['acme/shop'], branch: 'main', paths: ['*.md'] });
+    const [batch] = await drain(gitConnector.discover(testContext(config, api().fetch)));
+    expect(batch!.changes![0]!.commits.map((c) => c.files.map((x) => x.path))).toEqual([[], ['README.md'], []]);
   });
 
   test('a token and an app together are refused', () => {
