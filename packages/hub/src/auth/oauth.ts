@@ -7,7 +7,7 @@
  * verifier for an access token that lasts an hour and a refresh token that
  * rotates on every use and lapses after REFRESH_DAYS unused. The access
  * token is an ordinary personal token tied to the grant, so /mcp checks it
- * like any other, and revoking the grant ends both. ADR-2001 records why.
+ * like any other, and revoking the grant ends both. VAN-2001 records why.
  */
 import type { Db } from '../db/db.ts';
 import { maybe } from '../db/db.ts';

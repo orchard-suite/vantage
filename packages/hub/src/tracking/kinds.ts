@@ -1,5 +1,5 @@
 /**
- * Kinds (docs/decisions/3008). A kind is a document with a kind block, and
+ * Kinds (VAN-3008). A kind is a document with a kind block, and
  * its lifecycle is a view of kind `lifecycle` in it, or the one a shipped
  * kind draws when it builds on one. Saving the document registers the kind
  * in the same transaction as the version, so a kind the hub enforces is

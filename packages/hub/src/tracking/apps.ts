@@ -1,5 +1,5 @@
 /**
- * Modules' apps (docs/decisions/2005). An admin registers an OAuth client
+ * Modules' apps (VAN-2005). An admin registers an OAuth client
  * with the kinds it works and the workspace its kinds live in. Under its
  * app role a module reads its kinds whole, puts items and publishes their
  * labels, links them, and loads its kinds files; it never holds an item and

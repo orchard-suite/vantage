@@ -1,5 +1,5 @@
 /**
- * Tracked items over HTTP (docs/decisions/5001): nine verbs, the same
+ * Tracked items over HTTP (VAN-5001): nine verbs, the same
  * service the agent tools and the work pages call. Every write carries an
  * Idempotency-Key: sent twice, it answers the same and changes nothing the
  * second time. An item is named by its key (VAN-12) or by its kind and the

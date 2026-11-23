@@ -1,5 +1,5 @@
 /**
- * The plan on the picture (docs/decisions/3009): the boxes a roadmap item
+ * The plan on the picture (VAN-3009): the boxes a roadmap item
  * adds, changes, or retires, drawn as planned on the real view with no hand
  * styling. A switch shows the system today or after a horizon: today, a box
  * still to be added is a dashed ghost and a box still to be retired stands;

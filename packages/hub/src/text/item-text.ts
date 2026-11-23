@@ -1,5 +1,5 @@
 /**
- * An item's text form (docs/decisions/5002, 3005): a short header of its
+ * An item's text form (VAN-5002, VAN-3005): a short header of its
  * fields, then its Markdown body when the hub keeps it. Reading an item and
  * writing the same text back changes nothing. A write changes the title,
  * the labels, the parent, and the body; the state, the holders, and the

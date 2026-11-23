@@ -2,7 +2,7 @@
  * Every budget the agent door is held to, in one place. A task's budget is
  * its disk cost by rule; these are the sizes that rule cannot give. A
  * change may lower a standing ceiling. Raising one is a decision, recorded
- * in docs/decisions/0002.
+ * in VAN-0002.
  */
 export const BUDGET = {
   /** The most characters one read answers, across every address in the call. Past it the answer stops at a line and names the call that reads on. */

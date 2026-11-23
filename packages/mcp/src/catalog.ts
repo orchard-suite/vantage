@@ -2,7 +2,7 @@
  * Which tools an agent always holds and which it asks for. The core is
  * listed on connect. Every other tool belongs to one group and is listed
  * and called through vantage_tool. Adding to the core changes a budget and
- * docs/decisions/5004.
+ * VAN-5004.
  */
 export const CORE: readonly string[] = ['vantage_outline', 'vantage_find', 'vantage_read', 'vantage_patch', 'vantage_write', 'vantage_render', 'vantage_validate'];
 

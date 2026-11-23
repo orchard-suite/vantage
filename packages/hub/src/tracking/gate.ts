@@ -1,5 +1,5 @@
 /**
- * The one gate every move passes (docs/decisions/3008). It answers which
+ * The one gate every move passes (VAN-3008). It answers which
  * moves a caller may make from where an item stands, and refuses any other
  * with that same list, so a refusal and the way forward cannot disagree.
  * A lifecycle that does not draw a move makes it impossible.

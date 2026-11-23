@@ -1,0 +1,3 @@
+document: vantage
+decisions: VAN
+watch: [packages/, deploy/, skills/, scripts/, hooks/, .claude-plugin/, .github/workflows/, docs/, Dockerfile, Makefile, README.md, AGENTS.md, .mcp.json, release-please-config.json]

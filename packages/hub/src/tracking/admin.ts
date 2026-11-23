@@ -1,9 +1,9 @@
 /**
  * What a pipeline and an admin do to tracking: load a kind's file, and
  * erase an item. A kinds file is a plain document a module keeps in its own
- * repository and hands to the hub from its pipeline (docs/decisions/5001); a
+ * repository and hands to the hub from its pipeline (VAN-5001); a
  * hard delete is an event that blanks what the earlier events said and keeps
- * their place in the order (docs/decisions/3006).
+ * their place in the order (VAN-3006).
  */
 import { parseDocumentText } from '@vantage/model';
 import type { AppContext } from '../context.ts';

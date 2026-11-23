@@ -1,5 +1,5 @@
 /**
- * The one tool an agent acts on tracked items with (docs/decisions/5001):
+ * The one tool an agent acts on tracked items with (VAN-5001):
  * move, hold, release, note, attach, and link, many in one call. Reading an
  * item, listing a kind, and changing an item's title, labels, or body are
  * the five verbs. Each action commits alone and answers one line. The door

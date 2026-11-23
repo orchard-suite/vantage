@@ -1,5 +1,5 @@
 /**
- * The verbs that change an item (docs/decisions/5001): put, move, hold,
+ * The verbs that change an item (VAN-5001): put, move, hold,
  * release, note, attach, link. Each commits alone, in one transaction that
  * holds the feed lock, appends one event, and answers one line. A write sent
  * twice with the same key answers the first line again and changes nothing.
@@ -286,7 +286,7 @@ export async function note(ctx: AppContext, p: Principal, ref: string, text: str
 /** The longest file an item takes. */
 export const FILE_MAX = 25 * 1024 * 1024;
 
-/** Stores the file first, then commits the event that names it (docs/decisions/3007). */
+/** Stores the file first, then commits the event that names it (VAN-3007). */
 export async function attach(ctx: AppContext, p: Principal, ref: string, file: { name: string; contentType: string; bytes: Uint8Array }, key: string | undefined): Promise<WriteAnswer> {
   const again = await repeat(ctx, p, key);
   if (again) return again;
@@ -335,7 +335,7 @@ const live = (claim: ItemState['claim'], now = Date.now()): boolean => !!claim &
 const until = (minutes: number): string => new Date(Date.now() + minutes * 60_000).toISOString();
 
 /**
- * Takes an item for a set time (docs/decisions/3010). Two claims on one
+ * Takes an item for a set time (VAN-3010). Two claims on one
  * item cannot both hold: the row lock and the feed lock order them, and the
  * second finds the first. A claim past its end holds nothing; the next
  * claim lets the lapsed claimant go first.

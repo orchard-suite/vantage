@@ -21,20 +21,20 @@ that were made for the operator to confirm or overturn.
 | Identity | OIDC (Entra or any issuer), plus proxy mode behind an estate's front door | One sign-in model; proxy mode matches Orrery |
 | Push shape | Vantage batch, a superset of Backstage catalog entities | Existing providers feed it; our extensions ride along |
 | Hub location | This repository, `packages/hub`, `packages/connectors`, `packages/publish` | Engine and hub release together; one check gate |
-| Deployment | One image, two deployments (web, worker), one Postgres, one blob bucket | Stateless web pods scale by replica count; workers absorb bursts |
+| Deployment | One image, two deployments (web, worker) and an optional connector pool, one Postgres, one blob store | Stateless web pods scale by replica count; workers absorb bursts |
 | Agents | Bring your own, over MCP on HTTP with OAuth; in the browser, revisions from comments and diagrams drawn from a description, on a model API the organization configures | The hub never provides a model; it calls one only with the organization's key and counts each person's use |
 | Editing | YAML (in the browser's code editor or any agent) plus steering, never coordinates; pins for imports | Layout survives change; imports keep fidelity |
 | Open source | The repository is public and estate-neutral; interfaces (push shape, connector, target) are its public surface | Any estate runs the same hub |
 | Name | Vantage, to be checked before any external link carries it | Common product name |
-| Decision records | A first-class hub record, in registries held by workspaces, beside the diagrams they govern | Records and diagrams kept apart go stale apart; `docs/decisions/3001` |
-| Roadmaps | A fourth layer of the model, planned; items are hub records; status is read from proof, never typed | A plan kept apart from the picture shows neither what will be; `docs/decisions/3009` |
-| Tracking | The hub tracks the item (kind, state, holders, history); the item's owner keeps the content | One layer for states and "my work" without becoming every module's database; `docs/decisions/3005` |
-| Consistency with a module | Every action commits in one store; writes carry a key; the hub never calls a module | No distributed write, so no saga; `docs/decisions/3007` |
-| Tracking API | Nine verbs over plain HTTP, keyed by the caller's own id, behind a port the caller owns | A module is never built around Vantage; `docs/decisions/5001` |
-| First consumer | The agent; reading or changing anything costs it no more than a file on a disk, measured by the hub and held by a benchmark in the check gate | Agents do the work, and whole-thing tools made the hub dearer than a folder; `docs/decisions/0002` |
-| Agent door | Everything is text at an address, reached by five verbs: outline, find, read, patch, write | A change sends what changed, and a new kind of content needs no new tool; `docs/decisions/5002` |
-| Working copy | On a machine with a disk the agent edits files and the bridge syncs them; a path is always enough | No file passes through the model on its way to the hub; `docs/decisions/5003` |
-| Standing cost | A core of seven tools and a few lines of instructions; other tools, the guide, and the schema are read by name when needed | A conversation that reads one record does not pay for the product; `docs/decisions/5004` |
+| Decision records | A first-class hub record, in registries held by workspaces, beside the diagrams they govern | Records and diagrams kept apart go stale apart; VAN-3001 |
+| Roadmaps | A fourth layer of the model, planned; items are hub records; status is read from proof, never typed | A plan kept apart from the picture shows neither what will be; VAN-3009 |
+| Tracking | The hub tracks the item (kind, state, holders, history); the item's owner keeps the content | One layer for states and "my work" without becoming every module's database; VAN-3005 |
+| Consistency with a module | Every action commits in one store; writes carry a key; the hub never calls a module | No distributed write, so no saga; VAN-3007 |
+| Tracking API | Nine verbs over plain HTTP, keyed by the caller's own id, behind a port the caller owns | A module is never built around Vantage; VAN-5001 |
+| First consumer | The agent; reading or changing anything costs it no more than a file on a disk, measured by the hub and held by a benchmark in the check gate | Agents do the work, and whole-thing tools made the hub dearer than a folder; VAN-0002 |
+| Agent door | Everything is text at an address, reached by five verbs: outline, find, read, patch, write | A change sends what changed, and a new kind of content needs no new tool; VAN-5002 |
+| Working copy | On a machine with a disk the agent edits files and the bridge syncs them; a path is always enough | No file passes through the model on its way to the hub; VAN-5003 |
+| Standing cost | A core of seven tools and a few lines of instructions; other tools, the guide, and the schema are read by name when needed | A conversation that reads one record does not pay for the product; VAN-5004 |
 
 ## Vocabulary
 
@@ -95,7 +95,7 @@ These are built in the first phase they can apply to and never deferred.
    or external secrets where possible. Stored secrets are encrypted per org
    with a key from the environment, never logged, never returned by any API.
    The hub signs in to a managed Postgres as its workload identity when the
-   server takes it (`docs/decisions/2003`), so no database password exists.
+   server takes it (VAN-2003), so no database password exists.
 4. **Safe rendering.** Markdown and connector text are sanitized before they
    reach the viewer, the standalone HTML, or an export. The viewer sets a
    content security policy. Standalone HTML embeds no remote script.
@@ -376,7 +376,7 @@ and issues, pointed at the `repository` fact; it reads with a token by
 secret reference, or as a GitHub App, minting an installation token per
 repository each run from the app's private key, scoped to that repository
 and to issues, pull requests, and metadata, so nothing is rotated by hand;
-decision 2007).
+VAN-2007).
 
 ### Mapping
 
@@ -594,7 +594,7 @@ diagrams, points an embed at a storage account static site or at the hub.
   line by line like the YAML; the same lines changed on both sides is a
   409 that names the page. So a person's edit survives a generator that
   rewrites the page from an older read.
-- Every save passes one gate (`docs/decisions/3004`): the hub checks the
+- Every save passes one gate (VAN-3004): the hub checks the
   document whole, pages included, as the version would hold it after any
   merge, and saves nothing when it has errors. The answer is 422 with each
   error's code, message, path, and line. Warnings save. Create, save,
@@ -782,7 +782,7 @@ diagrams, points an embed at a storage account static site or at the hub.
 ### Decision records
 
 Architecture decision records live in the hub, next to the diagrams of
-the systems they decide about (`docs/decisions/3001`).
+the systems they decide about (VAN-3001).
 
 - **Registry.** A named, numbered set of records held by a workspace
   (`decision_registries`). Its prefix is two to twelve upper-case letters
@@ -814,7 +814,7 @@ the systems they decide about (`docs/decisions/3001`).
   `[[decision:SHOP-2001]]`; a save refuses a citation that names no
   record in the organization.
 - **Citation index.** The hub keeps where each record is cited from
-  (`decision_citations`, `docs/decisions/3002`): every document save
+  (`decision_citations`, VAN-3002): every document save
   indexes the boxes and pages of the head it writes, every record write
   indexes the record's prose and Related, and each row names its target
   by ULID. A record's citation of a number nobody holds yet waits until a
@@ -868,7 +868,7 @@ built
 kinds, items, their events, the move gate, access for people named on an
 item, the nine verbs, the change feed, the agent's text form and action
 tool, and the work pages. Phases 11 to 13 land the rest, in the order
-`docs/decisions/0001` sets. The code is `packages/hub/src/tracking/`.
+VAN-0001 sets. The code is `packages/hub/src/tracking/`.
 
 - **Item.** An immutable id (a ULID) and a key people say: the kind's
   prefix and a number (`ER-31`), unique in the organization. A kind, a
@@ -876,18 +876,18 @@ tool, and the work pages. Phases 11 to 13 land the rest, in the order
   the work, links (came from, part of, a box, a view, a decision), and a
   history. For an item another system owns: that system's own key, the
   content revision the state is about, and the labels it published. The
-  hub never reads a module's content (`docs/decisions/3005`).
+  hub never reads a module's content (VAN-3005).
 - **Events.** Every change to an item is one appended event; a
   current-state table is written in the same transaction and can be
   rebuilt from the events. History, the change feed, and the audit trail
   read the events. Each event has a position that only moves forward
-  (`docs/decisions/3006`).
+  (VAN-3006).
 - **One commit point.** Content commits in its owner; state commits in
   the hub. A submit is a saved, numbered, unchanging revision and then
   one keyed call to the hub. Every write carries an idempotency key. The
   hub never calls a module and sends nothing when an item moves; what
   follows a move reads the feed from its own bookmark
-  (`docs/decisions/3007`).
+  (VAN-3007).
 - **Kinds and lifecycles.** A kind is a file: a Vantage document with a
   `kind` block (prefix, labels of text, number, money, date, or choice,
   roles, parts, the lifecycle view, and an optional shipped base), and
@@ -897,7 +897,7 @@ tool, and the work pages. Phases 11 to 13 land the rest, in the order
   they need. One gate refuses every move the view does not draw. A parent
   state can be worked out from its parts. A state can have a page, and
   the view shows a live count per state. The hub ships work item and
-  roadmap item (`docs/decisions/3008`).
+  roadmap item (VAN-3008).
 - **Roadmaps.** A roadmap item names its outcome, who owes it, a horizon
   (now, next, later), what it waits on, the decision it came from, the
   boxes and arrows it adds, changes, or retires, and its proof. Board,
@@ -905,24 +905,24 @@ tool, and the work pages. Phases 11 to 13 land the rest, in the order
   item's state from its proof and shows the proof's age; no surface takes
   a typed status. Planned boxes draw on the real views, and a view can
   show today or after a horizon. Outside trackers are read through
-  connectors and never written (`docs/decisions/3009`).
+  connectors and never written (VAN-3009).
 - **Agents.** A queue an agent asks for what it may pick up; a claim that
   expires and is renewed while the run works; one run record per run on
   the item, with proof and reported cost; a handoff note; a question that
-  makes the item wait for a person (`docs/decisions/3010`).
+  makes the item wait for a person (VAN-3010).
 - **Access.** A workspace grant, or being named on the item: the person
   who asked, a holder, or a person a waiting move's role resolves to.
   Being named shows that item only. Every list, search, count, feed read,
-  tool, and page embed judges the caller (`docs/decisions/2004`). A
+  tool, and page embed judges the caller (VAN-2004). A
   module makes a person's move as that person, with a token the issuer
   gives it for them, and its own reads and writes under an app role
-  scoped to its kinds (`docs/decisions/2005`). The hub knows a person by
+  scoped to its kinds (VAN-2005). The hub knows a person by
   the issuer's id for them, so a browser, a front door, and every
-  module's token reach one user (`docs/decisions/2006`).
+  module's token reach one user (VAN-2006).
 - **API.** Nine verbs over HTTP: describe, put, move, hold and release,
   note and attach, get, find, changes, link. Each names an item by the
   caller's own key. Versioned and never broken; the web pages and agent
-  tools call the same verbs (`docs/decisions/5001`).
+  tools call the same verbs (VAN-5001).
 - **Agent cost.** An item reads as a card of a fixed size, with its
   notes, history, and links as parts. An event never carries a body. A
   roadmap is read as rows and changed by naming what changes; several
@@ -930,7 +930,7 @@ tool, and the work pages. Phases 11 to 13 land the rest, in the order
   is filled after the access check. A refused move answers the moves that
   are open. A claim is renewed by the bridge and by the run's own calls,
   never by a turn of the model. Finishing an item is one call. The guard
-  on each is in the record that decides it (`docs/decisions/0002`).
+  on each is in the record that decides it (VAN-0002).
 - **Catalog.** The hub pushes an inventory of its workspaces, members,
   documents, and items to the estate's catalog. The catalog lists them;
   the hub stays their home.
@@ -943,18 +943,18 @@ tool, and the work pages. Phases 11 to 13 land the rest, in the order
   concept), `repository` (host/owner/name), `audience`, required `pages`,
   `checks` every save enforces as errors (no-copied-facts,
   sections-name-boxes, name-every-box, evidence), and `rules` for the
-  writer. Decisions 3012, 3014.
+  writer. VAN-3012, VAN-3014.
 - `artifacts:` lists files under `artifacts/` the document keeps and
   versions and never draws, any type, up to the file limit; renders skip
   the folder. Read back as text at `workspace/document/artifacts/<file>`
-  or as bytes from `GET /api/v1/text/file`. Decision 3011.
+  or as bytes from `GET /api/v1/text/file`. VAN-3011.
 - `evidence:` ties a box, view, page, or page section to repository files
   at a commit. A `git` connector reads a repository's recent history
   (`changes` on a batch), signed in the way the `github` connector is,
-  with an app token scoped to contents and metadata (decision 2007); the
+  with an app token scoped to contents and metadata (VAN-2007); the
   hub keeps the latest per repository, and
   `workspace/document/stale` lists every tie a later commit touched, with
-  diffs, worked out on read. Decision 3013.
+  diffs, worked out on read. VAN-3013.
 - A repository points at its document with `vantage.yaml` (document,
   decisions, roadmap, work, watch; `vantage: false` declines). The estate
   maps the repository to its hub and workspace in
@@ -963,8 +963,8 @@ tool, and the work pages. Phases 11 to 13 land the rest, in the order
   repositories. It keeps no records, roadmap, or diagrams of its own. The
   plugin's session-start hook offers onboarding once in every repository
   that is not wired, and `vantage-onboard` does it; the import package
-  reads Mermaid and PlantUML for brownfield projects. Decisions 5005 and
-  5006.
+  reads Mermaid and PlantUML for brownfield projects. VAN-5005 and
+  VAN-5006.
 - A program keeps its documents, registry, and kinds in a workspace of its
   own. `vantage_workspaces` makes one; `vantage_move` moves a document (with
   the kind it defines and its items) or a registry there. A moved
@@ -1008,10 +1008,10 @@ tool, and the work pages. Phases 11 to 13 land the rest, in the order
 
 ### Scalability
 
-- Web pods stateless; replicas 1 for a small estate, 2 or 3 for a larger one.
-- Workers separate; in a small estate the worker is a second container in the web pod,
-  never inside the web process, because a render stalls every request in
-  that process. Job table in Postgres with `SKIP LOCKED`.
+- Web pods stateless; the chart runs 2, and a larger estate runs 3 or more.
+- Workers are their own deployment, never inside the web process, because
+  a render stalls every request in that process. `WORKER_EMBEDDED` runs one
+  in the web process for local development only. Job table in Postgres with `SKIP LOCKED`.
 - Artifacts belong to one render; a client revalidates them by a tag that
   names the render.
 - Live fan-out through Postgres LISTEN and NOTIFY; Redis is a later option.
@@ -1031,11 +1031,12 @@ tool, and the work pages. Phases 11 to 13 land the rest, in the order
 ### Deployment
 
 - One image: `ghcr.io/orchard-suite/vantage`. Entrypoint selects `web`, `worker`,
-  or `migrate`.
-- Kustomize base in `deploy/`: web deployment, worker deployment, service,
-  ingress, network policy, external secret, Postgres (or a reference to a
-  managed one), blob (Azure Blob; S3-compatible as an
-  alternative).
+  `migrate`, or `connector`.
+- Helm chart in `deploy/helm/vantage`: web, worker, and connector pool
+  deployments, service, ingress, network policy, disruption budget,
+  autoscaler, a secret the estate brings or the chart generates, Postgres
+  through CloudNativePG or an external one, nightly dumps, and blob storage
+  on a shared volume or in Azure Blob.
 - Health: `/healthz` (liveness), `/readyz` (ready unless the pod is stopping; reports the database and blob checks).
 - Configuration by environment variables, validated at start with a schema;
   the process refuses to start on a missing or malformed value.
@@ -1096,7 +1097,7 @@ Required additions, in order:
 ### Agent cost
 
 The agent is the first consumer, and a local disk sets the bar
-(`docs/decisions/0002`). Phase 9 built it. Before it, at v2.29.0 on a
+(VAN-0002). Phase 9 built it. Before it, at v2.29.0 on a
 hub in use: the tool list was 40 tools and 40,163 characters, the guide was
 52,157 sent whole, the connect instructions were 1,907, and the largest
 document was 88,596, read whole to change one box. After it: the tool list
@@ -1119,7 +1120,7 @@ characters stand alone. The first paragraph is that self-contained lead.
   gate runs it.
 - **Budgets.** One file holds them (`packages/mcp/src/budget.ts`). The
   standing budgets were set at what the rebuilt surface measured; a change
-  may lower one, and raising one changes `docs/decisions/0002`. The
+  may lower one, and raising one changes VAN-0002. The
   benchmark is `scripts/bench/agent-cost.ts`, and the check gate runs it
   as `agent-cost.test.ts`.
 - **Dashboard.** An estate's Vantage board shows agent calls and
@@ -1130,7 +1131,7 @@ characters stand alone. The first paragraph is that self-contained lead.
   `SHOP-2001`, `SHOP`, `~` (the person's own workspace), `guide`,
   `schema`; a part after `#` is a heading,
   a YAML path, or a line range. Registry prefixes, kind prefixes, and
-  workspace slugs share one namespace (`docs/decisions/5002`).
+  workspace slugs share one namespace (VAN-5002).
 - **Five verbs.** `outline` (names and sizes, never text), `find` (lines
   with address and line number, or a count), `read` (one or many
   addresses or parts, bounded, with the version held answered as
@@ -1147,7 +1148,7 @@ characters stand alone. The first paragraph is that self-contained lead.
   in one file beside them (`.vantage.json`). The agent edits with its own tools. Sync sends
   what changed, pulls what moved, and writes a conflict into the file
   with markers. Every content argument also takes a path, and every tool
-  that makes a file can write it to one (`docs/decisions/5003`).
+  that makes a file can write it to one (VAN-5003).
 - **Small core.** Always listed: the five verbs, render, and validate,
   and on a laptop checkout and sync. Every other tool is listed and called
   through `vantage_tool`, by group (`packages/mcp/src/catalog.ts`). A host
@@ -1156,7 +1157,7 @@ characters stand alone. The first paragraph is that self-contained lead.
   connect instructions teach the climb in a few lines. The guide and the
   schema are text at addresses, read by topic. Every error names the
   guide topic that explains it. No two tools carry the same field list
-  (`docs/decisions/5004`).
+  (VAN-5004).
 - **Removed in the same release:** `vantage_workspaces`,
   `vantage_documents`, `vantage_read` by workspace and document,
   `vantage_save`, `vantage_page`, `vantage_edit`, `vantage_search`,
@@ -1240,7 +1241,7 @@ Known gaps are listed under each phase.
     read as proof through a connector, and a hard delete as an event.
     Landed, except the pusher to the catalog, which needs the catalog's
     blueprints for workspaces and items first. A module in production
-    moves only after the six gates in `docs/decisions/0001`.
+    moves only after the six gates in VAN-0001.
 
 ## Blind spots
 
@@ -1251,6 +1252,6 @@ Known gaps are listed under each phase.
   part. Unverified per tenant.
 - The product name.
 - Tracking: speed of lists and the feed at size. Unmeasured until the
-  gate in `docs/decisions/0001`.
+  gate in VAN-0001.
 - Tracking: how long events of closed items are kept. Not decided.
 

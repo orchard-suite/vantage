@@ -1,7 +1,7 @@
 # Deploying the hub
 
-One image, `ghcr.io/orchard-suite/vantage`, three commands: `web`, `worker`,
-`migrate`. One Postgres. One blob location (a shared volume, or Azure Blob).
+One image, `ghcr.io/orchard-suite/vantage`, four commands: `web`, `worker`,
+`migrate`, and `connector`. One Postgres. One blob location (a shared volume, or Azure Blob).
 Web and worker pods are stateless; replicas are a number. The Helm chart in
 `deploy/helm/vantage` installs all of it.
 
@@ -21,7 +21,7 @@ malformed value stops the process with the variable named.
 | `OIDC_CLIENT_ASSERTION_FILE` | Instead of `OIDC_CLIENT_SECRET`: a file holding a signed token the issuer trusts as the client's credential, read on every use (Entra workload identity) |
 | `OIDC_API_SCOPE` | Optional; the scope the hub exposes at the issuer (Entra: `access_as_user`). Set with `OIDC_ISSUER`, every bearer route also takes access tokens the issuer signs for the hub, under `oidc` or `proxy` sign-in, so an agent or a module acts as the person (see "Agents that sign in with the issuer" and "Modules") |
 | `OIDC_API_AUDIENCE` | Optional; the hub's application URI, accepted as an audience beside `OIDC_CLIENT_ID`. Default `api://<OIDC_CLIENT_ID>`. A front door hub with no `OIDC_CLIENT_ID` names itself with this alone |
-| `OIDC_PERSON_CLAIM` | The claim that names a person the same in every app's tokens. Default `sub`; set `oid` on Entra, whose `sub` differs per app. A browser sign-in, a front door, and every app's token then reach one user (ADR-2006) |
+| `OIDC_PERSON_CLAIM` | The claim that names a person the same in every app's tokens. Default `sub`; set `oid` on Entra, whose `sub` differs per app. A browser sign-in, a front door, and every app's token then reach one user (VAN-2006) |
 | `SIGN_IN_GROUPS` | Optional, comma separated; only people in one of these groups (the OIDC groups claim, or the front door's groups header) may sign in |
 | `TEAM_WORKSPACES` | `everyone` (default) or `granted`: only admins and the people an admin lets make team workspaces |
 | `PUBLICATION_APPROVAL` | `true` runs a publication only once an admin approves it; default `false` |
@@ -307,8 +307,8 @@ hour.
 ## Modules
 
 A module is an app that keeps its own content and tracks its items in the
-hub through the nine verbs (ADR-5001). It calls the hub two ways
-(ADR-2005):
+hub through the nine verbs (VAN-5001). It calls the hub two ways
+(VAN-2005):
 
 - **As itself**, for its own work: loading its kinds file from its
   pipeline (`PUT /api/v1/kinds/<prefix>`), putting items by its own key,
@@ -356,6 +356,7 @@ apps they connected on their Account page and can disconnect any of them.
 To offer it in the sidebar, add `{ client: claude-desktop }` to `agents`: it
 shows the hub's address to paste, with the steps.
 
+## Connectors
 
 A connector belongs to one workspace and runs outside the hub, as its own
 app. Only that workspace's readers see it and what it observed. The hub

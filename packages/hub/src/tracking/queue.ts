@@ -1,5 +1,5 @@
 /**
- * The queue an agent asks (docs/decisions/3010): what it may pick up, given
+ * The queue an agent asks (VAN-3010): what it may pick up, given
  * what it can do. It answers cards and addresses with their sizes, never
  * text, and the last handoff note, which is short enough to come along.
  */

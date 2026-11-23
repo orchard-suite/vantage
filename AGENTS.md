@@ -7,6 +7,16 @@ This repository is public and estate-neutral. Every name in a test, an
 example, or a doc comes from the fixture world:
 https://github.com/orchard-suite/hedge/blob/main/docs/fixtures.md.
 
+## Docs and decisions
+
+`vantage.yaml` at the root points at this repository's diagram set, its
+pages, and its decision records in a Vantage hub; the estate's repository
+map says which hub. Read the records in its `decisions` registry before
+changing the code they govern; `VAN-NNNN` in a comment or a doc cites one.
+A decision that shapes how Vantage is built gets a record there, never a
+file here. A change to code a box's evidence cites moves that tie in the
+same pass.
+
 ## Working here
 
 - Bun monorepo. `bun install`, `bun run build` (viewer bundle), `bun run check`
@@ -29,18 +39,18 @@ https://github.com/orchard-suite/hedge/blob/main/docs/fixtures.md.
   same commit as the engine change.
 - `docs/spec.md` is the plan of record for the platform. A requirement that
   changes lands with its spec change.
-- The agent is the first consumer (`docs/decisions/0002`). A tool, an
+- The agent is the first consumer (VAN-0002). A tool, an
   answer, or a line of instruction is designed for the agent that pays
   for it: an answer has a size limit and names the call that reads more,
   a write sends what changed, and a file never passes through the model.
   A new kind of content brings a text form and an outline, never its own
-  read and write tools (`docs/decisions/5002`).
+  read and write tools (VAN-5002).
 - Tracked work is `packages/hub/src/tracking/`. An item's state changes
   only by appending an event through `store.ts`, and one fold in
   `state.ts` turns events into state; a new kind of change is a new event
-  type, never a column the history cannot explain (`docs/decisions/3006`).
+  type, never a column the history cannot explain (VAN-3006).
   Every move passes the one gate in `gate.ts`. A feature callers need is a
-  change to the nine verbs (`docs/decisions/5001`); moving an item route's
+  change to the nine verbs (VAN-5001); moving an item route's
   shape means `VANTAGE_WRITE_CONTRACT=1` on purpose, with a new version.
 - Connectors and publish targets are plugin interfaces
   (`packages/connectors/src/connector.ts`, `packages/publish/src/target.ts`).
