@@ -21,7 +21,7 @@ import { badRequest, forbidden, notFound, unauthorized, HttpError } from '../htt
 import { clientAddress, createRateLimiter } from '../ratelimit.ts';
 import { connectorBlocked, connectorsForClient, sourceById, type SourceRow } from '../sources/repo.ts';
 import { recordFailedRun } from '../sources/ingest.ts';
-import { enqueue } from '../worker/jobs.ts';
+import { enqueue, jobById } from '../worker/jobs.ts';
 import { pushKey } from '../worker/ingest-run.ts';
 import { randomId } from '../crypto.ts';
 
@@ -121,11 +121,14 @@ export function pushRoutes(ctx: AppContext, reg: OpenApiRegistry): Hono<HubEnv> 
     return c.body(null, 204);
   });
 
-  reg.add({ method: 'post', path: '/connector/:connector/failures', summary: 'Record a run that failed before it could push, so the workspace sees why', tag: 'push', params: ['connector'], body: { error: 'what went wrong' }, auth: 'source', responses: { '201': 'recorded' } });
+  reg.add({ method: 'post', path: '/connector/:connector/failures', summary: 'Record a run that failed before it could push, so the workspace sees why', tag: 'push', params: ['connector'], body: { error: 'what went wrong', job: "optional: the pool's run this was" }, auth: 'source', responses: { '201': 'recorded' } });
   app.post('/connector/:connector/failures', async (c) => {
     const { clientId, source } = await mine(c);
-    const input = await body(c, z.object({ error: z.string().min(1).max(4000) }).strict());
-    const runId = await recordFailedRun(ctx, { source, trigger: 'push', startedAt: new Date(), jobId: null, who: `connector-client:${clientId}` }, input.error);
+    const input = await body(c, z.object({ error: z.string().min(1).max(4000), job: z.string().min(1).max(100).optional() }).strict());
+    // A pool's run of this connector is named, so the pool's word on how it ended finds the failure already recorded.
+    const job = input.job ? await jobById(ctx.db, input.job) : undefined;
+    const jobId = job && job.kind === 'connector-run' && job.payload['sourceId'] === source.id ? job.id : null;
+    const runId = await recordFailedRun(ctx, { source, trigger: 'push', startedAt: new Date(), jobId, who: `connector-client:${clientId}` }, input.error);
     return c.json({ runId }, 201);
   });
 

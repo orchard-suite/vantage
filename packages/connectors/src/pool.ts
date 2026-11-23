@@ -92,7 +92,7 @@ export async function runPool(o: PoolOptions): Promise<void> {
     }, (leaseSeconds * 1000) / 4);
     let error: string | undefined;
     try {
-      await runConnectorOnce({ hub, connector: job.connector, tokenUrl: o.tokenUrl, clientId: job.clientId, scope: o.scope, assertionFile: o.assertionFile, registry: o.registry, log: runLog, fetch: fetchImpl, timeoutSeconds: o.timeoutSeconds ?? 600, pooled: true, signal: stop.signal });
+      await runConnectorOnce({ hub, connector: job.connector, tokenUrl: o.tokenUrl, clientId: job.clientId, scope: o.scope, assertionFile: o.assertionFile, registry: o.registry, log: runLog, fetch: fetchImpl, timeoutSeconds: o.timeoutSeconds ?? 600, pooled: true, signal: stop.signal, job: job.id });
     } catch (err) {
       error = (err as Error).message.slice(0, 4000);
     } finally {

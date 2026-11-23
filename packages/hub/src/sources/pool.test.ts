@@ -146,4 +146,40 @@ describe('connector pool', () => {
     expect(Object.keys((observed.body['model'] as { entities: Record<string, unknown> }).entities)).toEqual(['groups:prod']);
     await t.ctx.db.close();
   });
+
+  test('a pooled run that fails before it pushes leaves one failed run with its error, whether or not the runner could report it', async () => {
+    const { t, author, ws, make } = await setup();
+    const signIn = (await make({ name: 'Refused', slug: 'refused', connector: 'groups', config: { rg: 'prod' }, clientId: 'app-refused', every: 10 })).body['id'] as string;
+    const badConfig = (await make({ name: 'Bad', slug: 'bad', connector: 'groups', config: { rg: 'prod' }, clientId: 'app-bad', every: 10 })).body['id'] as string;
+    // The pool's registry reads a config its kind refuses: the runner signs in, then reports the failure itself.
+    const strict: Connector<{ rg: number }> = { id: 'groups', configSchema: z.object({ rg: z.number() }).strict(), async *discover() {} };
+
+    const dir = mkdtempSync(join(tmpdir(), 'vantage-pool-'));
+    writeFileSync(join(dir, 'token'), 'pool-sa-token\n');
+    const tokens: Record<string, string> = { pool: (await t.pool('pool-app')).authorization!.slice(7), 'app-bad': (await t.connector('app-bad')).authorization!.slice(7) };
+    const fetchImpl: FetchLike = async (input, init) => {
+      const url = String(input instanceof Request ? input.url : input);
+      if (url === 'https://login.example/token') {
+        const client = new URLSearchParams(String(init?.body)).get('client_id')!;
+        const token = client === 'pool-app' ? tokens['pool'] : tokens[client];
+        if (!token) return new Response(JSON.stringify({ error: 'invalid_client', error_description: 'no federated credential matches' }), { status: 401, headers: { 'content-type': 'application/json' } });
+        return new Response(JSON.stringify({ access_token: token, expires_in: 3600 }), { headers: { 'content-type': 'application/json' } });
+      }
+      return t.app.request(url.replace('https://hub.test', ''), init as RequestInit);
+    };
+    for (const id of [signIn, badConfig]) {
+      await t.json(`/api/v1/workspaces/${ws.slug}/connectors/${id}/run`, { method: 'POST', headers: author.headers });
+      const stop = new AbortController();
+      const log: Logger = { ...quiet, info: (m) => m === 'pool run end' && stop.abort() };
+      await runPool({ hub: 'https://hub.test', tokenUrl: 'https://login.example/token', clientId: 'pool-app', scope: 'api://hub/.default', assertionFile: join(dir, 'token'), registry: createRegistry([strict as Connector]), log, fetch: fetchImpl, waitSeconds: 0, signal: stop.signal, worker: 'w1' });
+    }
+
+    expect((await queuedRuns(t)).map((r) => r.state)).toEqual(['failed', 'failed']);
+    const runs = await t.ctx.db.query<{ source_id: string; status: string; error: string; job_id: string | null }>('select source_id, status, error, job_id from source_runs order by started_at');
+    const jobs = (await queuedRuns(t)).map((r) => r.id);
+    expect(runs.map((r) => [r.source_id, r.status, r.job_id])).toEqual([[signIn, 'failed', jobs[0]!], [badConfig, 'failed', jobs[1]!]]);
+    expect(runs[0]!.error).toContain('the issuer refused the client app-refused');
+    expect(runs[1]!.error).toContain('config invalid');
+    await t.ctx.db.close();
+  });
 });

@@ -12,7 +12,9 @@
  * What the connector keeps between runs is read from the hub before the run
  * and stored back after its batch is pushed, when it changed; the hub holds
  * it as bytes it never reads. A run that fails before it pushes is reported
- * to the hub, then rethrown, and keeps nothing.
+ * to the hub, with the pool's run when it has one, then rethrown, and keeps
+ * nothing. A run that cannot sign in or read its settings cannot report;
+ * in the pool, the hub records that failure from the pool's word.
  */
 import { readFileSync } from 'node:fs';
 import type { Batch } from './batch.ts';
@@ -45,6 +47,8 @@ export interface RunnerOptions {
   readonly pooled?: boolean;
   /** Stops the run early, such as when the pool shuts down. */
   readonly signal?: AbortSignal;
+  /** The pool's run this is, so a failure the runner reports is that run's. */
+  readonly job?: string;
 }
 
 export interface RunnerOutcome {
@@ -154,8 +158,8 @@ export async function runConnectorOnce(o: RunnerOptions): Promise<RunnerOutcome>
     return body;
   };
   const settings = (await call(`/connector/${encodeURIComponent(o.connector)}`)) as unknown as Settings;
-  if (settings.blocked) throw new Error(`the hub will not take a batch: ${settings.blocked}`);
   try {
+    if (settings.blocked) throw new Error(`the hub will not take a batch: ${settings.blocked}`);
     let batch: Batch;
     if (settings.connector === 'push') throw new Error('a push connector has no kind to run; push to it from your own script');
     const kind = o.registry.get(settings.connector);
@@ -182,7 +186,7 @@ export async function runConnectorOnce(o: RunnerOptions): Promise<RunnerOutcome>
   } catch (err) {
     const message = (err as Error).message;
     log.error('runner failed', { connector: settings.slug, error: message });
-    await call(`/connector/${encodeURIComponent(settings.id)}/failures`, { method: 'POST', body: JSON.stringify({ error: message.slice(0, 4000) }) }).catch((e: Error) => log.warn('runner could not report the failure', { error: e.message }));
+    await call(`/connector/${encodeURIComponent(settings.id)}/failures`, { method: 'POST', body: JSON.stringify({ error: message.slice(0, 4000), ...(o.job ? { job: o.job } : {}) }) }).catch((e: Error) => log.warn('runner could not report the failure', { error: e.message }));
     throw err;
   }
 }

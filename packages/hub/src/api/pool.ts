@@ -7,6 +7,8 @@
  * hub for a run, woken by the job queue's notices, so the pool hears of a
  * run within moments without asking every second. A queued run whose
  * connector was removed, paused, or stopped since is closed, not handed out.
+ * A run that ended in an error the connector did not record itself, such
+ * as one whose app could not sign in, is recorded as a failed run here.
  */
 import { Hono, type Context } from 'hono';
 import { z } from 'zod';
@@ -17,6 +19,8 @@ import { body } from './common.ts';
 import { forbidden, unauthorized } from '../http.ts';
 import { claim, fail, finish, jobById, JOBS_CHANNEL, releaseJobs, renewLeases, type JobLogLine } from '../worker/jobs.ts';
 import { sourceById } from '../sources/repo.ts';
+import { recordFailedRun } from '../sources/ingest.ts';
+import { maybe } from '../db/db.ts';
 import { runRefusal } from '../sources/runs.ts';
 
 /** The longest a lease request waits at the hub; under the idle timeout of the ingresses in front of it. */
@@ -98,12 +102,18 @@ export function poolRoutes(ctx: AppContext, reg: OpenApiRegistry): Hono<HubEnv> 
     return c.json({ held });
   });
 
-  reg.add({ method: 'post', path: '/connector-pool/jobs/:job/done', summary: 'Say how a run ended; the connector already recorded its batch or its failure', tag: 'pool', params: ['job'], body: { worker: "the pool runner's name", error: 'why it failed, when it did' }, auth: 'pool', responses: { '200': 'state: done, failed, or lost when the hub had taken it back' } });
+  reg.add({ method: 'post', path: '/connector-pool/jobs/:job/done', summary: 'Say how a run ended; a failure the connector did not record itself is recorded as its failed run', tag: 'pool', params: ['job'], body: { worker: "the pool runner's name", error: 'why it failed, when it did' }, auth: 'pool', responses: { '200': 'state: done, failed, or lost when the hub had taken it back' } });
   app.post('/connector-pool/jobs/:job/done', async (c) => {
     const input = await body(c, z.object({ worker: Worker, error: z.string().min(1).max(4000).optional() }).strict());
     const by = owner(c, input.worker);
     const job = await jobById(ctx.db, c.req.param('job'));
     if (!job || job.kind !== 'connector-run' || job.state !== 'running' || job.locked_by !== by) return c.json({ state: 'lost' });
+    if (input.error) {
+      // A run that failed before its app could reach the hub left no run of its own; the connector's page still says why.
+      const source = await sourceById(ctx.db, String(job.payload['sourceId'] ?? ''));
+      const recorded = await maybe(ctx.db, 'select 1 as x from source_runs where job_id = $1 limit 1', [job.id]);
+      if (source && !recorded) await recordFailedRun(ctx, { source, trigger: 'push', startedAt: job.run_at, jobId: job.id, who: by }, input.error);
+    }
     const state = input.error ? await fail(ctx.db, job, input.error, [line('error', input.error)]) : (await finish(ctx.db, job, [line('info', 'ran')])) ? 'done' : 'running';
     ctx.metrics.jobs.add(1, { task: 'connector-run', outcome: input.error ? 'failed' : 'done' });
     log.info('pool.run.end', { jobId: job.id, connectorId: job.payload['sourceId'], state, error: input.error });

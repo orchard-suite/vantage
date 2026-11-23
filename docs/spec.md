@@ -338,7 +338,10 @@ resolve as a Key Vault secret URL read as the connector's app, or, on a
 runner of its own, from its environment. The hub's worker merges a pushed
 batch into the observed layer, marks entities not seen as missing since,
 and records the run. A runner that fails before it pushes reports the
-failure, which is recorded as a failed run. Before a run the runner reads
+failure, which is recorded as a failed run; a blocked connector's run is
+one. A pooled run that fails where it cannot report, such as an app that
+cannot sign in, is recorded as a failed run from the pool's word on how
+the run ended, so every pooled run that fails leaves exactly one. Before a run the runner reads
 what the connector kept (`GET /connector/:id/kept`), and after it pushes it
 stores what the run read or wrote, gzipped, when it changed (`PUT`); the
 hub keeps those bytes as one blob per connector, never reads them, and
