@@ -1,6 +1,6 @@
 ---
 name: vantage-brief
-description: "Find the story before anything is written: the questions, one-sentence answers, the gesture and hero per view, the facts boxes carry, and the pages a set needs. Use when someone asks for a diagram, docs, a runbook, a wiki, or documentation."
+description: "Find the story before anything is written: the questions, one-sentence answers, the gesture and hero per view, and the pages a set needs. Use when someone asks for a diagram, docs, or a runbook."
 ---
 
 # Vantage brief

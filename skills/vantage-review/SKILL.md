@@ -1,6 +1,6 @@
 ---
 name: vantage-review
-description: "Review a Vantage document's pictures and pages for story and accuracy: what each view says, pages that copy facts or name no boxes, boxes nothing explains, claims with no evidence. Use to check, audit, or refresh diagrams or docs, or before publishing."
+description: "Review a Vantage document's pictures and pages for story and accuracy: copied facts, unnamed boxes, claims with no evidence. Use to check, audit, or refresh diagrams or docs, or before publishing."
 ---
 
 # Vantage review

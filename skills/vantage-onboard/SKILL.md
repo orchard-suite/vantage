@@ -1,6 +1,6 @@
 ---
 name: vantage-onboard
-description: "Give a repository living Vantage docs: pick a workspace, import its old diagrams or read the code, write the diagram and first pages with evidence, save, and write vantage.yaml. Use when a session says a project has none, or when asked to onboard or migrate docs."
+description: "Give a repository living Vantage docs: pick a workspace, import old diagrams or read the code, write the first set with evidence, and write vantage.yaml. Use when a project has none, or to migrate docs."
 ---
 
 # Vantage onboard

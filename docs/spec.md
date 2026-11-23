@@ -1102,8 +1102,10 @@ Required additions, in order:
   `vantage-connect` (configure a connector and mapping from a description
   of a source), `vantage-publish` (set up a publication), `decide`
   (write and migrate decision records, reading the estate's registries
-  from its config), and `vantage-work` (take an item from the queue,
-  claim it, ask a person when stuck, and finish the run).
+  from its config), `vantage-work` (take an item from the queue,
+  claim it, ask a person when stuck, and finish the run), and `roadmap`
+  (plan a roadmap at its level and the ones above and below it, reading
+  the estate's rules from its config).
 - Eval cases per skill under `evals/`.
 
 ### Agent cost

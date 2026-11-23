@@ -72,7 +72,8 @@ Install the Claude Code plugin. It brings the MCP tools and its skills
 (`vantage-brief` finds the story, `vantage-author` writes and iterates,
 `vantage-review` audits a set, `vantage-connect` and `vantage-publish` keep
 a set fresh, `decide` writes and migrates decision records,
-`vantage-work` takes tracked items from the queue and finishes them, and
+`vantage-work` takes tracked items from the queue and finishes them,
+`roadmap` plans a roadmap at its level and the levels above and below, and
 `vantage-onboard` gives a repository living docs). A session hook says,
 in one line, when a repository has no `vantage.yaml` or nothing maps it
 to a hub. A repository's `vantage.yaml` names its document; the hub and

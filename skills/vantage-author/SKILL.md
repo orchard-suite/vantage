@@ -1,6 +1,6 @@
 ---
 name: vantage-author
-description: "Write or change a Vantage document, its diagram views and its pages (docs, a runbook, a guide, a wiki, documentation): render and look, iterate until each view tells its story, then save to the hub. Use to create or update diagrams or docs."
+description: "Write or change a Vantage document, its views and pages (docs, a runbook, a wiki): render, look, iterate until each view tells its story, then save. Use to create or update diagrams or docs."
 ---
 
 # Vantage author
