@@ -172,6 +172,8 @@ const STATIC = [
   `--logo-coral:${BRAND.coral}`, `--logo-amber:${BRAND.amber}`, `--logo-blue:${BRAND.blue}`,
   '--ease:cubic-bezier(.2,.7,.2,1)', '--ease-in:cubic-bezier(.4,0,.6,1)',
   '--d-1:120ms', '--d-2:180ms', '--d-3:260ms',
+  // Nothing repaints forever: a spinner turns a set number of times and rests as an open ring, a skeleton shines a few passes and rests, the sign-in art settles once.
+  '--d-spin:.7s', '--spin-turns:8', '--d-shine:1.4s', '--shine-passes:3', '--d-art:900ms',
   '--ring:0 0 0 2px var(--panel),0 0 0 4px var(--accent)',
   '--knob:#ffffff',
 ].join(';');

@@ -103,7 +103,7 @@ select.field{appearance:none;padding-right:30px;cursor:pointer;background-image:
 .pill.warn{background:var(--warn-bg);color:var(--warn-ink);border-color:var(--warn-line)}
 .pill.bad{background:var(--bad-bg);color:var(--bad-ink);border-color:var(--bad-line)}
 .pill.info{background:var(--accent-soft);color:var(--accent-ink);border-color:transparent}
-.pill.busy::before{width:9px;height:9px;background:none;border:1.5px solid currentColor;border-right-color:transparent;animation:kit-spin .7s linear infinite}
+.pill.busy::before{width:9px;height:9px;background:none;border:1.5px solid currentColor;border-right-color:transparent;animation:kit-spin var(--d-spin) linear var(--spin-turns)}
 .count{display:inline-block;min-width:18px;height:18px;padding:0 5px;border-radius:var(--r-pill);background:var(--accent);color:var(--on-accent);font:600 10.5px/18px var(--mono);text-align:center}
 .tally{font:600 var(--fs-xs) var(--mono);color:var(--muted);background:var(--hover);border-radius:var(--r-pill);padding:2px 7px}
 .more{display:inline-flex;align-items:center;height:22px;padding:0 9px;border-radius:var(--r-pill);background:var(--panel);border:1px solid var(--line2);font:500 var(--fs-xs) var(--font);color:var(--muted)}
@@ -182,8 +182,8 @@ select.field{appearance:none;padding-right:30px;cursor:pointer;background-image:
 .progress{height:6px;border-radius:var(--r-pill);background:var(--line);overflow:hidden}
 .progress>i{display:block;height:100%;border-radius:inherit;background:var(--accent);transition:width var(--d-3) var(--ease)}
 .progress.ok>i{background:var(--emerald-stroke)}
-.spinner{display:inline-block;width:14px;height:14px;flex:none;border-radius:999px;border:2px solid currentColor;border-right-color:transparent;animation:kit-spin .7s linear infinite}
-.skeleton{border-radius:6px;background:linear-gradient(90deg,var(--hover) 0%,var(--sunken) 50%,var(--hover) 100%);background-size:200% 100%;animation:kit-shine 1.4s ease-in-out infinite}
+.spinner{display:inline-block;width:14px;height:14px;flex:none;border-radius:999px;border:2px solid currentColor;border-right-color:transparent;animation:kit-spin var(--d-spin) linear var(--spin-turns)}
+.skeleton{border-radius:6px;background:linear-gradient(90deg,var(--hover) 0%,var(--sunken) 50%,var(--hover) 100%);background-size:200% 100%;animation:kit-shine var(--d-shine) ease-in-out var(--shine-passes)}
 @keyframes kit-spin{to{transform:rotate(360deg)}}
 @keyframes kit-shine{from{background-position:100% 0}to{background-position:-100% 0}}
 @keyframes kit-rise{from{opacity:0;transform:translateY(8px) scale(.99)}to{opacity:1;transform:none}}

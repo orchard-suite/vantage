@@ -5,10 +5,10 @@ export const BRAND_CSS = `
 .auth-art img{height:30px;width:auto;align-self:flex-start}
 .auth-shapes{position:relative;height:300px}
 .auth-shapes i{position:absolute;display:block}
-.auth-shapes i:nth-child(1){left:6%;top:10%;width:180px;height:120px;border-radius:28px;background:linear-gradient(135deg,#ff8a7a,#e0435a);transform:rotate(-7deg);box-shadow:0 18px 40px rgba(0,0,0,.28);animation:auth-float 6s var(--ease) infinite;--r:-7deg}
-.auth-shapes i:nth-child(2){left:52%;top:0;width:160px;height:160px;border-radius:32px;background:linear-gradient(225deg,#ffcb5c,#f0901e);transform:rotate(9deg);box-shadow:0 18px 40px rgba(0,0,0,.28);animation:auth-float 7s var(--ease) infinite .8s;--r:9deg}
+.auth-shapes i:nth-child(1){left:6%;top:10%;width:180px;height:120px;border-radius:28px;background:linear-gradient(135deg,#ff8a7a,#e0435a);transform:rotate(-7deg);box-shadow:0 18px 40px rgba(0,0,0,.28);animation:auth-settle var(--d-art) var(--ease) both;--r:-7deg}
+.auth-shapes i:nth-child(2){left:52%;top:0;width:160px;height:160px;border-radius:32px;background:linear-gradient(225deg,#ffcb5c,#f0901e);transform:rotate(9deg);box-shadow:0 18px 40px rgba(0,0,0,.28);animation:auth-settle var(--d-art) var(--ease) var(--d-2) both;--r:9deg}
 .auth-shapes i:nth-child(3){left:34%;top:58%;width:120px;height:120px;border-radius:999px;background:radial-gradient(circle at 34% 28%,#9cc0ff,#4a7ef0 55%,#2448b8);box-shadow:0 18px 40px rgba(0,0,0,.3)}
-@keyframes auth-float{0%,100%{transform:translateY(0) rotate(var(--r))}50%{transform:translateY(-6px) rotate(var(--r))}}
+@keyframes auth-settle{from{transform:translateY(8px) rotate(var(--r))}to{transform:rotate(var(--r))}}
 .auth-art h2{margin:0;font:700 52px/56px var(--display);letter-spacing:-.03em;max-width:520px}
 .auth-art p{margin:14px 0 0;font:500 19px/27px var(--display);opacity:.86;max-width:480px}
 .auth-task{flex:1 1 50%;display:flex;align-items:center;justify-content:center;padding:40px 24px}
