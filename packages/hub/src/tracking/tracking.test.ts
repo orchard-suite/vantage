@@ -178,6 +178,8 @@ describe('tracked items', () => {
     await put(t.ctx, me, { kind: 'REQ', title: 'Two' }, 'k2');
     expect((await link(t.ctx, me, 'REQ-2', { rel: 'came-from', target: 'REQ-1' }, 'l1')).line).toBe('REQ-2 came-from REQ-1');
     expect((await refused(link(t.ctx, me, 'REQ-2', { rel: 'part-of', target: 'REQ-1' }, 'l2'))).message).toContain('lists no kinds as its parts');
+    expect((await link(t.ctx, me, 'REQ-2', { rel: 'waits-on', target: 'REQ-1' }, 'l3')).line).toBe('REQ-2 waits-on REQ-1');
+    expect((await refused(link(t.ctx, me, 'REQ-2', { rel: 'waits-on', target: 'REQ-2' }, 'l4'))).message).toContain('cannot link to itself');
   });
 
   test('a kind that draws its own lifecycle sends each state\'s live count, counting only what the reader may see', async () => {

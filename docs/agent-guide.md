@@ -1455,7 +1455,7 @@ views:
   ```
 
   A refused move names the moves open to you and what each needs.
-  `link` takes `came-from`, `part-of`, `box` or `view`
+  `link` takes `came-from`, `part-of`, `waits-on`, `box` or `view`
   (`workspace/document#id`), or `decision` (`SHOP-2001`). On a machine
   with a disk, `attach` takes the file's path.
 - People see an item when they can open its workspace, or when it names
@@ -1525,6 +1525,10 @@ views: []
 - A roadmap kept in Markdown comes in with `vantage_roadmap_import`: a
   table with an outcome column, or bullets under Now, Next, and Later. On a
   machine with a disk give `file`. Running it again makes nothing twice.
+- An item that cannot start before another says so with a `waits-on`
+  link to it. The build order is these links, never prose.
+- A kind's outline says which kinds take it as a part (`part of: PLAN`),
+  so a planner in one program climbs to the roadmap above it.
 - A page names an item with `[[item:PLAN-3]]`; readers who may see the item
   see its live state there.
 

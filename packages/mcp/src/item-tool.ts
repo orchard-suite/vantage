@@ -9,7 +9,7 @@
 import { z } from 'zod';
 
 const link = z.object({
-  rel: z.enum(['came-from', 'part-of', 'box', 'view', 'decision', 'proof', 'adds', 'changes', 'retires']),
+  rel: z.enum(['came-from', 'part-of', 'waits-on', 'box', 'view', 'decision', 'proof', 'adds', 'changes', 'retires']),
   target: z.string().describe('An item (VAN-3), workspace/document#box-or-view, or a record (SHOP-2001). proof: an item, or a box a connector should see'),
 });
 

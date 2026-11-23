@@ -180,7 +180,7 @@ export function itemRoutes(ctx: AppContext, reg: OpenApiRegistry): Hono<HubEnv> 
     return new Response(Buffer.from(bytes), { headers: { 'content-type': row.content_type, 'content-disposition': `attachment; filename="${row.name.replace(/"/g, '')}"` } });
   });
 
-  reg.add({ method: 'post', path: '/items/:item/links', summary: 'link: came-from or part-of an item, a box or a view (workspace/document#id), or a decision record; remove: true takes one away', tag: 'items', params: ['item'], body: { rel: 'came-from, part-of, box, view, or decision', target: 'what it links to', remove: 'optional' }, auth: 'author' });
+  reg.add({ method: 'post', path: '/items/:item/links', summary: 'link: came-from, part-of, or waits-on an item, a box or a view (workspace/document#id), or a decision record; remove: true takes one away', tag: 'items', params: ['item'], body: { rel: 'came-from, part-of, box, view, or decision', target: 'what it links to', remove: 'optional' }, auth: 'author' });
   app.post('/items/:item/links', async (c) => answer(c, await link(ctx, principal(c), item(c), await body(c, LinkBody), idempotencyKey(c))));
 
   reg.add({ method: 'post', path: '/items/batch', summary: 'Several writes in one request; each commits alone with its own key, and the answer says in a line each which landed', tag: 'items', body: { actions: '[{verb: put | move | hold | release | note | link, key, ...that verb\'s body, item}]' }, auth: 'user' });

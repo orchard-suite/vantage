@@ -12,7 +12,7 @@ import { HttpError, badRequest } from '../http.ts';
 import { headingOutline } from '@vantage/mcp';
 import { kindByPrefix } from '../tracking/kinds.ts';
 import { findItem } from '../tracking/access.ts';
-import { bodyOf, cardOf, describeKind, filesOf, find as findItems, history, linksOf, notes, type Row } from '../tracking/read.ts';
+import { bodyOf, cardOf, describeKind, filesOf, kindsFor, find as findItems, history, linksOf, notes, type Row } from '../tracking/read.ts';
 import { put } from '../tracking/write.ts';
 import type { Address } from './address.ts';
 import { itemTemplate, itemText, parseItemText, refuseFixed } from './item-text.ts';
@@ -71,6 +71,7 @@ const rowLine = (r: Row): string => `  ${r.key}  ${r.state}  ${r.title}${r.holde
 export async function kindOutline(ctx: AppContext, p: Principal, prefix: string, part: string | undefined): Promise<string> {
   const { kind, counts } = await describeKind(ctx, p, prefix);
   const def = kind.definition;
+  const within = (await kindsFor(ctx, p)).filter((k) => k.prefix !== kind.prefix && k.definition.parts.includes(kind.prefix)).map((k) => k.prefix);
   const filter: { state?: string; class?: (typeof def.states)[number]['class']; labels?: Record<string, string> } = {};
   if (part !== undefined) {
     const cls = def.states.find((s) => s.class === part)?.class;
@@ -88,6 +89,7 @@ export async function kindOutline(ctx: AppContext, p: Principal, prefix: string,
     ...(def.labels.length ? [`labels: ${def.labels.map((l) => `${l.name} (${l.type}${l.choices ? `: ${l.choices.join(', ')}` : ''})`).join(', ')}`] : []),
     ...(Object.keys(def.roles).length ? [`roles: ${Object.entries(def.roles).map(([r, w]) => `${r} = ${w.join(', ')}`).join('; ')}`] : []),
     ...(def.parts.length ? [`parts may be: ${def.parts.join(', ')}`] : []),
+    ...(within.length ? [`part of: ${within.join(', ')}`] : []),
   ];
   const page = await findItems(ctx, p, { kinds: [kind.prefix], ...filter, limit: 40 });
   lines.push('', `items${part ? ` in ${part}` : ''}, newest first (${n(page.total)}):`, ...page.rows.map(rowLine));

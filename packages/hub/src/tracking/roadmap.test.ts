@@ -6,6 +6,7 @@ import { get } from './read.ts';
 import { hold, link, move, put } from './write.ts';
 import { reworkDocument, reworkSource } from './worked.ts';
 import { importRoadmap, parseRoadmap } from './import.ts';
+import { kindOutline } from '../text/items.ts';
 
 const WORK = `title: Shop work
 kind: { prefix: SW, name: Shop work, base: work-item }
@@ -34,6 +35,14 @@ async function seeded() {
 }
 
 const stateOf = async (t: Awaited<ReturnType<typeof seeded>>, key: string): Promise<string> => (await findItem(t.t.ctx, t.p, key)).item.state;
+
+describe('a kind says which kinds take it as a part', () => {
+  test('the work kind names the roadmap that lists it, so a planner climbs from a program to the plan above it', async () => {
+    const { t, p } = await seeded();
+    expect(await kindOutline(t.ctx, p, 'SW', undefined)).toContain('part of: PLAN');
+    expect(await kindOutline(t.ctx, p, 'PLAN', undefined)).not.toContain('part of:');
+  });
+});
 
 describe('roadmap items work out their state from proof', () => {
   test('parts move a roadmap item through building to shipped and back, as events the hub makes', async () => {

@@ -6,7 +6,7 @@
  */
 import type { StateClass } from '@vantage/model';
 
-export const LINK_RELS = ['came-from', 'part-of', 'box', 'view', 'decision', 'proof', 'adds', 'changes', 'retires'] as const;
+export const LINK_RELS = ['came-from', 'part-of', 'waits-on', 'box', 'view', 'decision', 'proof', 'adds', 'changes', 'retires'] as const;
 export type LinkRel = (typeof LINK_RELS)[number];
 
 export type LabelValue = string | number;
@@ -27,7 +27,7 @@ export interface ItemState {
   readonly labels: Readonly<Record<string, LabelValue>>;
   readonly revision: string | null;
   readonly bodyId: string | null;
-  /** Targets by relation: `part-of` and `came-from` name item ids; `box`, `view`, `adds`, `changes`, and `retires` name document-id#id; `decision` names a record's ULID; `proof` names an item id or a document-id#box. */
+  /** Targets by relation: `part-of`, `came-from`, and `waits-on` name item ids; `box`, `view`, `adds`, `changes`, and `retires` name document-id#id; `decision` names a record's ULID; `proof` names an item id or a document-id#box. */
   readonly links: readonly { readonly rel: LinkRel; readonly target: string }[];
   /** Who claims the item and until when; a claim past its end holds nothing. */
   readonly claim: { readonly userId: string; readonly until: string } | null;
