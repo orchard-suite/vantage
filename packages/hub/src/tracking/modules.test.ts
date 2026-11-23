@@ -1,7 +1,8 @@
-/** Modules through a port (docs/decisions/2005, 5001, 3006): an app scoped to its kinds, a person acting through it, a kinds file from a pipeline, and a hard delete. */
+/** Modules through a port (VAN-2005, VAN-5001, VAN-3006): an app scoped to its kinds, a person acting through it, a kinds file from a pipeline, and a hard delete. */
 import { describe, expect, test } from 'bun:test';
 import { testApp, TEST_MODULE_ROLE } from '../testing.ts';
 import { findItem } from './access.ts';
+import { history } from './read.ts';
 import { rebuild } from './store.ts';
 
 const FORMS = `title: Forms
@@ -67,7 +68,7 @@ describe('modules through a port', () => {
     expect(person.body['line']).toBe('FRM-1 moved draft → submitted (submit)');
   });
 
-  test('a person acts through the module with the token the issuer gave it for them, as themselves (docs/decisions/2005, 2006)', async () => {
+  test('a person acts through the module with the token the issuer gave it for them, as themselves (VAN-2005, VAN-2006)', async () => {
     const { t, admin, ws, forms } = await seeded();
     await send(t, '/api/v1/apps', 'POST', admin.headers, { clientId: 'forms-client', name: 'Forms', workspace: ws.slug, kinds: ['FRM'] });
     await send(t, '/api/v1/kinds/FRM', 'PUT', forms, { yaml: FORMS });
@@ -110,6 +111,7 @@ describe('modules through a port', () => {
     expect(item.state).toBe('doing');
     const { folded, stored } = await rebuild(t.ctx.db, item.id);
     expect(folded).toEqual(stored!);
+    expect((await history(t.ctx, await findItem(t.ctx, admin.principal, 'SW-1'))).lines[0]).toMatch(/: erased: the person asked to be forgotten$/);
     const member = await t.bearer('member');
     expect((await send(t, '/api/v1/items/SW-1', 'DELETE', member.headers, { reason: 'no' }, 'e5')).status).toBe(403);
   });
