@@ -2,6 +2,14 @@
 
 All notable changes to this project will be documented in this file.
 
+## [4.0.2](https://github.com/orchard-suite/vantage/compare/v4.0.1...v4.0.2) (2026-11-23)
+
+### Bug Fixes
+
+* **vantage:** keep the date a minor fix sends ([23a54dd](https://github.com/orchard-suite/vantage/commit/23a54dd60bb7de3bbd2f11c2f83b8dbe918678e0))
+* **vantage:** show an erase in an item's history ([eb16aad](https://github.com/orchard-suite/vantage/commit/eb16aad005b33c3098b2c3cb06ff01574e862f7e))
+* **vantage:** land a double click once on work pages ([71265ed](https://github.com/orchard-suite/vantage/commit/71265edc60e7d5d54118129959e552972f62553f))
+
 ## [4.0.1](https://github.com/orchard-suite/vantage/compare/v4.0.0...v4.0.1) (2026-11-23)
 
 ### Bug Fixes
