@@ -13,3 +13,4 @@ export { countLines, headingOutline, headingSlug, headings, lineRange, markdownR
 export { guideOutline, guidePart, guideText, guideTopics, schemaOutline, schemaPart, schemaText } from './guide-text.ts';
 export { DOCUMENT_ADDRESS, FIND, OUTLINE, PATCH, READ, WRITE, WRITE_SHAPE, WRITE_SHAPE_FILES, type Edit } from './verbs.ts';
 export { ITEM, QUEUE, ROADMAP_IMPORT } from './item-tool.ts';
+export { WORKSPACE_ICONS, iconFormatOf, type IconFormat } from './icon-tool.ts';

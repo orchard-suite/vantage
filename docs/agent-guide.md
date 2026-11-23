@@ -185,7 +185,8 @@ The id works everywhere an icon does: on a node, on a local type, with
 `size: icon`. A workspace in the hub may also hold an icon pack every
 document in it can name (the `vantage_workspace_icons` tool, through
 `vantage_tool`); a document's own `icons:` win over the workspace's, and
-both over the shipped packs.
+both over the shipped packs. On a machine with a disk, put an icon by its
+`file` path; with no disk, send its bytes as `data`.
 
 In the hub, the files a document names travel with it. In a working copy
 they are files in the document's folder, and `vantage_sync` sends a new one.
@@ -1172,10 +1173,10 @@ lines, both are written into the file between `<<<<<<<` and `>>>>>>>`: fix
 the file and sync again.
 
 Wherever a tool takes content, give its path: `file` on a write, a path
-for each asset, `dir` for a folder of records to import. With `out`, a
-render or an export writes its file to that path and answers the notes, a
-saved document's too; open the picture when the question is how the
-diagram looks.
+for each asset, a workspace icon's `file`, `dir` for a folder of records to
+import. With `out`, a render or an export writes its file to that path and
+answers the notes, a saved document's too; open the picture when the
+question is how the diagram looks.
 
 ### Every other tool
 

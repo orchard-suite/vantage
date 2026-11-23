@@ -9,6 +9,7 @@
 import { readFileSync, readdirSync, statSync } from 'node:fs';
 import { randomUUID } from 'node:crypto';
 import { ITEM, ROADMAP_IMPORT } from './item-tool.ts';
+import { WORKSPACE_ICONS, iconFormatOf } from './icon-tool.ts';
 import { basename, join, resolve } from 'node:path';
 import type { Server } from '@modelcontextprotocol/sdk/server/index.js';
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
@@ -175,6 +176,15 @@ export async function createBridge(link: HubLink, opts: BridgeOptions = {}): Pro
         if ((a.finish || a.release === 'me') && !said.includes(': ')) claims.delete(a.item);
       }
       return r;
+    }),
+  );
+
+  laptop.registerTool(WORKSPACE_ICONS.name, { description: `${WORKSPACE_ICONS.description} A picture to put is given by its path.`, inputSchema: WORKSPACE_ICONS.laptopShape }, ({ file, format, ...args }) =>
+    guarded(async () => {
+      if (!file) return callHub(WORKSPACE_ICONS.name, { ...args, ...(format ? { format } : {}) });
+      const as = format ?? iconFormatOf(file);
+      if (!as) return answer(`${basename(file)} is not a picture an icon can be; give format, or a file ending in .svg, .png, .jpg, .gif, or .webp`, true);
+      return callHub(WORKSPACE_ICONS.name, { ...args, format: as, data: readFileSync(resolve(file)).toString('base64') });
     }),
   );
 

@@ -26,6 +26,7 @@ import { HttpError } from '../http.ts';
 import { decisionHistory } from '../decisions/read.ts';
 import { parseAddress } from '../text/address.ts';
 import { guardFor, text } from './run.ts';
+import { WORKSPACE_ICONS, type IconFormat } from '@vantage/mcp';
 
 
 interface Ref {
@@ -115,18 +116,9 @@ export function registerHubTools(server: McpServer, ctx: AppContext, p: Principa
   );
 
   server.registerTool(
-    'vantage_workspace_icons',
-    {
-      description: "The workspace's own icon pack: logos and marks every document in the workspace names as pack/name (acme/logo). List them, put one (an SVG or picture in base64; documents re-render), or delete one. Shipped pack names (generic, azure, aws, k8s, brand) are taken.",
-      inputSchema: {
-        workspace: z.string().describe('Workspace slug'),
-        action: z.enum(['list', 'put', 'delete']),
-        id: z.string().optional().describe('Icon id, pack/name; for put and delete'),
-        data: z.string().optional().describe('The picture in base64; for put'),
-        format: z.enum(['svg', 'png', 'jpg', 'gif', 'webp']).optional().describe('Picture format; for put, default svg'),
-      },
-    },
-    guarded<{ workspace: string; action: 'list' | 'put' | 'delete'; id?: string | undefined; data?: string | undefined; format?: 'svg' | 'png' | 'jpg' | 'gif' | 'webp' | undefined }>('vantage_workspace_icons', async (args) => {
+    WORKSPACE_ICONS.name,
+    { description: WORKSPACE_ICONS.description, inputSchema: WORKSPACE_ICONS.shape },
+    guarded<{ workspace: string; action: 'list' | 'put' | 'delete'; id?: string | undefined; data?: string | undefined; format?: IconFormat | undefined }>(WORKSPACE_ICONS.name, async (args) => {
       const ws = await requireWorkspace(ctx.db, p, args.workspace, args.action === 'list' ? 'viewer' : 'author');
       const actor = { orgId: p.orgId, who, surface: 'mcp' as const };
       if (args.action === 'list') {
