@@ -1090,7 +1090,8 @@ Climb, and stop as soon as you can act:
    new.
 
 Never read a whole document to change one line of it. Never write a whole
-page to change one sentence.
+page to change one sentence. Every answer has a size limit; a list answers
+a page and names the call that reads the next.
 
 A patch swaps one exact string. It needs no read first and no version: the
 old text must be there exactly once, and that is the guard. Put every
@@ -1197,7 +1198,7 @@ goes.
 
 The comment tools are called through `vantage_tool`. People leave
 comments on a view, or on boxes in it. `vantage_comments`
-lists the open ones; each line names its view and the ids of the boxes it
+lists the open ones, a page at a time (`from` reads the next); each line names its view and the ids of the boxes it
 is about (`view=context boxes=orders-api,orders-db`). Carry a comment out
 with `vantage_patch`, then resolve it with `vantage_resolve_comment`. To
 leave one yourself, `vantage_comment` takes the view and, for boxes, their

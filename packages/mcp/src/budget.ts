@@ -12,6 +12,10 @@ export const BUDGET = {
   /** The most lines one find answers, and the most characters of one of them. */
   findLines: 40,
   findLineChars: 240,
+  /** The most rows one list answers (comments, counts by thing); past it the answer names the call that reads on. */
+  listRows: 30,
+  /** The most characters any answer holds. A tool that lists keeps under it by its own paging; the door stops any answer past it at a line, as a last guard. */
+  answerChars: 32_000,
   /** What one hub call may cost above the same task on a disk: the address and the answer line. */
   addressAllowance: 100,
   /** What an agent holds before it works. */

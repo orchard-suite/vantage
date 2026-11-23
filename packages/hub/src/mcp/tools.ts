@@ -7,6 +7,7 @@
  */
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { z } from 'zod';
+import { BUDGET } from '@vantage/mcp';
 import type { AppContext } from '../context.ts';
 import type { Principal } from '../auth/principal.ts';
 import { memberWorkspaces, requireDelete, requireWorkspace } from '../authz.ts';
@@ -176,16 +177,21 @@ export function registerHubTools(server: McpServer, ctx: AppContext, p: Principa
 
   server.registerTool(
     'vantage_comments',
-    { description: 'Comments on a document; open ones by default.', inputSchema: { ...ref, view: z.string().optional(), include_resolved: z.boolean().optional() } },
-    guarded<Ref & { view?: string | undefined; include_resolved?: boolean | undefined }>('vantage_comments', async (args) => {
+    { description: 'Comments on a document, oldest first, a page at a time; open ones by default.', inputSchema: { ...ref, view: z.string().optional(), include_resolved: z.boolean().optional(), from: z.number().int().min(0).optional().describe('Skip this many; the answer names the next') } },
+    guarded<Ref & { view?: string | undefined; include_resolved?: boolean | undefined; from?: number | undefined }>('vantage_comments', async (args) => {
       const { d } = await doc(args.workspace, args.document, 'viewer');
-      const rows = await listComments(ctx.db, d.id, { view: args.view, open: !args.include_resolved });
+      const all = await listComments(ctx.db, d.id, { view: args.view, open: !args.include_resolved });
+      const from = args.from ?? 0;
+      const rows = all.slice(from, from + BUDGET.listRows);
+      const more = all.length - from - rows.length;
       const labels = await userLabels(ctx.db, rows.flatMap((c) => mentionTokens(c.text)));
       const mentions = (c: (typeof rows)[number]): string => {
         const ids = mentionTokens(c.text);
         return ids.length ? `  mentions=${ids.map((id) => `${labels.get(id) ?? id} <@${id}>`).join(',')}` : '';
       };
-      return text(rows.map((c) => `${c.id}  ${c.resolved_at ? 'resolved' : 'open'}  view=${c.view_id ?? '-'} boxes=${c.targets.join(',') || '-'}  by ${c.author_user_id ?? '-'}${mentions(c)}\n  ${renderMentions(c.text, labels).replace(/\n/g, '\n  ')}`).join('\n') || 'no comments');
+      const lines = rows.map((c) => `${c.id}  ${c.resolved_at ? 'resolved' : 'open'}  view=${c.view_id ?? '-'} boxes=${c.targets.join(',') || '-'}  by ${c.author_user_id ?? '-'}${mentions(c)}\n  ${renderMentions(c.text, labels).replace(/\n/g, '\n  ')}`);
+      if (more > 0) lines.push(`${more} more comment${more === 1 ? '' : 's'}. more: vantage_comments ${JSON.stringify({ workspace: args.workspace, document: args.document, ...(args.view ? { view: args.view } : {}), ...(args.include_resolved ? { include_resolved: true } : {}), from: from + rows.length })}`);
+      return text(lines.join('\n') || 'no comments');
     }),
   );
 

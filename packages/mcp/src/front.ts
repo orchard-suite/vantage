@@ -11,6 +11,7 @@ import { InMemoryTransport } from '@modelcontextprotocol/sdk/inMemory.js';
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { CallToolRequestSchema, ListToolsRequestSchema, type CallToolResult, type Tool } from '@modelcontextprotocol/sdk/types.js';
 import { GROUPS, groupOf } from './catalog.ts';
+import { BUDGET } from './budget.ts';
 
 /** Whatever holds the tools: an MCP server in this process, a hub over HTTP, or both. */
 export interface Backend {
@@ -61,6 +62,29 @@ const DOOR: Tool = {
 };
 
 const text = (t: string, isError = false): CallToolResult => ({ content: [{ type: 'text', text: t }], ...(isError ? { isError } : {}) });
+
+/**
+ * Every answer has a size limit (VAN-0002). A tool keeps under it with its
+ * own paging and names its own next call; an answer that still runs past it
+ * stops here at a line, so no tool can hand an agent an unbounded answer.
+ */
+export function bounded(result: CallToolResult, tool: string): CallToolResult {
+  let left = BUDGET.answerChars;
+  let cut = false;
+  const content = result.content.map((c) => {
+    if (c.type !== 'text' || cut) return c;
+    if (c.text.length <= left) {
+      left -= c.text.length;
+      return c;
+    }
+    cut = true;
+    const at = c.text.lastIndexOf('\n', left);
+    const kept = c.text.slice(0, at > 0 ? at : left);
+    const rest = c.text.slice(kept.length).split('\n').filter(Boolean).length;
+    return { ...c, text: `${kept}\n--- stopped at the size limit of ${BUDGET.answerChars} characters, ${rest} line${rest === 1 ? '' : 's'} left out. more: call ${tool} again for less: one thing, a part, a filter, or a later page ---` };
+  });
+  return cut ? { ...result, content } : result;
+}
 
 const firstSentence = (s: string | undefined): string => (/^.*?[.:](?=\s|$)/.exec(s ?? '')?.[0] ?? s ?? '').trim();
 
@@ -124,6 +148,7 @@ export function createFront(backend: Backend, opts: FrontOptions): Server {
     } catch (err) {
       result = text((err as Error).message, true);
     }
+    result = bounded(result, tool);
     opts.onCall?.({ tool, onDemand, charsIn: JSON.stringify(args).length, ...sizes(result), ms: Math.round(performance.now() - started), isError: result.isError === true });
     return result;
   });

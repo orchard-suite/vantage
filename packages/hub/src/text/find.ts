@@ -155,7 +155,12 @@ export async function find(ctx: AppContext, p: Principal, input: FindInput): Pro
   const byThing = new Map<string, number>();
   for (const x of matches) byThing.set(x.address, (byThing.get(x.address) ?? 0) + 1);
   const head = `${matches.length} line${matches.length === 1 ? '' : 's'} in ${byThing.size} of ${scope}${loose ? '; no line holds every word, these hold some' : ''}`;
-  if (input.count) return [head, ...[...byThing].map(([address, count]) => `${address}: ${count}`)].join('\n');
+  if (input.count) {
+    const counted = [...byThing].sort((a, b) => b[1] - a[1]);
+    const shownCounts = counted.slice(0, BUDGET.listRows);
+    const left = counted.length - shownCounts.length;
+    return [head, ...shownCounts.map(([address, count]) => `${address}: ${count}`), ...(left ? [`${left} more things left out, the fewest matches. more: narrow "in" to one of the things above`] : [])].join('\n');
+  }
   const shown = matches.slice(0, BUDGET.findLines);
   const lines = [head, ...shown.map((x) => `${x.address}:${x.line}: ${clip(x.text)}`)];
   if (shown.length < matches.length) lines.push(`${matches.length - shown.length} more lines left out. more: narrow "in" to one of: ${[...byThing.keys()].slice(0, 8).join(', ')}; or count: true`);

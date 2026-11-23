@@ -146,7 +146,7 @@ export interface Row {
 export const FIND_LIMIT = 100;
 
 /** Lists or counts the items the caller may see that match. A page never holds a row the caller may not see. */
-export async function find(ctx: AppContext, p: Principal, q: FindQuery, r?: Reach): Promise<{ rows: Row[]; total: number; counts?: Record<string, number> }> {
+export async function find(ctx: AppContext, p: Principal, q: FindQuery, r?: Reach): Promise<{ rows: Row[]; total: number; counts?: Record<string, number>; others?: number }> {
   const reach = r ?? (await reachOf(ctx, p));
   const params: unknown[] = [p.orgId];
   const where = ['i.org_id = $1'];
@@ -179,9 +179,13 @@ export async function find(ctx: AppContext, p: Principal, q: FindQuery, r?: Reac
   const total = Number((await ctx.dbRead.query<{ n: number }>(`select count(*)::int as n ${from}`, params))[0]?.n ?? 0);
   if (q.countBy) {
     const col = { state: 'i.state', class: 'i.class', kind: 'k.prefix', holder: "coalesce(i.holders ->> 0, 'nobody')" }[q.countBy];
-    const rows = await ctx.dbRead.query<{ v: string; n: number }>(`select ${col} as v, count(*)::int as n ${from} group by 1 order by 2 desc`, params);
+    // A count answers its largest groups, never more than a page of them; the rest are counted as one.
+    const grouped = await ctx.dbRead.query<{ v: string; n: number }>(`select ${col} as v, count(*)::int as n ${from} group by 1 order by 2 desc, 1 limit ${FIND_LIMIT + 1}`, params);
+    const rows = grouped.slice(0, FIND_LIMIT);
     const holders = q.countBy === 'holder' ? await people(ctx, rows.map((x) => x.v)) : new Map<string, string>();
-    return { rows: [], total, counts: Object.fromEntries(rows.map((x) => [holders.get(x.v) ?? x.v, Number(x.n)])) };
+    const counts = Object.fromEntries(rows.map((x) => [holders.get(x.v) ?? x.v, Number(x.n)]));
+    const counted = rows.reduce((sum, x) => sum + Number(x.n), 0);
+    return { rows: [], total, counts, ...(grouped.length > FIND_LIMIT ? { others: total - counted } : {}) };
   }
   const limit = Math.min(Math.max(1, q.limit ?? 20), FIND_LIMIT);
   const rows = await ctx.dbRead.query<{ key: string; title: string; state: string; class: ItemState['class']; holders: string[]; labels: Record<string, LabelValue>; updated_at: Date; proof_at: Date | null }>(
