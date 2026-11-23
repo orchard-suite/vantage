@@ -1,8 +1,8 @@
 import { describe, expect, test } from 'bun:test';
-import { generateKeyPairSync, verify } from 'node:crypto';
+import { generateKeyPairSync } from 'node:crypto';
 import { runConnector } from '../../run.ts';
 import { drain, fixtureFetch, testContext } from '../../testing.ts';
-import { appJwt, githubConnector, GithubConfigSchema, nextLink } from './github.ts';
+import { githubConnector, GithubConfigSchema, nextLink } from './github.ts';
 
 const dir = `${import.meta.dir}/fixtures`;
 
@@ -59,25 +59,21 @@ describe('github connector', () => {
     await expect(drain(githubConnector.discover(testContext(config, f.fetch, { GITHUB_TOKEN: 'ghs' })))).rejects.toThrow('404');
   });
 
-  test('as a GitHub App, it signs a JWT, trades it for an installation token, and reads with that', async () => {
-    const { privateKey, publicKey } = generateKeyPairSync('rsa', { modulusLength: 2048 });
-    const pem = privateKey.export({ type: 'pkcs1', format: 'pem' }).toString();
-    const f = fixtureFetch(dir, [{ match: 'app/installations/77/access_tokens', json: { token: 'ghs_app' } }, ...[
+  test('as a GitHub App, it reads each repository with its own token, asking for issues, pull requests, and metadata only', async () => {
+    const pem = generateKeyPairSync('rsa', { modulusLength: 2048 }).privateKey.export({ type: 'pkcs1', format: 'pem' }).toString();
+    const f = fixtureFetch(dir, [
+      { match: 'app/installations/77/access_tokens', json: { token: 'ghs_app' } },
       { match: 'repos/acme/shop/issues', file: 'shop-2.json' },
       { match: 'repos/acme/relay/issues', file: 'relay.json' },
-    ]]);
+    ]);
     const appConfig = GithubConfigSchema.parse({ app: { id: '123', installation: 77, privateKey: 'GITHUB_APP_KEY' }, repositories: ['acme/shop', 'acme/relay'] });
     await drain(githubConnector.discover(testContext(appConfig, f.fetch, { GITHUB_APP_KEY: pem })));
-    const [mint, ...reads] = f.calls;
-    expect(mint!.method).toBe('POST');
-    const jwt = mint!.headers.authorization!.replace('Bearer ', '');
-    const [h, p, s] = jwt.split('.');
-    expect(verify('RSA-SHA256', Buffer.from(`${h}.${p}`), publicKey, Buffer.from(s!, 'base64url'))).toBe(true);
-    const claims = JSON.parse(Buffer.from(p!, 'base64url').toString()) as { iss: string; iat: number; exp: number };
-    expect(claims.iss).toBe('123');
-    expect(claims.exp - claims.iat).toBe(600);
-    expect(reads.map((c) => c.headers.authorization)).toEqual(['Bearer ghs_app', 'Bearer ghs_app']);
-    expect(appJwt('1', pem, new Date(0)).split('.')).toHaveLength(3);
+    expect(f.calls.map((c) => c.method)).toEqual(['POST', 'GET', 'POST', 'GET']);
+    expect(f.calls.filter((c) => c.method === 'POST').map((c) => JSON.parse(c.body!))).toEqual([
+      { repositories: ['shop'], permissions: { issues: 'read', pull_requests: 'read', metadata: 'read' } },
+      { repositories: ['relay'], permissions: { issues: 'read', pull_requests: 'read', metadata: 'read' } },
+    ]);
+    expect(f.calls.filter((c) => c.method === 'GET').map((c) => c.headers.authorization)).toEqual(['Bearer ghs_app', 'Bearer ghs_app']);
   });
 
   test('a token and an app together are refused', () => {

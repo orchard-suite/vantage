@@ -5,22 +5,27 @@
  * and reads which boxes and page sections a commit may have made stale
  * against the evidence a document records. A commit's files never change,
  * so each is read once and kept between runs.
+ *
+ * It signs in with a token or as a GitHub App (`../github/app.ts`); an
+ * app's token asks only for contents and metadata.
  */
 import { z } from 'zod';
 import type { Batch, Changes } from '../../batch.ts';
 import { PATCH_MAX } from '../../batch.ts';
 import { fetchJson, type Connector, type ConnectorContext } from '../../connector.ts';
+import { githubSigner, githubSignIn, ONE_SIGN_IN, oneSignIn, type GithubPermissions } from '../github/app.ts';
 
 export const GitConfigSchema = z
   .object({
     url: z.string().url().default('https://api.github.com').describe('API base URL; a GitHub Enterprise server is https://host/api/v3'),
-    token: z.string().min(1).optional().describe('Secret reference for a token that may read the repositories; without it only public ones, at a low rate'),
+    ...githubSignIn,
     repositories: z.array(z.string().regex(/^[^/\s]+\/[^/\s]+$/, 'owner/name')).min(1).describe('Repositories as owner/name'),
     branch: z.string().min(1).optional().describe("The branch merges land on; default each repository's own default branch"),
     depth: z.number().int().min(1).max(1000).default(200).describe('How many commits back to read; a tie checked at an older commit is reported as unknown'),
     paths: z.array(z.string().min(1)).optional().describe('Keep only files under these paths (folders end in /), the way vantage.yaml watch names them'),
   })
-  .strict();
+  .strict()
+  .refine(oneSignIn, ONE_SIGN_IN);
 
 export type GitConfig = z.output<typeof GitConfigSchema>;
 
@@ -35,6 +40,9 @@ interface CommitDetail {
 }
 
 type KeptCommit = Changes['commits'][number];
+
+/** What reading commits and their diffs needs, and nothing more. */
+export const GIT_PERMISSIONS: GithubPermissions = { contents: 'read', metadata: 'read' };
 
 /** The host a repository is named under: github.com for the public API, the server's own host for Enterprise. */
 export function repositoryHost(apiUrl: string): string {
@@ -64,9 +72,9 @@ export const gitConnector: Connector<GitConfig> = {
     const { config, log } = ctx;
     const base = config.url.replace(/\/$/, '');
     const host = repositoryHost(base);
-    const token = config.token !== undefined ? await ctx.secrets(config.token) : undefined;
-    const headers: Record<string, string> = { accept: 'application/vnd.github+json', 'x-github-api-version': '2022-11-28', ...(token !== undefined ? { authorization: `Bearer ${token}` } : {}) };
+    const signer = await githubSigner(ctx, base, GIT_PERMISSIONS);
     for (const repo of config.repositories) {
+      const headers = await signer(repo);
       const branch = config.branch ?? (await fetchJson<{ default_branch: string }>(ctx, `${base}/repos/${repo}`, { headers })).default_branch;
       const listed: string[] = [];
       for (let page = 1; listed.length < config.depth; page++) {

@@ -1,4 +1,5 @@
 import { describe, expect, test } from 'bun:test';
+import { generateKeyPairSync } from 'node:crypto';
 import { BatchSchema } from '../../batch.ts';
 import { keptStore } from '../../kept.ts';
 import { drain, fixtureFetch, testContext } from '../../testing.ts';
@@ -41,6 +42,30 @@ describe('git connector', () => {
     const [batch] = await drain(gitConnector.discover({ ...testContext(config, again.fetch), kept: keptStore(kept.entries()) }));
     expect(again.calls.map((c) => c.url)).toEqual(['https://api.github.com/repos/acme/shop/commits?sha=main&per_page=100&page=1']);
     expect(batch!.changes![0]!.commits.map((c) => c.files.length)).toEqual([1, 0, 1]);
+  });
+
+  test('as a GitHub App, it finds the owner\'s installation and reads with a token for that one repository, contents and metadata only', async () => {
+    const pem = generateKeyPairSync('rsa', { modulusLength: 2048 }).privateKey.export({ type: 'pkcs1', format: 'pem' }).toString();
+    const f = fixtureFetch('', [
+      { match: 'repos/acme/shop/installation', json: { id: 41 } },
+      { match: 'app/installations/41/access_tokens', json: { token: 'ghs_shop', expires_at: '2026-10-28T11:00:00Z' } },
+      { match: /repos\/acme\/shop$/, json: { default_branch: 'main' } },
+      { match: 'repos/acme/shop/commits?sha=main', json: [{ sha: 'aaa1111' }] },
+      { match: 'commits/aaa1111', json: detail('aaa1111', '2026-11-01T10:00:00Z', 'feat(orders): start', [{ filename: 'src/orders/api.ts' }]) },
+    ]);
+    const config = GitConfigSchema.parse({ app: { id: 'Iv23app', privateKey: 'KEY' }, repositories: ['acme/shop'] });
+    const [batch] = await drain(gitConnector.discover(testContext(config, f.fetch, { KEY: pem })));
+    expect(batch!.changes![0]!.head).toBe('aaa1111');
+    const [lookup, mint, ...reads] = f.calls;
+    expect(lookup!.url).toBe('https://api.github.com/repos/acme/shop/installation');
+    expect(mint!.method).toBe('POST');
+    expect(JSON.parse(mint!.body!)).toEqual({ repositories: ['shop'], permissions: { contents: 'read', metadata: 'read' } });
+    expect(reads.length).toBeGreaterThan(0);
+    expect(reads.every((c) => c.headers.authorization === 'Bearer ghs_shop')).toBe(true);
+  });
+
+  test('a token and an app together are refused', () => {
+    expect(GitConfigSchema.safeParse({ token: 'T', app: { id: '1', privateKey: 'K' }, repositories: ['a/b'] }).success).toBe(false);
   });
 
   test('names a repository by the host people use', () => {

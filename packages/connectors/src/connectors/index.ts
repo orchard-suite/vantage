@@ -15,6 +15,7 @@ export * from './cloudflare/cloudflare.ts';
 export * from './azure-resource-graph/azure-resource-graph.ts';
 export * from './http/http.ts';
 export * from './jira/jira.ts';
+export * from './github/app.ts';
 export * from './github/github.ts';
 export * from './git/git.ts';
 

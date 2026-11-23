@@ -64,6 +64,14 @@ of its source; an item it leaves out is closed.
 - `github` reads open pull requests and issues of `repositories`
   (owner/name) and points them at the `repository` fact (`fact` renames it).
   Labels named for a severity, or mapped in `severities`, set it.
+- `github` and `git` sign in the same way. Prefer `app`: `{ id, privateKey,
+  installation? }`, the GitHub App's id and its private key as a secret
+  reference. Each run mints a one-hour token per repository, for that
+  repository alone, asking for issues, pull requests, and metadata
+  (`github`) or contents and metadata (`git`); install the app with those
+  read-only. Without `installation`, each owner's installation is looked
+  up, so one app installed on two owners serves both. `token`, a stored
+  token by secret reference, is for an estate with no app. Never both.
 
 ### Code history
 
@@ -74,8 +82,8 @@ to `paths` when given. It draws nothing. The hub keeps the history per
 repository, and every document whose `docs.repository` names it reads
 `workspace/document/stale`: the boxes and page sections whose evidence
 files a later commit changed, with the diffs. Set `every` to how often
-merges land (60 is usual). Scope its token to read the repositories and
-nothing else. `guide#docs-that-stay-true` has the evidence format.
+merges land (60 is usual). Sign it in as an app installed with
+read-only Contents and Metadata on only these repositories. `guide#docs-that-stay-true` has the evidence format.
 
 The boxes show a count and the panel lists the items. When a box should
 show items and does not, check that its entity carries the fact the items

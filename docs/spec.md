@@ -373,8 +373,10 @@ thing by a label prefix or a field and points by a key template or a fact;
 basic auth with an email and an API token, or a bearer token, by secret
 reference); GitHub (the open issues list of each repository, pull requests
 and issues, pointed at the `repository` fact; it reads with a token by
-secret reference, or as a GitHub App installation, minting an installation
-token each run from the app's private key, so nothing is rotated by hand).
+secret reference, or as a GitHub App, minting an installation token per
+repository each run from the app's private key, scoped to that repository
+and to issues, pull requests, and metadata, so nothing is rotated by hand;
+decision 2007).
 
 ### Mapping
 
@@ -948,7 +950,9 @@ tool, and the work pages. Phases 11 to 13 land the rest, in the order
   or as bytes from `GET /api/v1/text/file`. Decision 3011.
 - `evidence:` ties a box, view, page, or page section to repository files
   at a commit. A `git` connector reads a repository's recent history
-  (`changes` on a batch); the hub keeps the latest per repository, and
+  (`changes` on a batch), signed in the way the `github` connector is,
+  with an app token scoped to contents and metadata (decision 2007); the
+  hub keeps the latest per repository, and
   `workspace/document/stale` lists every tie a later commit touched, with
   diffs, worked out on read. Decision 3013.
 - A repository points at its document with `vantage.yaml` (document,

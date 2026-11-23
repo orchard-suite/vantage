@@ -4,31 +4,21 @@
  * pointed at a fact: every bound entity whose repository fact names the
  * repository shows them. The connector reports no entities of its own.
  *
- * It reads as a token, or as a GitHub App: each run signs a short JWT with
- * the app's private key and trades it for an installation token, so nothing
- * that reads a private repository has to be rotated by hand.
+ * It signs in with a token or as a GitHub App (`app.ts`); an app's token
+ * asks only for issues, pull requests, and metadata.
  */
-import { createPrivateKey, sign } from 'node:crypto';
 import { z } from 'zod';
 import { ITEM_SEVERITIES, type ItemSeverity } from '@vantage/model';
 import type { Batch, BatchItem } from '../../batch.ts';
 import { HttpError, type Connector, type ConnectorContext } from '../../connector.ts';
+import { githubSigner, githubSignIn, ONE_SIGN_IN, oneSignIn, type GithubPermissions } from './app.ts';
 
 const SeveritySchema = z.enum(ITEM_SEVERITIES);
 
 export const GithubConfigSchema = z
   .object({
     url: z.string().url().default('https://api.github.com').describe('API base URL; a GitHub Enterprise server is https://host/api/v3'),
-    token: z.string().min(1).optional().describe('Secret reference for a token that may read the repositories; without it and without app, only public ones, at a low rate'),
-    app: z
-      .object({
-        id: z.string().min(1).describe('The GitHub App id, or its client id'),
-        installation: z.number().int().positive().describe('The installation id on the account that owns the repositories'),
-        privateKey: z.string().min(1).describe("Secret reference for the app's private key (PEM)"),
-      })
-      .strict()
-      .optional()
-      .describe('Read as a GitHub App installation instead of a token: a fresh installation token every run'),
+    ...githubSignIn,
     repositories: z.array(z.string().regex(/^[^/\s]+\/[^/\s]+$/, 'owner/name')).min(1).describe('Repositories as owner/name'),
     fact: z.string().min(1).default('repository').describe('The fact that names a repository on observed entities, as owner/name or its URL'),
     pulls: z.boolean().default(true).describe('Report open pull requests'),
@@ -36,7 +26,7 @@ export const GithubConfigSchema = z
     severities: z.record(z.string(), SeveritySchema).default({}).describe('Label name to severity; a label named for a severity (critical, high, medium, low, info) counts too'),
   })
   .strict()
-  .refine((c) => !(c.token !== undefined && c.app !== undefined), { message: 'give token or app, not both' });
+  .refine(oneSignIn, ONE_SIGN_IN);
 
 export type GithubConfig = z.output<typeof GithubConfigSchema>;
 
@@ -81,28 +71,8 @@ function itemOf(config: GithubConfig, repo: string, i: GithubIssue): BatchItem {
   };
 }
 
-const b64url = (s: string | Buffer): string => Buffer.from(s).toString('base64url');
-
-/** A JWT the app signs for itself, valid ten minutes; GitHub allows a minute of clock skew each way. */
-export function appJwt(id: string, pem: string, now: Date): string {
-  const iat = Math.floor(now.getTime() / 1000) - 60;
-  const data = `${b64url(JSON.stringify({ alg: 'RS256', typ: 'JWT' }))}.${b64url(JSON.stringify({ iat, exp: iat + 600, iss: id }))}`;
-  return `${data}.${b64url(sign('RSA-SHA256', Buffer.from(data), createPrivateKey(pem)))}`;
-}
-
-async function tokenOf(ctx: ConnectorContext<GithubConfig>, base: string): Promise<string | undefined> {
-  const { config } = ctx;
-  if (config.token !== undefined) return ctx.secrets(config.token);
-  if (config.app === undefined) return undefined;
-  const url = `${base}/app/installations/${config.app.installation}/access_tokens`;
-  const jwt = appJwt(config.app.id, await ctx.secrets(config.app.privateKey), ctx.now());
-  const res = await ctx.fetch(url, { method: 'POST', headers: { accept: 'application/vnd.github+json', 'x-github-api-version': '2022-11-28', authorization: `Bearer ${jwt}` }, signal: ctx.signal });
-  if (!res.ok) {
-    ctx.log.error('github app token refused', { url, status: res.status });
-    throw new HttpError(res.status, url, await res.text());
-  }
-  return ((await res.json()) as { token: string }).token;
-}
+/** What reading open issues and pull requests needs, and nothing more. */
+export const GITHUB_PERMISSIONS: GithubPermissions = { issues: 'read', pull_requests: 'read', metadata: 'read' };
 
 export const githubConnector: Connector<GithubConfig> = {
   id: 'github',
@@ -110,9 +80,9 @@ export const githubConnector: Connector<GithubConfig> = {
   async *discover(ctx: ConnectorContext<GithubConfig>): AsyncIterable<Batch> {
     const { config, log } = ctx;
     const base = config.url.replace(/\/$/, '');
-    const token = await tokenOf(ctx, base);
-    const headers: Record<string, string> = { accept: 'application/vnd.github+json', 'x-github-api-version': '2022-11-28', ...(token !== undefined ? { authorization: `Bearer ${token}` } : {}) };
+    const signer = await githubSigner(ctx, base, GITHUB_PERMISSIONS);
     for (const repo of config.repositories) {
+      const headers = await signer(repo);
       const items: BatchItem[] = [];
       let url: string | undefined = `${base}/repos/${repo}/issues?state=open&per_page=100`;
       let pages = 0;
