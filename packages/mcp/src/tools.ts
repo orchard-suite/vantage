@@ -13,7 +13,7 @@ import { formatReport, importFile, searchIcons, type TitleBlock, type Validation
 import { DOCUMENT_ADDRESS, OUTLINE, READ } from './verbs.ts';
 import { guideOutline, guidePart, schemaOutline, schemaPart } from './guide-text.ts';
 import { inlineEngine, type LocalEngine } from './engine.ts';
-import { drawnContent, type DocumentArgs, type Drawn, type DrawOutcome, type ViewArgs } from './draw.ts';
+import { drawnContent, type DocumentArgs, type Drawn, type DrawOutcome, type ExploreArgs, type ViewArgs } from './draw.ts';
 
 export interface LocalToolOptions {
   /** Allow `file` and `out` arguments that touch the local filesystem. */
@@ -31,11 +31,10 @@ export type SavedDrawing = { readonly drawn: Drawn } | { readonly refused: ToolA
 
 /** How the tools that draw and check reach a saved document: the hub draws its own copy, with its imports, pictures, and workspace icons. */
 export interface SavedDocuments {
-  /** Its YAML, for a tool that only lays it out. */
-  text(address: string): Promise<string>;
   validate(address: string): Promise<ToolAnswer>;
   drawView(address: string, args: ViewArgs): Promise<SavedDrawing>;
   drawDocument(address: string, args: DocumentArgs): Promise<SavedDrawing>;
+  drawExplore(address: string, args: ExploreArgs): Promise<SavedDrawing>;
 }
 
 const TOPIC = 'For anything else at an address, sign in to a hub: vantage login <hub url>.';
@@ -172,13 +171,9 @@ export function registerLocalTools(server: McpServer, opts: LocalToolOptions): v
       },
     },
     async (args) => {
-      const r = await engine.explore(saved && args.address ? { ...args, text: await saved.text(args.address) } : args);
-      if (!r.result) return fail(r.diagnostics);
-      write(args.out, r.result.png);
-      const text = r.result.candidates
-        .map((c, i) => `${String.fromCharCode(65 + i)}. ${c.name}: score ${c.score}, ${c.width}x${c.height}${c.notes.length ? `\n   notes: ${c.notes.join('; ')}` : ''}\n   hints:\n${c.yaml.split('\n').map((l) => `     ${l}`).join('\n')}`)
-        .join('\n');
-      return { content: [{ type: 'image', data: Buffer.from(r.result.png).toString('base64'), mimeType: 'image/png' }, { type: 'text', text }] };
+      const req: ExploreArgs = { view: args.view, theme: args.theme, limit: args.limit };
+      if (saved && args.address) return present(await saved.drawExplore(args.address, req), args.out);
+      return present(await engine.drawExplore({ ...sourceOf(args), ...req }), args.out);
     },
   );
 

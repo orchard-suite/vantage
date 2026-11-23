@@ -1152,9 +1152,10 @@ are one version. Write to `~` for a new diagram in the person's own
 workspace, named after its title; never ask the person for a slug. Answer
 with the link the write gives, as `[Name](url)`.
 
-`vantage_render`, `vantage_export`, and `vantage_validate` take `address`
-for a saved document; the hub reads its own copy, with its imports,
-pictures, and workspace icons. A saved document draws in every format,
+`vantage_render`, `vantage_export`, `vantage_explore`, and
+`vantage_validate` take `address` for a saved document; the hub reads its
+own copy, with its imports, pictures, and workspace icons, so an explored
+layout is the one a render draws. A saved document draws in every format,
 theme, and title block a file does: png, svg, pdf, drawio, and vsdx for
 one view, html, pdf, drawio, and vsdx for the whole document. Send `text`
 only for YAML that is saved nowhere.
@@ -1174,9 +1175,9 @@ the file and sync again.
 
 Wherever a tool takes content, give its path: `file` on a write, a path
 for each asset, a workspace icon's `file`, `dir` for a folder of records to
-import. With `out`, a render or an export writes its file to that path and
-answers the notes, a saved document's too; open the picture when the
-question is how the diagram looks.
+import. With `out`, a render, an export, or an explore writes its file to
+that path and answers the notes, a saved document's too; open the picture
+when the question is how the diagram looks.
 
 ### Every other tool
 

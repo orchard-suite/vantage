@@ -5,15 +5,16 @@
  * come along.
  */
 import type { Diagnostic } from '@vantage/model';
-import { explore, load, resourcesFor, validate, type ExploreRequest, type ExploreResult, type Source, type Validation } from '@vantage/server';
-import { drawDocument, drawView, type DocumentArgs, type DrawOutcome, type ViewArgs } from './draw.ts';
+import { load, resourcesFor, validate, type Source, type Validation } from '@vantage/server';
+import { drawDocument, drawExplore, drawView, type DocumentArgs, type DrawOutcome, type ExploreArgs, type ViewArgs } from './draw.ts';
 
 export interface LocalEngine {
   /** One view of a file or of text, as one file. */
   drawView(req: Source & ViewArgs): Promise<DrawOutcome>;
   /** The whole document, or the views named, as one file. */
   drawDocument(req: Source & DocumentArgs): Promise<DrawOutcome>;
-  explore(req: ExploreRequest): Promise<{ result?: ExploreResult; diagnostics: readonly Diagnostic[] }>;
+  /** One relation view of a file or of text, laid out several ways on one sheet. */
+  drawExplore(req: Source & ExploreArgs): Promise<DrawOutcome>;
   validate(src: Source): Promise<Validation>;
 }
 
@@ -27,6 +28,6 @@ async function loaded(src: Source, draw: (m: NonNullable<ReturnType<typeof load>
 export const inlineEngine: LocalEngine = {
   drawView: (req) => loaded(req, (m, d) => drawView(m, resourcesFor(m), req, d)),
   drawDocument: (req) => loaded(req, (m, d) => drawDocument(m, resourcesFor(m), req, d)),
-  explore: async (req) => explore(req),
+  drawExplore: (req) => loaded(req, async (m, d) => drawExplore(m, resourcesFor(m), req, d)),
   validate: async (src) => validate(src),
 };

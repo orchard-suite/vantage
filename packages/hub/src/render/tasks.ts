@@ -89,7 +89,7 @@ export interface Tasks {
   localDrawDocument: [Parameters<LocalEngine['drawDocument']>[0], DrawOutcome];
   /** A saved version drawn with its imports, pictures, and workspace icons, in every format a file draws in. */
   savedDraw: [SavedDrawInput, DrawOutcome];
-  localExplore: [Parameters<LocalEngine['explore']>[0], Awaited<ReturnType<LocalEngine['explore']>>];
+  localDrawExplore: [Parameters<LocalEngine['drawExplore']>[0], DrawOutcome];
   localValidate: [Parameters<LocalEngine['validate']>[0], Awaited<ReturnType<LocalEngine['validate']>>];
   produce: [ProduceInput, ProduceOutput];
   review: [ReviewInput, ReviewOutput];
@@ -231,7 +231,7 @@ const RUNNERS: { [K in TaskKind]: (input: TaskInput<K>) => TaskOutput<K> | Promi
   localDrawView: (i) => inlineEngine.drawView(i),
   localDrawDocument: (i) => inlineEngine.drawDocument(i),
   savedDraw,
-  localExplore: (i) => inlineEngine.explore(i),
+  localDrawExplore: (i) => inlineEngine.drawExplore(i),
   localValidate: (i) => inlineEngine.validate(i),
   produce,
   review: reviewDocument,

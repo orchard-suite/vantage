@@ -120,10 +120,10 @@ export async function createBridge(link: HubLink, opts: BridgeOptions = {}): Pro
     return drawn ? { drawn } : { refused: reply(r) };
   };
   const saved: SavedDocuments = {
-    text: async (address) => (await api.read(address)).text,
     validate: async (address) => reply(await callHub('vantage_validate', { address })),
     drawView: (address, args) => drawnBy('vantage_render', address, args, args.format),
     drawDocument: (address, args) => drawnBy('vantage_export', address, args, args.format),
+    drawExplore: (address, args) => drawnBy('vantage_explore', address, args, 'png'),
   };
 
   const laptop = new McpServer({ name: 'vantage-laptop', version: BRIDGE_VERSION });

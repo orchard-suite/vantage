@@ -35,7 +35,7 @@ function poolEngine(ctx: AppContext): LocalEngine {
   return {
     drawView: (args) => ctx.render.run('localDrawView', args),
     drawDocument: (args) => ctx.render.run('localDrawDocument', args),
-    explore: (args) => ctx.render.run('localExplore', args),
+    drawExplore: (args) => ctx.render.run('localDrawExplore', args),
     validate: (args) => ctx.render.run('localValidate', args),
   };
 }

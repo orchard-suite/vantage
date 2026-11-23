@@ -6,7 +6,7 @@
  */
 import type { CallToolResult } from '@modelcontextprotocol/sdk/types.js';
 import { pictureViews, type Diagnostic, type Model } from '@vantage/model';
-import { exportModel, renderModel, type Orientation, type PageSize, type Resources, type Theme, type TitleBlock } from '@vantage/server';
+import { exploreModel, exportModel, renderModel, type Orientation, type PageSize, type Resources, type Theme, type TitleBlock } from '@vantage/server';
 
 export type ViewFormat = 'png' | 'svg' | 'pdf' | 'drawio' | 'vsdx';
 export type DocumentFormat = 'html' | 'pdf' | 'drawio' | 'vsdx';
@@ -29,6 +29,13 @@ export interface DocumentArgs {
   readonly titleBlock?: TitleBlock | true | undefined;
   readonly page?: PageSize | undefined;
   readonly orientation?: Orientation | undefined;
+}
+
+/** One relation view laid out several ways, side by side. */
+export interface ExploreArgs {
+  readonly view?: string | undefined;
+  readonly theme?: Theme | undefined;
+  readonly limit?: number | undefined;
 }
 
 /** A drawn file: plain data that crosses a thread and a wire. */
@@ -72,6 +79,16 @@ export async function drawDocument(model: Model, res: Resources, a: DocumentArgs
   if (!d.result) return { diagnostics: d.diagnostics };
   const { bytes, contentType, extension, viewIds } = d.result;
   return { drawn: { bytes, contentType, extension, notes: `${viewIds.length} view${viewIds.length === 1 ? '' : 's'}, ${bytes.byteLength} bytes`, name: viewIds[0] ?? 'view' }, diagnostics: d.diagnostics };
+}
+
+/** The candidates on one contact sheet, each with its score, its notes, and the hints to paste into the view. */
+export function drawExplore(model: Model, res: Resources, a: ExploreArgs, diagnostics: readonly Diagnostic[] = []): DrawOutcome {
+  const r = exploreModel(model, res, { view: a.view, theme: a.theme, limit: a.limit }, diagnostics);
+  if (!r.result) return { diagnostics: r.diagnostics };
+  const notes = r.result.candidates
+    .map((c, i) => `${String.fromCharCode(65 + i)}. ${c.name}: score ${c.score}, ${c.width}x${c.height}${c.notes.length ? `\n   notes: ${c.notes.join('; ')}` : ''}\n   hints:\n${c.yaml.split('\n').map((l) => `     ${l}`).join('\n')}`)
+    .join('\n');
+  return { drawn: { bytes: r.result.png, contentType: 'image/png', extension: 'png', notes, name: r.result.viewId }, diagnostics: r.diagnostics };
 }
 
 /** Whether a format's file is text an agent can read in the answer. */

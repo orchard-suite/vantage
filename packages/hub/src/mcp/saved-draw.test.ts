@@ -5,6 +5,8 @@ import { join } from 'node:path';
 import { TOOL_DOOR } from '@vantage/mcp';
 import { testApp, SAMPLE_YAML } from '../testing.ts';
 import { agent, laptop } from './testing.ts';
+import { accessibleWorkspaces } from '../authz.ts';
+import { saveDocument } from '../documents/save.ts';
 
 /** A saved document draws by its address in every format, theme, and title block a file does (VAN-5002, VAN-5003). */
 describe('a saved document drawn by its address', () => {
@@ -53,6 +55,43 @@ describe('a saved document drawn by its address', () => {
     const r = await a.client.callTool({ name: 'vantage_render', arguments: { address: doc, format: 'pdf', theme: 'print' } });
     const res = (r.content as { type: string; resource?: { blob?: string } }[]).find((c) => c.type === 'resource');
     expect(Buffer.from(res!.resource!.blob!, 'base64').subarray(0, 4).toString()).toBe('%PDF');
+    await t.ctx.db.close();
+  });
+});
+
+describe('a saved document explored by its address', () => {
+  const ROOT = `title: Shop
+imports:
+  - { path: shared.vantage.yaml, as: shared }
+nodes:
+  - name: Shop API
+    type: api
+relations:
+  - { from: shop-api, to: shared.orders-db, label: writes }
+views:
+  - id: context
+    title: Context
+    include: { nodes: [shop-api, shared.orders-db] }
+`;
+  const SHARED = `title: Shared
+nodes:
+  - name: Orders DB
+    type: database
+`;
+
+  test('lays the view out with what the document imports, as a render of it does', async () => {
+    const t = await testApp();
+    const me = await t.bearer('agent');
+    const { call } = await laptop(t, { url: 'http://hub.test', token: me.token });
+    const ws = (await accessibleWorkspaces(t.ctx.db, me.principal)).find((w) => w.role === 'author')!;
+    const r = await saveDocument(t.ctx, { orgId: me.principal.orgId, workspaceId: ws.id, authorUserId: me.principal.userId, who: me.principal.userId, surface: 'api', yaml: ROOT, imports: { 'shared.vantage.yaml': SHARED }, name: 'Shop', slug: 'shop' });
+    expect(r.status).toBe('saved');
+    const doc = `${ws.slug}/shop`;
+    const drawn = await call('vantage_render', { address: doc, view: 'context', format: 'svg', out: join(mkdtempSync(join(tmpdir(), 'vantage-explore-')), 'c.svg') });
+    const size = /view context: (\d+x\d+)/.exec(drawn)![1]!;
+    const explored = await call('vantage_explore', { address: doc, view: 'context', limit: 2 });
+    expect(explored).toContain(`A. as written: score`);
+    expect(explored).toContain(size);
     await t.ctx.db.close();
   });
 });

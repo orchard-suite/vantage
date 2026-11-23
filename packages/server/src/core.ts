@@ -238,6 +238,11 @@ export interface ExploreResult {
 export function explore(req: ExploreRequest): { result?: ExploreResult; diagnostics: readonly Diagnostic[] } {
   const { model, diagnostics } = load(req);
   if (!model) return { diagnostics };
+  return exploreModel(model, resourcesFor(model), req, diagnostics);
+}
+
+/** Explores a loaded model with the icons and pictures it was given. */
+export function exploreModel(model: Model, res: Resources, req: DrawOptions<ExploreRequest>, diagnostics: readonly Diagnostic[] = []): { result?: ExploreResult; diagnostics: readonly Diagnostic[] } {
   const view = req.view ? model.views.find((v) => v.id === req.view) : model.views.find((v) => v.kind === 'relation' && !v.hidden);
   if (!view || view.kind !== 'relation') {
     return { diagnostics: [...diagnostics, { severity: 'error', code: 'unknown-view', message: `explore needs a relation view; views: ${model.views.filter((v) => v.kind === 'relation').map((v) => v.id).join(', ')}` }] };
@@ -245,7 +250,7 @@ export function explore(req: ExploreRequest): { result?: ExploreResult; diagnost
   const theme = req.theme ?? (model.theme === 'auto' ? 'light' : model.theme);
   const candidates = exploreLayouts(model, view, req.limit ?? 4);
   const items = candidates.map((c, i) => ({
-    svg: renderSvg(c.layout, { theme, ...resourcesFor(model) }),
+    svg: renderSvg(c.layout, { theme, ...res }),
     width: c.layout.width,
     height: c.layout.height,
     caption: `${String.fromCharCode(65 + i)}. ${c.name}  (score ${c.score})`,

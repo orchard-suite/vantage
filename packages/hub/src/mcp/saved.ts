@@ -39,7 +39,6 @@ export function savedDocuments(ctx: AppContext, p: Principal): SavedDocuments {
     }
   };
   return {
-    text: async (address) => (await at(address)).head.yaml,
     validate: (address) =>
       guarded(async () => {
         const { ws, doc, head } = await at(address);
@@ -54,6 +53,7 @@ export function savedDocuments(ctx: AppContext, p: Principal): SavedDocuments {
         return text(lines.join('\n'), out.errors.length > 0);
       }),
     drawView: (address, view) => draw(address, { view }),
+    drawExplore: (address, explore) => draw(address, { explore }),
     drawDocument: (address, document) => draw(address, { document }),
   };
 }
