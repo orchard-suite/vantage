@@ -1,0 +1,10 @@
+{ "apiVersion": "v1", "kind": "List", "items": [
+  { "apiVersion": "v1", "kind": "Service", "metadata": { "name": "relay", "namespace": "relay", "creationTimestamp": "2026-09-02T00:00:00Z" },
+    "spec": { "type": "ClusterIP", "clusterIP": "10.96.12.4", "selector": { "app": "relay" }, "ports": [{ "port": 443, "targetPort": 8443, "protocol": "TCP" }] } },
+  { "apiVersion": "v1", "kind": "Service", "metadata": { "name": "postgres", "namespace": "relay", "creationTimestamp": "2026-09-02T00:00:00Z" },
+    "spec": { "type": "ClusterIP", "clusterIP": "None", "selector": { "app": "postgres" }, "ports": [{ "port": 5432 }] } },
+  { "apiVersion": "v1", "kind": "Service", "metadata": { "name": "grafana", "namespace": "monitoring", "creationTimestamp": "2026-09-02T00:00:00Z" },
+    "spec": { "type": "ClusterIP", "clusterIP": "10.96.12.9", "selector": { "app": "grafana" }, "ports": [{ "port": 80, "targetPort": 3000 }] } },
+  { "apiVersion": "v1", "kind": "Service", "metadata": { "name": "kubernetes", "namespace": "default", "creationTimestamp": "2026-09-01T00:00:00Z" },
+    "spec": { "type": "ClusterIP", "clusterIP": "10.96.0.1", "ports": [{ "port": 443, "targetPort": 6443 }] } }
+] }

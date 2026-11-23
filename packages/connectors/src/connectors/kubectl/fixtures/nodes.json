@@ -1,0 +1,12 @@
+{ "apiVersion": "v1", "kind": "List", "items": [
+  { "apiVersion": "v1", "kind": "Node", "metadata": { "name": "worker-a", "labels": { "node.kubernetes.io/instance-type": "Standard_D4s_v5", "node-role.kubernetes.io/worker": "" } },
+    "status": { "nodeInfo": { "kubeletVersion": "v1.31.2", "osImage": "Ubuntu 24.04 LTS", "architecture": "amd64", "containerRuntimeVersion": "containerd://1.7.22" },
+      "capacity": { "cpu": "4", "memory": "16Gi" },
+      "conditions": [{ "type": "Ready", "status": "True" }],
+      "addresses": [{ "type": "InternalIP", "address": "10.0.1.4" }, { "type": "Hostname", "address": "worker-a" }] } },
+  { "apiVersion": "v1", "kind": "Node", "metadata": { "name": "worker-b", "labels": { "node.kubernetes.io/instance-type": "Standard_D4s_v5" } },
+    "status": { "nodeInfo": { "kubeletVersion": "v1.31.2", "osImage": "Ubuntu 24.04 LTS", "architecture": "amd64", "containerRuntimeVersion": "containerd://1.7.22" },
+      "capacity": { "cpu": "4", "memory": "16Gi" },
+      "conditions": [{ "type": "Ready", "status": "False" }],
+      "addresses": [{ "type": "InternalIP", "address": "10.0.1.5" }] } }
+] }

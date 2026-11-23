@@ -1,0 +1,31 @@
+{
+  "entities": [
+    {
+      "blueprint": "azure_app_service",
+      "key": "/subscriptions/0000/resourcegroups/rg-shop-prod/providers/microsoft.web/sites/shop-auth-prod",
+      "title": "shop-auth-prod",
+      "state": "active",
+      "fields": { "app_name": "shop-auth-prod", "cost_last_month_cents": 115207, "requests_7d": 120345.5, "always_on": true, "health": "green" },
+      "relations": {
+        "resource_group": [{ "blueprint": "azure_resource_group", "key": "rg-shop-prod", "title": "rg-shop-prod" }],
+        "service": [{ "blueprint": "service", "key": "auth", "title": "auth" }],
+        "environment": [{ "blueprint": "environment", "key": "prod", "title": "prod" }]
+      }
+    },
+    {
+      "blueprint": "azure_app_service",
+      "key": "/subscriptions/0000/resourcegroups/rg-shop-prod/providers/microsoft.web/sites/shop-web-prod",
+      "title": "shop-web-prod",
+      "state": "active",
+      "fields": { "app_name": "shop-web-prod", "cost_last_month_cents": 4250, "health": "green" },
+      "relations": {
+        "resource_group": [{ "blueprint": "azure_resource_group", "key": "rg-shop-prod", "title": "rg-shop-prod" }],
+        "service": [{ "blueprint": "service", "key": "web", "title": "web" }],
+        "environment": [{ "blueprint": "environment", "key": "prod", "title": "prod" }]
+      }
+    }
+  ],
+  "total": 2,
+  "limit": 200,
+  "offset": 0
+}

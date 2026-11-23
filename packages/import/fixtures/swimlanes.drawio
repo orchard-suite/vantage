@@ -1,0 +1,48 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<mxfile host="app.diagrams.net" version="24.7.17">
+  <diagram id="lanes-1" name="Checkout Lanes">
+    <mxGraphModel dx="1000" dy="600" grid="1" gridSize="10" pageWidth="1100" pageHeight="850">
+      <root>
+        <mxCell id="0"/>
+        <mxCell id="1" parent="0"/>
+        <mxCell id="lane-shop" value="Shop" style="swimlane;whiteSpace=wrap;html=1;startSize=30;fillColor=#dae8fc;strokeColor=#6c8ebf;" vertex="1" parent="1">
+          <mxGeometry x="40" y="40" width="520" height="200" as="geometry"/>
+        </mxCell>
+        <mxCell id="cart" value="Cart" style="rounded=1;whiteSpace=wrap;html=1;" vertex="1" parent="lane-shop">
+          <mxGeometry x="40" y="70" width="120" height="60" as="geometry"/>
+        </mxCell>
+        <mxCell id="checkout" value="Checkout" style="rounded=1;whiteSpace=wrap;html=1;" vertex="1" parent="lane-shop">
+          <mxGeometry x="200" y="70" width="120" height="60" as="geometry"/>
+        </mxCell>
+        <mxCell id="paid" value="Paid?" style="rhombus;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;" vertex="1" parent="lane-shop">
+          <mxGeometry x="360" y="60" width="120" height="80" as="geometry"/>
+        </mxCell>
+        <mxCell id="lane-pay" value="Payments" style="swimlane;whiteSpace=wrap;html=1;startSize=30;fillColor=#d5e8d4;strokeColor=#82b366;" vertex="1" parent="1">
+          <mxGeometry x="40" y="280" width="520" height="200" as="geometry"/>
+        </mxCell>
+        <mxCell id="psp" value="Payment Provider" style="shape=hexagon;perimeter=hexagonPerimeter2;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;" vertex="1" parent="lane-pay">
+          <mxGeometry x="200" y="70" width="140" height="70" as="geometry"/>
+        </mxCell>
+        <mxCell id="ledger" value="Ledger" style="shape=cylinder3;whiteSpace=wrap;html=1;boundedLbl=1;backgroundOutline=1;size=15;" vertex="1" parent="lane-pay">
+          <mxGeometry x="400" y="60" width="100" height="90" as="geometry"/>
+        </mxCell>
+        <mxCell id="e1" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=classic;endFill=1;" edge="1" parent="1" source="cart" target="checkout">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="e2" value="pay" style="curved=1;html=1;endArrow=classic;endFill=1;" edge="1" parent="1" source="checkout" target="psp">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="300" y="260"/>
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e3" value="result" style="edgeStyle=orthogonalEdgeStyle;dashed=1;html=1;endArrow=open;endFill=0;" edge="1" parent="1" source="psp" target="paid">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="e4" value="records" style="edgeStyle=entityRelationEdgeStyle;html=1;startArrow=ERone;startFill=0;endArrow=ERmany;endFill=0;" edge="1" parent="1" source="psp" target="ledger">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>

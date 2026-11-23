@@ -1,0 +1,24 @@
+{{- range $tier := list "web" "worker" }}
+{{- $a := (index $.Values $tier).autoscaling }}
+{{- if $a.enabled }}
+---
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: {{ include "vantage.fullname" $ }}-{{ $tier }}
+  labels:
+    {{- include "vantage.labels" $ | nindent 4 }}
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: {{ include "vantage.fullname" $ }}-{{ $tier }}
+  minReplicas: {{ $a.minReplicas }}
+  maxReplicas: {{ $a.maxReplicas }}
+  metrics:
+    - type: Resource
+      resource:
+        name: cpu
+        target: { type: Utilization, averageUtilization: {{ $a.targetCPUUtilizationPercentage }} }
+{{- end }}
+{{- end }}

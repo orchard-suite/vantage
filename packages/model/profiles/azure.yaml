@@ -1,0 +1,109 @@
+name: azure
+description: "Microsoft Azure: the generic vocabulary drawn with Azure architecture icons, plus one type per common Azure service. `matches` lists the Azure resource types (as Resource Graph reports them) each type stands for."
+types:
+  # The generic vocabulary, restyled.
+  function: { extends: function, icon: azure/function-apps }
+  database: { extends: database, icon: azure/sql-database }
+  cache: { extends: cache, icon: azure/cache-redis }
+  storage: { extends: storage, icon: azure/storage-accounts }
+  queue: { extends: queue, icon: azure/azure-service-bus }
+  topic: { extends: topic, icon: azure/event-grid-topics }
+  search: { extends: search, icon: azure/cognitive-search }
+  secret: { extends: secret, icon: azure/key-vaults }
+  identity: { extends: identity, icon: azure/entra-id }
+  monitoring: { extends: monitoring, icon: azure/monitor }
+  config: { extends: config, icon: azure/app-configuration }
+  registry: { extends: registry, icon: azure/container-registries }
+  gateway: { extends: gateway, icon: azure/application-gateways }
+  loadbalancer: { extends: loadbalancer, icon: azure/load-balancers, matches: [microsoft.network/loadbalancers] }
+  cdn: { extends: cdn, icon: azure/front-door-and-cdn-profiles }
+  dns: { extends: dns, icon: azure/dns-zones }
+  firewall: { extends: firewall, icon: azure/firewalls, matches: [microsoft.network/azurefirewalls] }
+  tunnel: { extends: tunnel, icon: azure/virtual-network-gateways }
+  model: { extends: model, icon: azure/azure-openai }
+  subscription: { extends: subscription, icon: azure/subscriptions, matches: [microsoft.resources/subscriptions] }
+  resourcegroup: { extends: resourcegroup, icon: azure/resource-groups, matches: [microsoft.resources/subscriptions/resourcegroups] }
+  network: { extends: network, icon: azure/virtual-networks }
+  subnet: { extends: subnet, icon: azure/subnet, matches: [microsoft.network/virtualnetworks/subnets] }
+  cluster: { extends: cluster, icon: azure/kubernetes-services }
+  vm: { extends: vm, icon: azure/virtual-machine }
+
+  # Governance and identity.
+  tenant: { extends: subscription, icon: azure/entra-id, description: An Entra tenant }
+  managementgroup: { extends: subscription, icon: azure/management-groups, description: A management group, matches: [microsoft.management/managementgroups] }
+  policy: { extends: config, icon: azure/policy, description: An Azure Policy assignment or initiative, matches: [microsoft.authorization/policyassignments] }
+  entraid: { extends: identity, icon: azure/entra-id, description: Microsoft Entra ID }
+  appregistration: { extends: identity, icon: azure/app-registrations, description: An app registration }
+  enterpriseapp: { extends: identity, icon: azure/enterprise-applications, description: An enterprise application (service principal) }
+  managedidentity: { extends: identity, icon: azure/managed-identities, description: A managed identity, matches: [microsoft.managedidentity/userassignedidentities] }
+  entragroup: { extends: users, icon: azure/groups, description: An Entra security group }
+  keyvault: { extends: secret, icon: azure/key-vaults, description: A key vault, matches: [microsoft.keyvault/vaults] }
+
+  # Compute.
+  appservice: { extends: service, icon: azure/app-services, description: An App Service web app, matches: [microsoft.web/sites] }
+  appserviceplan: { extends: host, icon: azure/app-service-plans, description: An App Service plan, matches: [microsoft.web/serverfarms] }
+  functionapp: { extends: function, icon: azure/function-apps, description: A function app }
+  staticwebapp: { extends: web, icon: azure/static-apps, description: A static web app, matches: [microsoft.web/staticsites] }
+  containerapp: { extends: service, icon: azure/worker-container-app, description: A container app, matches: [microsoft.app/containerapps] }
+  containerappenv: { extends: cluster, icon: azure/container-apps-environments, description: A container apps environment, matches: [microsoft.app/managedenvironments] }
+  containerinstance: { extends: container, icon: azure/container-instances, description: A container instance, matches: [microsoft.containerinstance/containergroups] }
+  aks: { extends: cluster, icon: azure/kubernetes-services, description: An AKS cluster, matches: [microsoft.containerservice/managedclusters] }
+  acr: { extends: registry, icon: azure/container-registries, description: A container registry, matches: [microsoft.containerregistry/registries] }
+  virtualmachine: { extends: vm, icon: azure/virtual-machine, description: A virtual machine, matches: [microsoft.compute/virtualmachines] }
+  vmss: { extends: vm, icon: azure/vm-scale-sets, description: A virtual machine scale set, matches: [microsoft.compute/virtualmachinescalesets] }
+  disk: { extends: storage, icon: azure/disks, description: A managed disk, matches: [microsoft.compute/disks] }
+  logicapp: { extends: job, icon: azure/logic-apps, description: A logic app workflow, matches: [microsoft.logic/workflows] }
+  batch: { extends: job, icon: azure/batch-accounts, description: A batch account, matches: [microsoft.batch/batchaccounts] }
+
+  # Data.
+  storageaccount: { extends: storage, icon: azure/storage-accounts, description: A storage account, matches: [microsoft.storage/storageaccounts] }
+  blob: { extends: storage, icon: azure/blob-block, description: A blob container }
+  fileshare: { extends: storage, icon: azure/storage-azure-files, description: An Azure Files share }
+  sqlserver: { extends: database, icon: azure/sql-server, description: A logical SQL server, matches: [microsoft.sql/servers] }
+  sqldatabase: { extends: database, icon: azure/sql-database, description: An Azure SQL database, matches: [microsoft.sql/servers/databases] }
+  sqlmi: { extends: database, icon: azure/sql-managed-instance, description: A SQL managed instance, matches: [microsoft.sql/managedinstances] }
+  cosmosdb: { extends: database, icon: azure/azure-cosmos-db, description: A Cosmos DB account, matches: [microsoft.documentdb/databaseaccounts] }
+  postgres: { extends: database, icon: azure/azure-database-postgresql-server, description: An Azure Database for PostgreSQL server, matches: [microsoft.dbforpostgresql/flexibleservers, microsoft.dbforpostgresql/servers] }
+  mysql: { extends: database, icon: azure/azure-database-mysql-server, description: An Azure Database for MySQL server, matches: [microsoft.dbformysql/flexibleservers, microsoft.dbformysql/servers] }
+  redis: { extends: cache, icon: azure/cache-redis, description: An Azure Cache for Redis, matches: [microsoft.cache/redis, microsoft.cache/redisenterprise] }
+  servicebus: { extends: queue, icon: azure/azure-service-bus, description: A Service Bus namespace, matches: [microsoft.servicebus/namespaces] }
+  eventgrid: { extends: topic, icon: azure/event-grid-topics, description: An Event Grid topic, matches: [microsoft.eventgrid/topics, microsoft.eventgrid/systemtopics] }
+  eventhub: { extends: topic, icon: azure/event-hubs, description: An Event Hubs namespace, matches: [microsoft.eventhub/namespaces] }
+  datafactory: { extends: pipeline, icon: azure/data-factories, description: A data factory, matches: [microsoft.datafactory/factories] }
+  databricks: { extends: worker, icon: azure/azure-databricks, description: A Databricks workspace, matches: [microsoft.databricks/workspaces] }
+  synapse: { extends: database, icon: azure/azure-synapse-analytics, description: A Synapse workspace, matches: [microsoft.synapse/workspaces] }
+  aisearch: { extends: search, icon: azure/cognitive-search, description: An AI Search service, matches: [microsoft.search/searchservices] }
+  openai: { extends: model, icon: azure/azure-openai, description: An Azure OpenAI or AI services account, matches: [microsoft.cognitiveservices/accounts] }
+  appconfig: { extends: config, icon: azure/app-configuration, description: An App Configuration store, matches: [microsoft.appconfiguration/configurationstores] }
+
+  # Networking.
+  vnet: { extends: network, icon: azure/virtual-networks, description: A virtual network, matches: [microsoft.network/virtualnetworks] }
+  nsg: { extends: firewall, icon: azure/network-security-groups, description: A network security group, matches: [microsoft.network/networksecuritygroups] }
+  privateendpoint: { extends: tunnel, icon: azure/private-endpoints, description: A private endpoint, matches: [microsoft.network/privateendpoints] }
+  privatelink: { extends: tunnel, icon: azure/private-link, description: A private link service, matches: [microsoft.network/privatelinkservices] }
+  dnszone: { extends: dns, icon: azure/dns-zones, description: A DNS zone, matches: [microsoft.network/dnszones, microsoft.network/privatednszones] }
+  publicip: { extends: gateway, icon: azure/public-ip-addresses, description: A public IP address, matches: [microsoft.network/publicipaddresses] }
+  natgateway: { extends: gateway, icon: azure/nat, description: A NAT gateway, matches: [microsoft.network/natgateways] }
+  bastion: { extends: gateway, icon: azure/bastions, description: A bastion host, matches: [microsoft.network/bastionhosts] }
+  vpngateway: { extends: tunnel, icon: azure/virtual-network-gateways, description: A virtual network gateway, matches: [microsoft.network/virtualnetworkgateways] }
+  expressroute: { extends: tunnel, icon: azure/expressroute-circuits, description: An ExpressRoute circuit, matches: [microsoft.network/expressroutecircuits] }
+  virtualwan: { extends: network, icon: azure/virtual-wans, description: A virtual WAN, matches: [microsoft.network/virtualwans] }
+  appgateway: { extends: gateway, icon: azure/application-gateways, description: An application gateway, matches: [microsoft.network/applicationgateways] }
+  frontdoor: { extends: cdn, icon: azure/front-door-and-cdn-profiles, description: A Front Door or CDN profile, matches: [microsoft.cdn/profiles, microsoft.network/frontdoors] }
+  waf: { extends: firewall, icon: azure/web-application-firewall-policies-waf, description: A WAF policy, matches: [microsoft.network/applicationgatewaywebapplicationfirewallpolicies, microsoft.network/frontdoorwebapplicationfirewallpolicies] }
+  apim: { extends: gateway, icon: azure/api-management-services, description: An API Management service, matches: [microsoft.apimanagement/service] }
+  nic: { extends: socket, icon: azure/network-interfaces, description: A network interface, matches: [microsoft.network/networkinterfaces] }
+  routetable: { extends: config, icon: azure/route-tables, description: A route table, matches: [microsoft.network/routetables] }
+
+  # Operations.
+  loganalytics: { extends: monitoring, icon: azure/log-analytics-workspaces, description: A Log Analytics workspace, matches: [microsoft.operationalinsights/workspaces] }
+  appinsights: { extends: monitoring, icon: azure/application-insights, description: An Application Insights resource, matches: [microsoft.insights/components] }
+  grafana: { extends: monitoring, icon: azure/azure-managed-grafana, description: A managed Grafana, matches: [microsoft.dashboard/grafana] }
+  backupvault: { extends: storage, icon: azure/backup-vault, description: A backup vault, matches: [microsoft.dataprotection/backupvaults] }
+  recoveryvault: { extends: storage, icon: azure/recovery-services-vaults, description: A Recovery Services vault, matches: [microsoft.recoveryservices/vaults] }
+  defender: { extends: monitoring, icon: azure/microsoft-defender-for-cloud, description: Microsoft Defender for Cloud }
+  sentinel: { extends: monitoring, icon: azure/azure-sentinel, description: Microsoft Sentinel }
+  costbudget: { extends: config, icon: azure/cost-budgets, description: A cost budget, matches: [microsoft.consumption/budgets] }
+  automation: { extends: job, icon: azure/automation-accounts, description: An automation account, matches: [microsoft.automation/automationaccounts] }
+  devops: { extends: pipeline, icon: azure/azure-devops, description: An Azure DevOps organization or project }
+  signalr: { extends: socket, icon: azure/signalr, description: A SignalR service, matches: [microsoft.signalrservice/signalr] }

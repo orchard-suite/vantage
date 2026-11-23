@@ -1,0 +1,20 @@
+[
+  {
+    "number": 42,
+    "title": "Retry payment webhooks",
+    "html_url": "https://github.com/acme/shop/pull/42",
+    "updated_at": "2026-10-28T07:00:00Z",
+    "draft": false,
+    "labels": [{ "name": "payments" }],
+    "pull_request": { "url": "https://api.github.com/repos/acme/shop/pulls/42" }
+  },
+  {
+    "number": 41,
+    "title": "Spike: new cart layout",
+    "html_url": "https://github.com/acme/shop/pull/41",
+    "updated_at": "2026-10-26T12:00:00Z",
+    "draft": true,
+    "labels": [],
+    "pull_request": { "url": "https://api.github.com/repos/acme/shop/pulls/41" }
+  }
+]

@@ -1,0 +1,249 @@
+[
+  {
+    "method": "get",
+    "path": "/kinds",
+    "params": [],
+    "query": [],
+    "body": []
+  },
+  {
+    "method": "get",
+    "path": "/kinds/:prefix",
+    "params": [
+      "prefix"
+    ],
+    "query": [],
+    "body": []
+  },
+  {
+    "method": "get",
+    "path": "/items/:item/moves",
+    "params": [
+      "item"
+    ],
+    "query": [],
+    "body": []
+  },
+  {
+    "method": "put",
+    "path": "/items",
+    "params": [],
+    "query": [],
+    "body": [
+      "kind",
+      "item",
+      "ref",
+      "title",
+      "labels",
+      "revision",
+      "body",
+      "parent"
+    ]
+  },
+  {
+    "method": "post",
+    "path": "/items/:item/move",
+    "params": [
+      "item"
+    ],
+    "query": [],
+    "body": [
+      "to",
+      "note",
+      "revision"
+    ]
+  },
+  {
+    "method": "post",
+    "path": "/items/:item/hold",
+    "params": [
+      "item"
+    ],
+    "query": [],
+    "body": [
+      "person"
+    ]
+  },
+  {
+    "method": "post",
+    "path": "/items/:item/release",
+    "params": [
+      "item"
+    ],
+    "query": [],
+    "body": [
+      "person"
+    ]
+  },
+  {
+    "method": "post",
+    "path": "/items/:item/notes",
+    "params": [
+      "item"
+    ],
+    "query": [],
+    "body": [
+      "text"
+    ]
+  },
+  {
+    "method": "post",
+    "path": "/items/:item/files",
+    "params": [
+      "item"
+    ],
+    "query": [
+      "name"
+    ],
+    "body": []
+  },
+  {
+    "method": "get",
+    "path": "/items/:item/files/:id",
+    "params": [
+      "item",
+      "id"
+    ],
+    "query": [],
+    "body": []
+  },
+  {
+    "method": "post",
+    "path": "/items/:item/links",
+    "params": [
+      "item"
+    ],
+    "query": [],
+    "body": [
+      "rel",
+      "target",
+      "remove"
+    ]
+  },
+  {
+    "method": "post",
+    "path": "/items/batch",
+    "params": [],
+    "query": [],
+    "body": [
+      "actions"
+    ]
+  },
+  {
+    "method": "get",
+    "path": "/items/:item",
+    "params": [
+      "item"
+    ],
+    "query": [
+      "held"
+    ],
+    "body": []
+  },
+  {
+    "method": "get",
+    "path": "/items/:item/history",
+    "params": [
+      "item"
+    ],
+    "query": [
+      "before",
+      "limit"
+    ],
+    "body": []
+  },
+  {
+    "method": "get",
+    "path": "/items/:item/notes",
+    "params": [
+      "item"
+    ],
+    "query": [
+      "before",
+      "limit"
+    ],
+    "body": []
+  },
+  {
+    "method": "get",
+    "path": "/items",
+    "params": [],
+    "query": [
+      "keys",
+      "kind",
+      "state",
+      "class",
+      "holder",
+      "asker",
+      "parent",
+      "q",
+      "label.<name>",
+      "limit",
+      "offset",
+      "count"
+    ],
+    "body": []
+  },
+  {
+    "method": "get",
+    "path": "/documents/:id/plan",
+    "params": [
+      "id"
+    ],
+    "query": [],
+    "body": []
+  },
+  {
+    "method": "post",
+    "path": "/apps",
+    "params": [],
+    "query": [],
+    "body": [
+      "clientId",
+      "name",
+      "workspace",
+      "kinds"
+    ]
+  },
+  {
+    "method": "get",
+    "path": "/apps",
+    "params": [],
+    "query": [],
+    "body": []
+  },
+  {
+    "method": "put",
+    "path": "/kinds/:prefix",
+    "params": [
+      "prefix"
+    ],
+    "query": [],
+    "body": [
+      "yaml",
+      "workspace"
+    ]
+  },
+  {
+    "method": "delete",
+    "path": "/items/:item",
+    "params": [
+      "item"
+    ],
+    "query": [],
+    "body": [
+      "reason"
+    ]
+  },
+  {
+    "method": "get",
+    "path": "/changes",
+    "params": [],
+    "query": [
+      "after",
+      "limit",
+      "kinds"
+    ],
+    "body": []
+  }
+]

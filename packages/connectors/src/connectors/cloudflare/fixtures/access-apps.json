@@ -1,0 +1,6 @@
+{ "success": true, "errors": [], "messages": [],
+  "result": [
+    { "id": "a1000000-0000-4000-8000-000000000001", "name": "Relay", "domain": "relay.example.test", "type": "self_hosted", "session_duration": "24h", "self_hosted_domains": ["relay.example.test/admin"] },
+    { "id": "a1000000-0000-4000-8000-000000000002", "name": "Warp", "type": "warp", "session_duration": "24h" }
+  ],
+  "result_info": { "page": 1, "per_page": 100, "total_pages": 1, "count": 2, "total_count": 2 } }

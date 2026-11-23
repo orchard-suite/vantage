@@ -1,0 +1,21 @@
+[
+  { "apiVersion": "backstage.io/v1alpha1", "kind": "Domain", "metadata": { "name": "commerce", "title": "Commerce" }, "spec": { "owner": "group:default/platform" } },
+  { "apiVersion": "backstage.io/v1alpha1", "kind": "System", "metadata": { "name": "shop", "description": "The web shop" }, "spec": { "owner": "platform", "domain": "commerce" } },
+  { "apiVersion": "backstage.io/v1alpha1", "kind": "Component",
+    "metadata": { "name": "checkout", "title": "Checkout", "namespace": "default", "description": "Takes payment", "tags": ["go", "critical"],
+      "annotations": { "backstage.io/source-location": "url:https://git.example.test/org/checkout", "pagerduty.com/service-id": "P1" },
+      "labels": { "tier": "1" },
+      "links": [{ "url": "https://docs.example.test/checkout", "title": "Docs" }] },
+    "spec": { "type": "service", "lifecycle": "production", "owner": "group:default/payments", "system": "shop",
+      "dependsOn": ["component:ledger", "resource:default/orders-db"], "providesApis": ["checkout-api"], "consumesApis": ["api:default/ledger-api"] },
+    "relations": [{ "type": "ownedBy", "targetRef": "group:default/payments" }, { "type": "dependencyOf", "targetRef": "component:default/storefront" }] },
+  { "apiVersion": "backstage.io/v1alpha1", "kind": "Component", "metadata": { "name": "ledger" }, "spec": { "type": "service", "lifecycle": "production", "owner": "payments", "system": "shop", "providesApis": ["ledger-api"] } },
+  { "apiVersion": "backstage.io/v1alpha1", "kind": "Component", "metadata": { "name": "storefront" }, "spec": { "type": "website", "lifecycle": "production", "owner": "storefront", "system": "shop", "consumesApis": ["checkout-api"] } },
+  { "apiVersion": "backstage.io/v1alpha1", "kind": "Component", "metadata": { "name": "checkout-worker" }, "spec": { "type": "service", "lifecycle": "experimental", "owner": "payments", "subcomponentOf": "checkout" } },
+  { "apiVersion": "backstage.io/v1alpha1", "kind": "API", "metadata": { "name": "checkout-api" }, "spec": { "type": "openapi", "lifecycle": "production", "owner": "payments", "system": "shop", "definition": "openapi: 3.0.0" } },
+  { "apiVersion": "backstage.io/v1alpha1", "kind": "API", "metadata": { "name": "ledger-api" }, "spec": { "type": "grpc", "lifecycle": "production", "owner": "payments", "system": "shop" } },
+  { "apiVersion": "backstage.io/v1alpha1", "kind": "Resource", "metadata": { "name": "orders-db" }, "spec": { "type": "database", "owner": "payments", "system": "shop" } },
+  { "apiVersion": "backstage.io/v1alpha1", "kind": "Group", "metadata": { "name": "payments" }, "spec": { "type": "team", "children": [], "parent": "platform" } },
+  { "apiVersion": "backstage.io/v1alpha1", "kind": "Group", "metadata": { "name": "platform" }, "spec": { "type": "team", "children": ["payments"] } },
+  { "apiVersion": "backstage.io/v1alpha1", "kind": "User", "metadata": { "name": "oncall-bot" }, "spec": { "memberOf": ["payments"] } }
+]

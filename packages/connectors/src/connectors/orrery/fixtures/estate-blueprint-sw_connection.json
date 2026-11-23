@@ -1,0 +1,13 @@
+{
+  "id": "sw_connection",
+  "title": "Connection",
+  "fields": {
+    "host": { "type": "string", "title": "Host" },
+    "kind": { "type": "string", "title": "Kind" },
+    "evidence": { "type": "string", "title": "Evidence" },
+    "setting_names": { "type": "string", "many": true, "title": "Setting names" },
+    "calls_7d": { "type": "number", "title": "Calls in 7 days" },
+    "health": { "type": "string" }
+  },
+  "relations": {}
+}

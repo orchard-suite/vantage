@@ -1,0 +1,15 @@
+{
+  "title": "Save to picture",
+  "metric": "CPU for 20 one-fact saves of the release's load test document to reach their pictures, in one process",
+  "unit": "ms",
+  "better": "lower",
+  "score": "bun scripts/bench/save-cpu.ts --saves 20 | tail -1",
+  "heldout": "bun scripts/bench/load-saves.ts --database-url postgres://postgres@localhost:55432/vantage --readers 10 --agents 2 --saves 10 --views 40 --max-p95 100 | awk '/^save to picture/ {print $7}'",
+  "guard": ["bun run check"],
+  "editable": ["packages/hub/src/**", "packages/layout/src/**", "packages/model/src/**", "packages/render/src/**", "packages/server/src/**"],
+  "frozen": ["scripts/bench/**", "**/*.test.ts", "packages/layout/goldens/**", "bun.lock", "examples/**"],
+  "setup": "bun install --frozen-lockfile && bun run build",
+  "runs": 5,
+  "noise": 2,
+  "timeout": 1200
+}

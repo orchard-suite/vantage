@@ -1,0 +1,14 @@
+export { createMcpServer, startMcp, type McpOptions } from './server.ts';
+export { registerGuideDoor, registerLocalTools, validationSummary, type LocalToolOptions, type SavedDocuments } from './tools.ts';
+export { inlineEngine, type LocalEngine, type RenderOutcome } from './engine.ts';
+export { createBridge, createLocalDoor, type BridgeOptions } from './bridge.ts';
+export { checkout, sync, type TextApi } from './workcopy.ts';
+export { hubConfigPath, loginToHub, readHubLink, removeHubLink, writeHubLink, type DeviceStart, type HubLink, type LoginOptions } from './hub.ts';
+export { BUDGET } from './budget.ts';
+export { CORE, GROUPS, LAPTOP_CORE, groupOf } from './catalog.ts';
+export { agentInstructions, INSTRUCTIONS_LEAD } from './instructions.ts';
+export { createFront, firstOf, inProcess, TOOL_DOOR, type Backend, type ClosableBackend, type CallMeasure, type FrontOptions } from './front.ts';
+export { countLines, headingOutline, headingSlug, headings, lineRange, markdownRange, sliceLines, type Heading, type Range } from './markdown.ts';
+export { guideOutline, guidePart, guideText, guideTopics, schemaOutline, schemaPart, schemaText } from './guide-text.ts';
+export { DOCUMENT_ADDRESS, FIND, OUTLINE, PATCH, READ, WRITE, WRITE_SHAPE, WRITE_SHAPE_FILES, type Edit } from './verbs.ts';
+export { ITEM, QUEUE, ROADMAP_IMPORT } from './item-tool.ts';

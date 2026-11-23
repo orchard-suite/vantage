@@ -1,0 +1,26 @@
+{
+  "entities": [
+    {
+      "id": "01J0000000000000000000NS01",
+      "blueprint": "k8s-namespace",
+      "key": "relay",
+      "title": "relay",
+      "icon": null,
+      "state": "active",
+      "hidden": false,
+      "fields": { "phase": "Active", "labels": { "team": "platform" } },
+      "relations": { "cluster": [{ "blueprint": "k8s-cluster", "key": "cluster-a", "title": "cluster-a" }] },
+      "owner": "kube-sync",
+      "scope": null,
+      "createdAt": "2026-10-01T00:00:00Z",
+      "updatedAt": "2026-10-27T09:00:00Z",
+      "lastSeenAt": "2026-10-28T09:00:00Z",
+      "missingSince": null,
+      "deletedAt": null,
+      "status": "green"
+    }
+  ],
+  "total": 1,
+  "limit": 2,
+  "offset": 0
+}

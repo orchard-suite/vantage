@@ -1,0 +1,17 @@
+{
+  "issues": [
+    {
+      "id": "20001",
+      "key": "INC-7",
+      "fields": {
+        "summary": "Checkout errors after the deploy",
+        "status": { "name": "Investigating" },
+        "priority": { "name": "P1" },
+        "updated": "2026-10-28T09:40:00.000+0000",
+        "labels": [],
+        "components": [{ "id": "1", "name": "relay" }, { "id": "2", "name": "shop-api" }]
+      }
+    }
+  ],
+  "isLast": true
+}

@@ -1,0 +1,4 @@
+{ "data": [
+    { "id": "svc-003", "name": "Catalog", "kind": "web", "team": "storefront", "runtime": { "language": "typescript", "version": "5.9" }, "owner": "team-storefront", "dependencies": [{ "id": "svc-002", "via": "http" }] }
+  ],
+  "next": null }

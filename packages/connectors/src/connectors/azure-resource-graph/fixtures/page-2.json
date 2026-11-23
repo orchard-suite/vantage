@@ -1,0 +1,8 @@
+{ "totalRecords": 6, "count": 2, "resultTruncated": "false",
+  "data": [
+    { "id": "/subscriptions/11111111-2222-4333-8444-555555555555/resourceGroups/rg-data/providers/Microsoft.Network/privateEndpoints/pe-sql", "name": "pe-sql", "type": "microsoft.network/privateendpoints", "location": "eastus2", "resourceGroup": "rg-data", "subscriptionId": "11111111-2222-4333-8444-555555555555", "kind": null, "sku": null, "tags": {},
+      "properties": { "provisioningState": "Succeeded", "subnet": { "id": "/subscriptions/11111111-2222-4333-8444-555555555555/resourceGroups/rg-net/providers/Microsoft.Network/virtualNetworks/vnet-hub/subnets/snet-data" },
+        "privateLinkServiceConnections": [{ "name": "sql", "properties": { "privateLinkServiceId": "/subscriptions/11111111-2222-4333-8444-555555555555/resourceGroups/rg-data/providers/Microsoft.Sql/servers/sql-shop", "groupIds": ["sqlServer"] } }] } },
+    { "id": "/subscriptions/11111111-2222-4333-8444-555555555555/resourceGroups/rg-data/providers/Microsoft.Sql/servers/sql-shop", "name": "sql-shop", "type": "microsoft.sql/servers", "location": "eastus2", "resourceGroup": "rg-data", "subscriptionId": "11111111-2222-4333-8444-555555555555", "kind": "v12.0", "sku": null, "tags": {},
+      "properties": { "state": "Ready", "version": "12.0", "privateEndpointConnections": [{ "id": "/subscriptions/11111111-2222-4333-8444-555555555555/resourceGroups/rg-data/providers/Microsoft.Sql/servers/sql-shop/privateEndpointConnections/pe-sql", "properties": { "privateEndpoint": { "id": "/subscriptions/11111111-2222-4333-8444-555555555555/resourceGroups/rg-data/providers/Microsoft.Network/privateEndpoints/pe-sql" } } }] } }
+  ] }

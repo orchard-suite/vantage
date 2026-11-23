@@ -1,0 +1,12 @@
+node_modules
+**/node_modules
+packages/viewer/dist
+out
+.git
+.workbench
+examples
+!examples/shop/shop.vantage.yaml
+!examples/harbor/harbor.vantage.yaml
+skills
+*.md
+!docs/agent-guide.md

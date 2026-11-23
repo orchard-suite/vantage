@@ -1,0 +1,11 @@
+Vantage {{ .Chart.AppVersion }} is installing as {{ include "vantage.fullname" . }}.
+
+  web:      {{ .Values.web.replicas }} pods, service {{ include "vantage.fullname" . }}:{{ .Values.service.port }}
+  worker:   {{ .Values.worker.replicas }} pods
+  database: {{ .Values.database.mode }}{{ if eq .Values.database.mode "cnpg" }} ({{ .Values.database.cnpg.instances }} instances, cluster {{ include "vantage.dbCluster" . }}){{ end }}
+  files:    {{ .Values.storage.driver }}{{ if eq .Values.storage.driver "fs" }} ({{ .Values.storage.fs.accessMode }}, claim {{ include "vantage.claim" . }}){{ end }}
+
+Pods wait for the database on first start; the migrations run in each pod's
+init container under a lock. Open {{ .Values.publicUrl }} once the web pods are ready:
+
+  kubectl -n {{ .Release.Namespace }} rollout status deploy/{{ include "vantage.fullname" . }}-web

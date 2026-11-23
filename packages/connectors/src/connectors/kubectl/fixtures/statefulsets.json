@@ -1,0 +1,8 @@
+{ "apiVersion": "v1", "kind": "List", "items": [
+  { "apiVersion": "apps/v1", "kind": "StatefulSet", "metadata": { "name": "postgres", "namespace": "relay", "creationTimestamp": "2026-09-02T00:00:00Z" },
+    "spec": { "replicas": 1, "updateStrategy": { "type": "RollingUpdate" }, "serviceName": "postgres", "selector": { "matchLabels": { "app": "postgres" } },
+      "template": { "metadata": { "labels": { "app": "postgres" } },
+        "spec": { "containers": [{ "name": "postgres", "image": "docker.example.test/postgres:16.4",
+          "env": [{ "name": "POSTGRES_PASSWORD", "valueFrom": { "secretKeyRef": { "name": "relay-db", "key": "password" } } }] }] } } },
+    "status": { "readyReplicas": 1 } }
+] }

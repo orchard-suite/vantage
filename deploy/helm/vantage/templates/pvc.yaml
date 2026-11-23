@@ -1,0 +1,25 @@
+{{- if and (eq .Values.storage.driver "fs") (not .Values.storage.fs.existingClaim) }}
+{{- if and (eq .Values.storage.fs.accessMode "ReadWriteOnce") (or (gt (int .Values.web.replicas) 1) (gt (int .Values.worker.replicas) 1)) }}
+{{- fail "storage.fs.accessMode ReadWriteOnce cannot serve more than one pod per tier; use ReadWriteMany, or one web and one worker" }}
+{{- end }}
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: {{ include "vantage.claim" . }}
+  labels:
+    {{- include "vantage.labels" . | nindent 4 }}
+    {{- with .Values.storage.fs.labels }}
+    {{- toYaml . | nindent 4 }}
+    {{- end }}
+  annotations:
+    # The files outlive an uninstall; pictures and icons people uploaded live here.
+    helm.sh/resource-policy: keep
+spec:
+  accessModes: [{{ .Values.storage.fs.accessMode }}]
+  {{- with .Values.storage.fs.storageClass }}
+  storageClassName: {{ . }}
+  {{- end }}
+  resources:
+    requests:
+      storage: {{ .Values.storage.fs.size }}
+{{- end }}

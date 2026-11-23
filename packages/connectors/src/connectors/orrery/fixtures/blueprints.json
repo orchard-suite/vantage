@@ -1,0 +1,10 @@
+{
+  "blueprints": [
+    { "id": "k8s-namespace", "title": "Namespace" },
+    { "id": "k8s-deployment", "title": "Deployment" },
+    { "id": "k8s-service", "title": "Service" }
+  ],
+  "counts": { "k8s-namespace": 1, "k8s-deployment": 3, "k8s-service": 1 },
+  "layout": {},
+  "adminOnly": []
+}

@@ -1,0 +1,305 @@
+title: Shop Architecture
+author: Ada Example
+updated: 2026-10-26
+
+nodes:
+  - name: Shoppers
+    type: users
+    subtitle: Web and mobile
+  - name: Ops Team
+    type: actor
+  - id: azure
+    name: Azure
+    type: cloud
+    subtitle: sub-shop-prod
+    children:
+      - id: edge
+        name: Edge
+        type: group
+        children:
+          - name: Front Door
+            type: cdn
+            subtitle: WAF + CDN
+          - name: DNS Zone
+            type: dns
+            subtitle: shop.example.com
+      - id: apps
+        name: Application Tier
+        type: resourcegroup
+        subtitle: rg-shop-apps
+        children:
+          - name: Web App
+            type: web
+            subtitle: Next.js
+            bind: shop-orrery:service:shop-web
+          - name: Orders API
+            type: api
+            subtitle: ASP.NET 10
+            bind: shop-orrery:service:orders-api
+          - name: Catalog API
+            type: api
+            subtitle: Go
+            bind: shop-orrery:service:catalog-api
+          - name: Order Worker
+            type: worker
+            subtitle: Service Bus trigger
+            bind: shop-orrery:service:order-worker
+      - id: data
+        name: Data Tier
+        type: resourcegroup
+        subtitle: rg-shop-data
+        children:
+          - name: Orders DB
+            type: database
+            subtitle: Azure SQL
+            bind: shop-orrery:database:orders-db
+          - name: Catalog DB
+            type: database
+            subtitle: Cosmos DB
+          - name: Cache
+            type: cache
+            subtitle: Redis
+          - name: Order Events
+            type: queue
+            subtitle: Service Bus
+      - id: platform
+        name: Platform
+        type: resourcegroup
+        subtitle: rg-shop-platform
+        children:
+          - name: Key Vault
+            type: secret
+          - name: App Insights
+            type: monitoring
+          - name: Container Registry
+            type: registry
+  - name: Stripe
+    type: external
+    subtitle: Payments
+  - name: GitHub
+    type: repo
+    subtitle: acme/shop
+
+relations:
+  - from: shoppers
+    to: front-door
+    label: browse and buy
+    tags: [requests]
+  - from: front-door
+    to: web-app
+    label: routes
+    tags: [requests]
+  - from: web-app
+    to: [orders-api, catalog-api]
+    label: calls
+    tags: [requests]
+  - from: orders-api
+    to: orders-db
+    label: reads and writes orders
+    kind: data
+    tags: [data]
+  - from: orders-api
+    to: order-events
+    label: publishes order placed
+    kind: async
+    tags: [data, requests]
+  - from: order-events
+    to: order-worker
+    label: triggers
+    kind: async
+    tags: [data, requests]
+  - from: order-worker
+    to: stripe
+    label: captures payment
+    tags: [requests]
+  - from: catalog-api
+    to: catalog-db
+    label: reads products
+    kind: data
+    tags: [data]
+  - from: catalog-api
+    to: cache
+    label: caches hot products
+    kind: data
+    tags: [data]
+  - from: [orders-api, catalog-api, order-worker]
+    to: key-vault
+    label: reads secrets
+    kind: auth
+    tags: [platform]
+  - from: [web-app, orders-api, catalog-api, order-worker]
+    to: app-insights
+    label: sends telemetry
+    kind: observe
+    tags: [platform]
+  - from: github
+    to: container-registry
+    label: pushes images
+    kind: deploy
+    tags: [deploy]
+  - from: container-registry
+    to: [web-app, orders-api, catalog-api, order-worker]
+    label: pulls image
+    kind: deploy
+    tags: [deploy]
+  - from: ops-team
+    to: app-insights
+    label: watches dashboards
+    tags: [platform]
+
+views:
+  - id: context
+    title: Context
+    group: Overview
+    question: Who uses the shop and what does it depend on?
+    relations:
+      - from: shoppers
+        to: azure
+        label: shop at
+      - from: azure
+        to: stripe
+        label: takes payment through
+      - from: ops-team
+        to: azure
+        label: operates
+      - from: github
+        to: azure
+        label: deploys to
+  - id: requests
+    title: Requests
+    group: Overview
+    question: How does a purchase travel through the system?
+    include: { tags: [requests] }
+  - id: data
+    title: Data
+    group: Overview
+    question: Which service owns which store?
+    include: { tags: [data] }
+    openItems: true
+  - id: platform
+    title: Platform
+    group: Operations
+    question: What do the workloads lean on?
+    include: { tags: [platform] }
+  - id: deploy
+    title: Delivery
+    group: Operations
+    question: How does code reach production?
+    include: { tags: [deploy] }
+  - id: end-to-end
+    title: End to End
+    group: Overview
+    extends: [requests, data, platform]
+  - id: purchase
+    kind: sequence
+    title: Purchase
+    group: Processes
+    steps:
+      - from: shoppers
+        to: web-app
+        label: submit cart
+        steps:
+          - from: web-app
+            to: orders-api
+            label: POST /orders
+            steps:
+              - from: orders-api
+                to: orders-db
+                label: insert order
+                reply: order id
+              - from: orders-api
+                to: order-events
+                label: order placed
+                kind: async
+            reply: 201 Created
+        reply: confirmation page
+      - loop: until payment settles
+        steps:
+          - from: order-events
+            to: order-worker
+            label: deliver message
+            kind: async
+          - from: order-worker
+            to: stripe
+            label: capture payment
+            steps:
+              - alt: card accepted
+                steps:
+                  - from: stripe
+                    to: order-worker
+                    label: paid
+                    kind: reply
+                else:
+                  - from: stripe
+                    to: order-worker
+                    label: declined
+                    kind: reply
+  - id: release
+    kind: flow
+    title: Release Flow
+    group: Processes
+    lanes: [Developer, GitHub Actions, Cluster]
+    steps:
+      - id: push
+        text: Push to main
+        shape: start
+        lane: Developer
+      - id: test
+        text: Run tests
+        lane: GitHub Actions
+      - id: pass
+        text: Tests pass?
+        shape: decision
+        lane: GitHub Actions
+      - id: build
+        text: Build and push image
+        lane: GitHub Actions
+      - id: fix
+        text: Fix and push again
+        lane: Developer
+      - id: bump
+        text: Bump manifest
+        lane: GitHub Actions
+      - id: sync
+        text: Argo CD syncs
+        lane: Cluster
+      - id: done
+        text: Live
+        shape: end
+        lane: Cluster
+    edges:
+      - { from: push, to: test }
+      - { from: test, to: pass }
+      - { from: pass, to: build, label: yes }
+      - { from: pass, to: fix, label: no }
+      - { from: fix, to: test }
+      - { from: build, to: bump }
+      - { from: bump, to: sync }
+      - { from: sync, to: done }
+  - id: tour
+    kind: walkthrough
+    title: Follow an Order
+    group: Processes
+    view: requests
+    steps:
+      - title: A shopper arrives
+        text: Traffic lands on Front Door first.
+        highlight: [shoppers, front-door]
+      - title: The web app calls the APIs
+        highlight: [web-app, orders-api, catalog-api]
+      - title: Orders go async
+        text: The API publishes an event; the worker captures payment later.
+        highlight: [order-events, order-worker, stripe]
+  - id: how-an-order-works
+    kind: doc
+    title: How an Order Works
+    group: Guides
+    question: What happens between a shopper pressing Buy and the money moving?
+    file: pages/how-an-order-works.md
+    beside: requests
+  - id: runbook
+    kind: doc
+    title: Runbook
+    group: Guides
+    question: What runs, and how does a change reach production?
+    file: pages/runbook.md

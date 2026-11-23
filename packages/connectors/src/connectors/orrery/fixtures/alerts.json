@@ -1,0 +1,48 @@
+{
+  "alerts": [
+    {
+      "fingerprint": "a1f0c2",
+      "source": "alertmanager",
+      "status": "firing",
+      "labels": { "alertname": "RelayDown", "severity": "critical", "namespace": "relay" },
+      "annotations": { "summary": "Relay has no ready replicas", "runbook_url": "https://runbooks.example.test/relay-down" },
+      "startsAt": "2026-10-28T09:30:00Z",
+      "endsAt": null,
+      "entity": { "blueprint": "k8s-deployment", "key": "relay/relay" },
+      "updatedAt": "2026-10-28T09:55:00Z"
+    },
+    {
+      "fingerprint": "b2e1d3",
+      "source": "alertmanager",
+      "status": "firing",
+      "labels": { "alertname": "RelayLatencyHigh", "severity": "warning" },
+      "annotations": {},
+      "startsAt": "2026-10-28T09:40:00Z",
+      "endsAt": null,
+      "entity": { "blueprint": "k8s-service", "key": "relay/relay" },
+      "updatedAt": "2026-10-28T09:50:00Z"
+    },
+    {
+      "fingerprint": "c3f2e4",
+      "source": "alertmanager",
+      "status": "resolved",
+      "labels": { "alertname": "RelayRestarts", "severity": "warning" },
+      "annotations": {},
+      "startsAt": "2026-10-28T08:00:00Z",
+      "endsAt": "2026-10-28T08:20:00Z",
+      "entity": { "blueprint": "k8s-deployment", "key": "relay/relay" },
+      "updatedAt": "2026-10-28T08:20:00Z"
+    },
+    {
+      "fingerprint": "d4a3f5",
+      "source": "alertmanager",
+      "status": "firing",
+      "labels": { "alertname": "NodeDiskPressure", "severity": "page" },
+      "annotations": {},
+      "startsAt": "2026-10-28T09:00:00Z",
+      "endsAt": null,
+      "entity": null,
+      "updatedAt": "2026-10-28T09:58:00Z"
+    }
+  ]
+}

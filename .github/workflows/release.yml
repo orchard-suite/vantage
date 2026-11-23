@@ -1,0 +1,67 @@
+name: Release
+
+on:
+  push:
+    branches: [main]
+    paths-ignore:
+      - '**/*.md'
+      - 'docs/**'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  packages: write
+  # The build signs the image keyless; a called workflow gets no more than this.
+  id-token: write
+
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+# Every push to main is tested first and may release.
+jobs:
+  test:
+    if: ${{ !contains(github.event.head_commit.message, '[skip ci]') }}
+    permissions:
+      contents: read
+    uses: ./.github/workflows/test.yml
+
+  version:
+    needs: test
+    runs-on: ubuntu-latest
+    outputs:
+      released: ${{ steps.release.outputs.released }}
+      tag: ${{ steps.release.outputs.tag }}
+      version: ${{ steps.release.outputs.version }}
+    steps:
+      # The branch tip, not the pushed commit: a run queued behind another
+      # release must see that release's version commit and tags.
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.ref_name }}
+          fetch-depth: 0
+      - id: release
+        uses: dsswift/release-damnit@v1.9.2
+        with:
+          since-last-release: 'true'
+          publish: 'true'
+
+  build:
+    needs: version
+    if: needs.version.outputs.released == 'true'
+    uses: ./.github/workflows/build.yml
+    with:
+      tag: ${{ needs.version.outputs.tag }}
+    secrets: inherit
+
+  # Last: an estate's deploy tool follows this branch, so it moves only once
+  # the hub image the release's chart names is published and signed.
+  released:
+    needs: [version, build]
+    permissions:
+      contents: write
+      packages: read
+    uses: ./.github/workflows/released.yml
+    with:
+      ref: ${{ needs.version.outputs.tag }}
+    secrets: inherit

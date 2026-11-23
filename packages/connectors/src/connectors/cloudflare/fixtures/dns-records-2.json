@@ -1,0 +1,5 @@
+{ "success": true, "errors": [], "messages": [],
+  "result": [
+    { "id": "r0000000000000000000000000000003", "zone_id": "z1a2b3c4d5e6f7a8b9c0d1e2f3a4b5c6", "name": "mail.example.test", "type": "MX", "content": "mx.mailhost.test", "proxied": false, "ttl": 3600, "comment": null }
+  ],
+  "result_info": { "page": 2, "per_page": 2, "total_pages": 2, "count": 1, "total_count": 3 } }

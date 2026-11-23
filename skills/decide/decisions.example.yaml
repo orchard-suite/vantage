@@ -1,0 +1,55 @@
+# Example estate config for the decide skill. Fictional names throughout.
+#
+# The skill reads the file named by VANTAGE_DECISIONS_CONFIG, else
+# ~/.config/vantage/decisions.yaml. An estate keeps its own copy and links
+# it into place. With no file, the skill lists the registries on the hub
+# and asks which one a decision belongs in.
+
+# Optional. The scheme a new registry gets when its entry names none.
+# These are the defaults.
+categories:
+  0: Governance
+  1: Infrastructure
+  2: Security
+  3: Data
+  4: Compute
+  5: Development
+  6: Operations
+
+# Optional. The time zone for Last updated and decision dates. The local
+# date is sent; with none, the hub stamps the date in UTC.
+timezone: Europe/Berlin
+
+registries:
+  # One organization registry: decisions that apply across programs.
+  - prefix: ACME
+    name: Acme Platform decisions
+    scope: organization
+    workspace: platform
+    when: Applies across programs, or is department policy.
+
+  # One registry per program, in the workspace its diagrams live in.
+  - prefix: SHOP
+    name: Shop decisions
+    scope: program
+    program: Shop
+    workspace: shop
+    when: Unique to the Shop program.
+    # Repositories whose in-repo records migrate into this registry.
+    repositories:
+      - github.com/acme-example/shop-api
+      - github.com/acme-example/shop-web
+
+  - prefix: COMET
+    name: Comet decisions
+    scope: program
+    program: Comet
+    workspace: comet
+    when: Unique to the Comet program.
+    repositories:
+      - github.com/acme-example/comet
+    # A registry may use its own scheme.
+    categories:
+      0: Governance
+      3: Data
+      5: Development

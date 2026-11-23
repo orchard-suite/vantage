@@ -1,0 +1,8 @@
+{ "apiVersion": "v1", "kind": "List", "items": [
+  { "apiVersion": "networking.k8s.io/v1", "kind": "Ingress", "metadata": { "name": "relay", "namespace": "relay", "creationTimestamp": "2026-09-02T00:00:00Z" },
+    "spec": { "ingressClassName": "nginx", "tls": [{ "hosts": ["relay.example.test"], "secretName": "relay-tls" }],
+      "rules": [{ "host": "relay.example.test", "http": { "paths": [{ "path": "/", "pathType": "Prefix", "backend": { "service": { "name": "relay", "port": { "number": 443 } } } }] } }] } },
+  { "apiVersion": "networking.k8s.io/v1", "kind": "Ingress", "metadata": { "name": "grafana", "namespace": "monitoring", "creationTimestamp": "2026-09-02T00:00:00Z" },
+    "spec": { "ingressClassName": "nginx", "defaultBackend": { "service": { "name": "grafana", "port": { "number": 80 } } },
+      "rules": [{ "host": "grafana.example.test", "http": { "paths": [{ "path": "/", "pathType": "Prefix", "backend": { "service": { "name": "grafana", "port": { "number": 80 } } } }] } }] } }
+] }

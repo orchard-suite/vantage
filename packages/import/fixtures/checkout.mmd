@@ -1,0 +1,28 @@
+---
+title: Checkout
+---
+%% Every bracket shape, every edge form, nested subgraphs.
+flowchart LR
+    shopper((Shopper)) -->|browses| web[Storefront]
+    web -- places order --> api(Orders API)
+    api ==> queue[[Order Queue]]
+    api -.-> audit>Audit Log]
+    api --- cfg{{Config}}
+    api -. emits .-> events([Event Stream])
+    subgraph data [Data Tier]
+        direction TB
+        db[(Orders DB)]
+        cache[(Redis)]
+        subgraph archive ["Cold Archive"]
+            blob[/Blob Store/]
+        end
+    end
+    api --> db & cache
+    worker[Order Worker] --> db --> blob
+    queue --> worker
+    check{Paid?} --> worker
+    classDef hot fill:#f96
+    class api hot
+    style db fill:#eee
+    click web "https://example.com"
+    linkStyle 0 stroke:#333

@@ -1,0 +1,16 @@
+{
+  "issues": [
+    {
+      "id": "10003",
+      "key": "OPS-103",
+      "fields": {
+        "summary": "Tidy the runbook index",
+        "status": { "name": "To Do" },
+        "priority": null,
+        "updated": "2026-10-20T10:00:00.000+0000",
+        "labels": ["docs"]
+      }
+    }
+  ],
+  "isLast": true
+}

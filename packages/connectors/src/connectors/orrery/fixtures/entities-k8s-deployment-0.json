@@ -1,0 +1,51 @@
+{
+  "entities": [
+    {
+      "id": "01J0000000000000000000DP01",
+      "blueprint": "k8s-deployment",
+      "key": "relay/relay",
+      "title": "Relay",
+      "icon": null,
+      "state": "active",
+      "hidden": false,
+      "fields": { "image": "registry.example.test/relay:1.4.2", "replicas": 2, "ready": 2, "notes": null },
+      "relations": {
+        "namespace": [{ "blueprint": "k8s-namespace", "key": "relay", "title": "relay" }],
+        "service": [{ "blueprint": "k8s-service", "key": "relay/relay", "title": "relay" }]
+      },
+      "owner": "kube-sync",
+      "scope": null,
+      "createdAt": "2026-10-01T00:00:00Z",
+      "updatedAt": "2026-10-27T09:00:00Z",
+      "lastSeenAt": "2026-10-28T09:00:00Z",
+      "missingSince": null,
+      "deletedAt": null,
+      "status": "green"
+    },
+    {
+      "id": "01J0000000000000000000DP02",
+      "blueprint": "k8s-deployment",
+      "key": "relay/relay-worker",
+      "title": "Relay Worker",
+      "icon": null,
+      "state": "active",
+      "hidden": false,
+      "fields": { "image": "registry.example.test/relay-worker:1.4.2", "replicas": 1, "ready": 1 },
+      "relations": {
+        "namespace": [{ "blueprint": "k8s-namespace", "key": "relay", "title": "relay" }],
+        "service": []
+      },
+      "owner": "kube-sync",
+      "scope": null,
+      "createdAt": "2026-10-01T00:00:00Z",
+      "updatedAt": "2026-10-27T09:00:00Z",
+      "lastSeenAt": "2026-10-28T09:00:00Z",
+      "missingSince": null,
+      "deletedAt": null,
+      "status": "green"
+    }
+  ],
+  "total": 3,
+  "limit": 2,
+  "offset": 0
+}

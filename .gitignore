@@ -1,0 +1,10 @@
+node_modules/
+dist/
+.workbench/
+*.tsbuildinfo
+.DS_Store
+out/
+
+# The global gitignore hides NuGet packages/ folders; this repo uses packages/ for source.
+!packages/
+!packages/*

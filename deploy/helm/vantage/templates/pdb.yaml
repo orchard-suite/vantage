@@ -1,0 +1,17 @@
+{{- range $tier := list "web" "worker" }}
+{{- $v := index $.Values $tier }}
+{{- if $v.podDisruptionBudget }}
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: {{ include "vantage.fullname" $ }}-{{ $tier }}
+  labels:
+    {{- include "vantage.labels" $ | nindent 4 }}
+spec:
+  {{- toYaml $v.podDisruptionBudget | nindent 2 }}
+  selector:
+    matchLabels:
+      {{- include "vantage.selector" (dict "root" $ "component" $tier) | nindent 6 }}
+{{- end }}
+{{- end }}

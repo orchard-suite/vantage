@@ -1,0 +1,9 @@
+[
+  {
+    "number": 39,
+    "title": "Checkout fails for saved cards",
+    "html_url": "https://github.com/acme/shop/issues/39",
+    "updated_at": "2026-10-28T09:10:00Z",
+    "labels": [{ "name": "bug" }, { "name": "P0" }]
+  }
+]

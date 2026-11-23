@@ -1,0 +1,6 @@
+{
+  "vantage": {
+    "command": "sh",
+    "args": ["${CLAUDE_PLUGIN_ROOT}/scripts/mcp.sh"]
+  }
+}

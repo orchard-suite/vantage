@@ -1,0 +1,31 @@
+name: k8s
+description: "Kubernetes: the generic vocabulary drawn with the Kubernetes community icons, plus one type per common resource kind. `matches` lists the resource kinds (lowercase, as kubectl reports them) each type stands for."
+types:
+  # The generic vocabulary, restyled.
+  namespace: { extends: namespace, icon: k8s/ns, matches: [namespace] }
+  pod: { extends: pod, icon: k8s/pod, matches: [pod] }
+  job: { extends: job, icon: k8s/job, matches: [job] }
+  secret: { extends: secret, icon: k8s/secret, matches: [secret] }
+  config: { extends: config, icon: k8s/cm }
+  cluster: { extends: cluster, icon: k8s/control-plane }
+
+  # Resource kinds.
+  deployment: { extends: service, icon: k8s/deploy, description: A deployment, matches: [deployment] }
+  statefulset: { extends: service, icon: k8s/sts, description: A stateful set, matches: [statefulset] }
+  daemonset: { extends: service, icon: k8s/ds, description: A daemon set, matches: [daemonset] }
+  replicaset: { extends: service, icon: k8s/rs, description: A replica set, matches: [replicaset] }
+  cronjob: { extends: job, icon: k8s/cronjob, description: A cron job, matches: [cronjob] }
+  svc: { extends: loadbalancer, icon: k8s/svc, description: A Kubernetes service, matches: [service] }
+  ingress: { extends: gateway, icon: k8s/ing, description: An ingress, matches: [ingress] }
+  configmap: { extends: config, icon: k8s/cm, description: A config map, matches: [configmap] }
+  pvc: { extends: storage, icon: k8s/pvc, description: A persistent volume claim, matches: [persistentvolumeclaim] }
+  pv: { extends: storage, icon: k8s/pv, description: A persistent volume, matches: [persistentvolume] }
+  storageclass: { extends: config, icon: k8s/sc, description: A storage class, matches: [storageclass] }
+  serviceaccount: { extends: identity, icon: k8s/sa, description: A service account, matches: [serviceaccount] }
+  role: { extends: identity, icon: k8s/role, description: A role, matches: [role] }
+  clusterrole: { extends: identity, icon: k8s/crole, description: A cluster role, matches: [clusterrole] }
+  rolebinding: { extends: identity, icon: k8s/rb, description: A role binding, matches: [rolebinding] }
+  hpa: { extends: config, icon: k8s/hpa, description: A horizontal pod autoscaler, matches: [horizontalpodautoscaler] }
+  networkpolicy: { extends: firewall, icon: k8s/netpol, description: A network policy, matches: [networkpolicy] }
+  crd: { extends: config, icon: k8s/crd, description: A custom resource definition, matches: [customresourcedefinition] }
+  node: { extends: host, icon: k8s/node, description: A node, matches: [node] }

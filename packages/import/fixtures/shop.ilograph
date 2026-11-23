@@ -1,0 +1,83 @@
+imports:
+  - from: ./lib.ilograph
+    namespace: Lib
+
+description: |-
+  A small shop, written the Ilograph way.
+
+resources:
+  - name: Shoppers
+    icon: Azure/General/User Icon.svg
+  - id: grp
+    name: Edge
+  - name: Azure
+    instanceOf: Lib::Cloud
+    children:
+      - name: Front Door
+        instanceOf: Lib::Gateway
+        subtitle: afd-shop
+      - id: apps
+        name: Apps
+        children:
+          - id: web
+            name: Web App
+            instanceOf: Lib::App
+          - id: api
+            name: Orders API
+            instanceOf: Lib::App
+            children:
+              - id: orders
+                name: /orders
+              - id: health
+                name: /health
+      - name: Orders DB
+        instanceOf: Lib::Database
+        style: plural
+
+perspectives:
+  - name: Base
+    hidden: true
+    relations:
+      - from: Shoppers
+        to: Front Door
+        label: browse
+  - name: Context
+    notes: |
+      Who uses the shop and how a request reaches the API. This is the first view a reader opens.
+    color: DodgerBlue
+    extends: Base
+    overrides:
+      - parentId: grp
+        resourceId: Front Door
+    relations:
+      - from: Front Door
+        to: web
+        label: routes
+      - from: web
+        to: Orders API/[orders, health]
+        label: calls
+      - from: Orders API
+        to: Orders DB
+        label: reads
+        color: Orange
+    walkthrough:
+      - text: A shopper arrives at Front Door.
+        select: Front Door
+      - text: The web app calls the API.
+        highlight: web, api
+  - name: Place an order
+    sequence:
+      start: Shoppers
+      steps:
+        - to: Front Door
+          label: GET /
+        - toAndBack: web
+          label: render
+        - toAsync: Orders DB
+          label: audit
+        - restartAt: web
+        - subSequence:
+            name: checkout
+            steps:
+              - to: api
+                label: POST /orders

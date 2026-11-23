@@ -1,0 +1,18 @@
+{
+  "name": "@vantage/cli",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "bin": {
+    "vantage": "src/main.ts"
+  },
+  "dependencies": {
+    "@vantage/connectors": "workspace:*",
+    "@vantage/layout": "workspace:*",
+    "@vantage/mcp": "workspace:*",
+    "@vantage/model": "workspace:*",
+    "@vantage/publish": "workspace:*",
+    "@vantage/render": "workspace:*",
+    "@vantage/server": "workspace:*"
+  }
+}

@@ -1,0 +1,77 @@
+{{- if eq .Values.database.mode "cnpg" }}
+{{- $db := .Values.database.cnpg }}
+# The hub's Postgres, run by the CloudNativePG operator: a primary and its
+# standbys on different nodes, streaming replication, failover and
+# switchover by the operator, and an `-app` Secret the pods read.
+apiVersion: postgresql.cnpg.io/v1
+kind: Cluster
+metadata:
+  name: {{ include "vantage.dbCluster" . }}
+  labels:
+    {{- include "vantage.labels" . | nindent 4 }}
+  annotations:
+    # The database outlives an uninstall.
+    helm.sh/resource-policy: keep
+spec:
+  instances: {{ $db.instances }}
+  imageName: {{ $db.imageName }}
+  # An upgrade restarts the standbys first, then moves the primary role to one of them.
+  primaryUpdateStrategy: unsupervised
+  primaryUpdateMethod: switchover
+  smartShutdownTimeout: {{ $db.smartShutdownTimeout }}
+  switchoverDelay: {{ $db.switchoverDelay }}
+  bootstrap:
+    initdb:
+      database: {{ $db.database }}
+      owner: {{ $db.owner }}
+      {{- if $db.import.enabled }}
+      import:
+        type: microservice
+        databases: [{{ $db.import.database }}]
+        source:
+          externalCluster: import
+      {{- end }}
+  {{- if $db.import.enabled }}
+  externalClusters:
+    - name: import
+      connectionParameters:
+        host: {{ required "database.cnpg.import.host is required" $db.import.host }}
+        port: {{ $db.import.port | quote }}
+        user: {{ $db.import.user }}
+        dbname: {{ $db.import.database }}
+        sslmode: disable
+      password:
+        name: {{ required "database.cnpg.import.passwordSecret is required" $db.import.passwordSecret }}
+        key: password
+  {{- end }}
+  postgresql:
+    parameters:
+      {{- toYaml $db.parameters | nindent 6 }}
+  storage:
+    size: {{ $db.storage.size }}
+    {{- with $db.storage.storageClass }}
+    storageClass: {{ . }}
+    {{- end }}
+  resources:
+    {{- toYaml $db.resources | nindent 4 }}
+  {{- if $db.podMonitor }}
+  monitoring:
+    enablePodMonitor: true
+  {{- end }}
+  affinity:
+    podAntiAffinityType: {{ $db.podAntiAffinityType }}
+    topologyKey: kubernetes.io/hostname
+    {{- with $db.nodeSelector }}
+    nodeSelector:
+      {{- toYaml . | nindent 6 }}
+    {{- end }}
+    {{- with $db.tolerations }}
+    tolerations:
+      {{- toYaml . | nindent 6 }}
+    {{- end }}
+  {{- with $db.inheritedLabels }}
+  inheritedMetadata:
+    labels:
+      {{- toYaml . | nindent 6 }}
+  {{- end }}
+{{- end }}

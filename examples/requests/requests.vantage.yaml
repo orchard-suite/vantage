@@ -1,0 +1,28 @@
+vantage: 1
+title: Access requests
+description: A kind of tracked item with a lifecycle of its own. A person asks for access, an approver who is not the asker approves or declines with a note, and whoever holds the request finishes it.
+kind:
+  prefix: ACC
+  name: Access request
+  labels:
+    - { name: system, type: choice, choices: [cloud, source, tickets] }
+    - { name: until, type: date, title: Access until }
+  roles:
+    approver: [lead@example.com, team:platform]
+  lifecycle: flow
+views:
+  - id: flow
+    kind: lifecycle
+    title: How an access request moves
+    question: Who decides an access request, and what does each move need?
+    direction: down
+    states:
+      - { id: asked, text: Asked, class: not-started }
+      - { id: approved, text: Approved, class: in-progress }
+      - { id: granted, text: Granted, class: done }
+      - { id: declined, text: Declined, class: parked }
+    moves:
+      - { from: asked, to: approved, label: approve, who: [approver], approval: true, needs: [label:until] }
+      - { from: asked, to: declined, label: decline, who: [approver], needs: [note] }
+      - { from: approved, to: granted, label: grant, who: [holder] }
+      - { from: declined, to: asked, label: ask again, who: [asker], needs: [note] }

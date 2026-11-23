@@ -1,0 +1,23 @@
+@startuml
+title Pay for an order
+actor Shopper as S
+participant "Orders API" as API
+database "Orders DB" as DB
+queue Events
+S -> API : POST /orders
+activate API
+API -> DB : insert order
+DB --> API : order id
+alt card accepted
+  API ->> Events : order paid
+else card declined
+  API --> S : 402
+end
+loop retries
+  API -> DB : update status
+end
+note over API, DB : All writes are in one transaction
+== Later ==
+API -> Events
+return 201 Created
+@enduml

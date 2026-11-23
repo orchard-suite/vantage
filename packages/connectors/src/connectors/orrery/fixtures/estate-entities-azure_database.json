@@ -1,0 +1,15 @@
+{
+  "entities": [
+    {
+      "blueprint": "azure_database",
+      "key": "/subscriptions/0000/resourcegroups/rg-data/providers/microsoft.sql/servers/shop-sql/databases/shop-prod",
+      "title": "shop-prod",
+      "state": "active",
+      "fields": { "host": "shop-sql.database.example.net" },
+      "relations": { "resource_group": [{ "blueprint": "azure_resource_group", "key": "rg-data", "title": "rg-data" }] }
+    }
+  ],
+  "total": 1,
+  "limit": 200,
+  "offset": 0
+}

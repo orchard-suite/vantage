@@ -1,0 +1,31 @@
+sequenceDiagram
+    title Sign in
+    actor U as User
+    participant W as Web App
+    participant I as Identity
+    participant D@{ "type": "database" }
+    autonumber
+    U->>W: open sign-in
+    W->>+I: redirect to authorize
+    Note over U,I: The user signs in with a passkey
+    I-->>-W: code
+    alt code valid
+        W->>I: exchange code
+        I-->>W: tokens
+    else code expired
+        W-->>U: show error
+    else
+        W-)D: log failure
+    end
+    loop every 5 minutes
+        W->>I: refresh token
+    end
+    par audit
+        W-)D: write audit
+    and metrics
+        W-)D: write metric
+    end
+    opt remember me
+        W->>D: store session
+    end
+    W-->>U: signed in

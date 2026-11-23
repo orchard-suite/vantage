@@ -1,0 +1,85 @@
+{{- if .Values.database.dumps.enabled }}
+{{- if eq .Values.database.auth "azure" }}
+{{- fail "database.dumps needs a password in DATABASE_URL; with database.auth azure the managed server keeps the backups" }}
+{{- end }}
+{{- $d := .Values.database.dumps }}
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: {{ include "vantage.fullname" . }}-dumps
+  labels:
+    {{- include "vantage.labels" . | nindent 4 }}
+  annotations:
+    helm.sh/resource-policy: keep
+spec:
+  accessModes: [ReadWriteOnce]
+  {{- with $d.storageClass }}
+  storageClassName: {{ . }}
+  {{- end }}
+  resources:
+    requests:
+      storage: {{ $d.size }}
+---
+# A nightly logical dump: a copy a backup tier that copies files can carry, and one a restore can read anywhere.
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: {{ include "vantage.fullname" . }}-dump
+  labels:
+    {{- include "vantage.labels" . | nindent 4 }}
+spec:
+  schedule: {{ $d.schedule | quote }}
+  concurrencyPolicy: Forbid
+  successfulJobsHistoryLimit: 3
+  failedJobsHistoryLimit: 3
+  jobTemplate:
+    spec:
+      backoffLimit: 1
+      activeDeadlineSeconds: 1800
+      ttlSecondsAfterFinished: 172800
+      template:
+        metadata:
+          labels:
+            {{- include "vantage.selector" (dict "root" . "component" "dump") | nindent 12 }}
+        spec:
+          restartPolicy: OnFailure
+          securityContext:
+            {{- toYaml .Values.podSecurityContext | nindent 12 }}
+          containers:
+            - name: dump
+              image: {{ .Values.database.cnpg.imageName }}
+              command:
+                - sh
+                - -c
+                - |
+                  set -e
+                  file="/dumps/vantage-$(date +%Y%m%d-%H%M%S).sql.gz"
+                  pg_dump "$DATABASE_URL" --no-owner --no-acl | gzip > "$file.part"
+                  mv "$file.part" "$file"
+                  ls -t /dumps/vantage-*.sql.gz | tail -n +{{ add $d.keep 1 }} | xargs -r rm --
+                  ls -la /dumps
+              env:
+                {{- if eq .Values.database.mode "cnpg" }}
+                - name: DATABASE_URL
+                  valueFrom: { secretKeyRef: { name: {{ include "vantage.dbCluster" . }}-app, key: uri } }
+                {{- end }}
+                {{- if and (eq .Values.database.mode "external") .Values.database.external.url }}
+                - name: DATABASE_URL
+                  value: {{ .Values.database.external.url | quote }}
+                {{- end }}
+              {{- if eq .Values.database.mode "external" }}
+              envFrom:
+                {{- include "vantage.envFrom" . | nindent 16 }}
+              {{- end }}
+              securityContext:
+                {{- toYaml .Values.securityContext | nindent 16 }}
+              resources:
+                requests: { cpu: 50m, memory: 64Mi }
+                limits: { cpu: 500m, memory: 512Mi }
+              volumeMounts:
+                - { name: dumps, mountPath: /dumps }
+          volumes:
+            - name: dumps
+              persistentVolumeClaim:
+                claimName: {{ include "vantage.fullname" . }}-dumps
+{{- end }}

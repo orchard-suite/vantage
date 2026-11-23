@@ -1,0 +1,19 @@
+name: bpmn
+description: "Business process notation: pools, lanes, tasks, gateways, events."
+types:
+  pool: { extends: group, role: boundary, shape: box, color: slate, description: A participant in the process }
+  lane: { extends: group, role: boundary, shape: box, color: slate, frame: dashed, description: A role inside a pool }
+  task: { role: compute, shape: rounded, color: blue, description: A unit of work }
+  usertask: { extends: task, icon: generic/user, description: Work a person does }
+  servicetask: { extends: task, icon: generic/service, description: Work a system does }
+  subprocess: { role: compute, shape: rounded, color: blue, icon: generic/component, description: A collapsed process }
+  gateway: { role: compute, shape: diamond, color: amber, description: A decision or a merge }
+  exclusive: { extends: gateway, description: One path out }
+  parallel: { extends: gateway, description: Every path out }
+  event: { role: actor, shape: circle, color: emerald, description: Something that happens }
+  startevent: { extends: event, description: Where the process begins }
+  endevent: { extends: event, color: red, description: Where the process ends }
+  timerevent: { extends: event, icon: generic/clock, description: A wait or a schedule }
+  messageevent: { extends: event, icon: generic/mail, description: A message arrives or leaves }
+  dataobject: { role: data, shape: document, color: slate, description: Data the process reads or writes }
+  datastore: { role: data, shape: cylinder, color: emerald, description: A store }

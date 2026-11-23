@@ -1,0 +1,7 @@
+{ "data": [
+    { "id": "svc-001", "name": "Checkout", "kind": "api", "team": "payments", "runtime": { "language": "go", "version": "1.23" }, "owner": "team-payments", "links": { "docs": "https://docs.example.test/checkout" },
+      "dependencies": [{ "id": "svc-002", "via": "grpc" }, { "id": "svc-003", "via": "http" }] },
+    { "id": "svc-002", "name": "Ledger", "kind": "api", "team": "payments", "runtime": { "language": "rust", "version": "1.82" }, "owner": "team-payments", "dependencies": [] },
+    { "id": "", "name": "Broken", "kind": "api", "team": "payments", "dependencies": [] }
+  ],
+  "next": "https://catalog.example.test/api/services?page=2" }

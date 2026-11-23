@@ -1,0 +1,4 @@
+{ "data": { "organization": { "repositories": { "nodes": [
+  { "name": "relay", "url": "https://git.example.test/org/relay", "primaryLanguage": { "name": "TypeScript" }, "isArchived": false, "stargazerCount": 12 },
+  { "name": "sealer", "url": "https://git.example.test/org/sealer", "primaryLanguage": null, "isArchived": true, "stargazerCount": 0 }
+] } } } }

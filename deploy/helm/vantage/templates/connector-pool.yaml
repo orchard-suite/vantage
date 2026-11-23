@@ -1,0 +1,89 @@
+{{- /*
+The shared connector pool (docs/deploy.md, Connectors): a few runners that
+run every connector with an interval, each run as that connector's own app.
+Memory follows the runs at once (replicas x concurrency), not how many
+connectors exist. The pool signs in to the hub as its own app, which holds
+the hub's pool role; each connector's app trusts this service account with
+a federated credential, so the same projected token signs in as any of
+them. It runs the hub's image, so it always matches the hub it serves.
+*/ -}}
+{{- $c := .Values.connectors }}
+{{- $p := $c.pool }}
+{{- if $p.enabled }}
+{{- $sa := default "connector-pool" $p.serviceAccount }}
+{{- $sel := dict "root" . "component" "connector-pool" }}
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: {{ $sa }}
+  labels:
+    {{- include "vantage.labels" . | nindent 4 }}
+    app.kubernetes.io/component: connector-pool
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "vantage.fullname" . }}-connector-pool
+  labels:
+    {{- include "vantage.labels" . | nindent 4 }}
+    app.kubernetes.io/component: connector-pool
+spec:
+  replicas: {{ $p.replicas }}
+  revisionHistoryLimit: 3
+  # A stopping runner hands its runs back to the hub's queue, and another takes them.
+  strategy:
+    type: RollingUpdate
+    rollingUpdate: { maxSurge: 1, maxUnavailable: 0 }
+  selector:
+    matchLabels:
+      {{- include "vantage.selector" $sel | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "vantage.selector" $sel | nindent 8 }}
+        app.kubernetes.io/version: {{ .Chart.AppVersion | quote }}
+        {{- with $c.podLabels }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+    spec:
+      serviceAccountName: {{ $sa }}
+      terminationGracePeriodSeconds: {{ add $p.graceSeconds 15 }}
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      securityContext:
+        {{- toYaml .Values.podSecurityContext | nindent 8 }}
+      {{- with $c.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      containers:
+        - name: pool
+          image: {{ include "vantage.image" . }}
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          args: ["connector", "pool", "--concurrency", {{ $p.concurrency | quote }}, "--timeout", {{ $c.timeoutSeconds | quote }}, "--grace", {{ $p.graceSeconds | quote }}]
+          env:
+            - { name: VANTAGE_HUB, value: {{ default .Values.publicUrl $c.hub | quote }} }
+            - { name: VANTAGE_TOKEN_URL, value: {{ required "connectors.tokenUrl is required" $c.tokenUrl | quote }} }
+            - { name: VANTAGE_SCOPE, value: {{ required "connectors.scope is required" $c.scope | quote }} }
+            - { name: AZURE_CLIENT_ID, value: {{ required "connectors.pool.clientId is required" $p.clientId | quote }} }
+            - { name: AZURE_FEDERATED_TOKEN_FILE, value: /var/run/secrets/azure/tokens/azure-identity-token }
+          securityContext:
+            {{- toYaml .Values.securityContext | nindent 12 }}
+          resources:
+            {{- toYaml $p.resources | nindent 12 }}
+          volumeMounts:
+            - { name: azure-identity-token, mountPath: /var/run/secrets/azure/tokens, readOnly: true }
+            - { name: tmp, mountPath: /tmp }
+      volumes:
+        - name: azure-identity-token
+          projected:
+            sources:
+              - serviceAccountToken:
+                  path: azure-identity-token
+                  audience: {{ $c.tokenAudience }}
+                  expirationSeconds: 3600
+        - name: tmp
+          emptyDir: {}
+{{- end }}

@@ -1,0 +1,202 @@
+---
+name: decide
+description: "Write, change, supersede, or migrate decision records (ADRs) in Vantage. Use when a decision about how a system is built or run is made, changed, or reversed, or when a repository's decision records should move into Vantage."
+---
+
+# Decide
+
+A decision record says what was decided, why, and what it costs. In Vantage
+it lives in a registry beside the diagrams it governs, and a box shows the
+records that govern it. Read `guide#decision-records-in-a-hub` once per
+session: it has the record's text form. A record is text at its citation
+(`SHOP-2001`), read and changed with the five verbs; the record tools that
+are not text are called through `vantage_tool`.
+
+## 1. Read the estate's settings
+
+Read the file named by `VANTAGE_DECISIONS_CONFIG`, else
+`~/.config/vantage/decisions.yaml`. Where it has a rule, it wins over this
+skill. It names:
+
+- `registries`: each with `prefix`, `name`, `scope` (`organization` or
+  `program`), `workspace`, `when` (the words that say a decision belongs
+  there), and for a program `program` and `repositories`. An entry may
+  carry its own `categories`.
+- `categories`: the scheme a new registry gets, digit to name.
+- `timezone`: the zone for dates you send.
+
+With no file, use the defaults: categories 0 Governance, 1 Infrastructure,
+2 Security, 3 Data, 4 Compute, 5 Development, 6 Operations; dates in the
+local zone of the machine. List the registries with `vantage_outline`
+(no address) and ask which one fits. A fictional example ships beside this skill as
+`decisions.example.yaml`.
+
+If a registry the file names does not exist on the hub yet, make it with
+`vantage_registries` (`action: create`) in its workspace, with its
+categories, before you write to it.
+
+## 2. Pick the registry
+
+- **Organization**: the decision applies across programs, or is department
+  policy.
+- **Program**: the decision is unique to one program. Use that program's
+  registry, in the program's own workspace, where its diagrams live. A
+  program with no workspace gets one first (`vantage_workspaces`), and a
+  registry that sits elsewhere moves there with `vantage_move`.
+
+Infer it from the decision and the `when` lines. A repository you are
+working in names its registry in `vantage.yaml` (`decisions`), and its
+hub and workspace come from the pointer (`sh
+"${CLAUDE_PLUGIN_ROOT}/scripts/pointer.sh"`: `vantage.yaml`, else the
+estate's `repos.yaml`); without `decisions`, it maps to the program whose
+`repositories` lists it. When it is
+not plain, ask, with the choices and a one-line reason each.
+
+## 3. Search before you write
+
+Call `vantage_find` with the decision's key words and `in:` the registry,
+and read the section that matters of what comes back
+(`vantage_read SHOP-2001#decision`). Read a whole record only when you
+will rewrite most of it.
+
+- The decision stands and only gets sharper (more examples, a clearer
+  rule, new links): **refine** it with `vantage_patch`, sending only the
+  sentences that change. Last updated moves. Send `minor: true` only for
+  a date or wording fix.
+- The decision is reversed or replaced: **supersede** it with
+  `vantage_decision_supersede`. The old record keeps its body.
+- Nothing covers it: **create** it with a `vantage_write` to the registry
+  (`SHOP`), in the record's text form. It takes the next number in its
+  category; `vantage_decision_next` shows which.
+
+On a machine with a disk, several records at once are easier as files:
+`vantage_checkout` the registry, edit or add files under
+`decisions/<REGISTRY>/`, and `vantage_sync`.
+
+One decision per record. Decisions made together that can change apart get
+a record each.
+
+## 4. Write it
+
+- **Decision makers**: the real people who decided, by name. If you do not
+  know who decided, ask. Never guess, and never put a role or a team
+  where a name belongs.
+- **Category**: the digit whose name fits the decision's domain.
+- **Dates**: the decision date, and Last updated as `updatedOn`, both as
+  the local date (`YYYY-MM-DD`) in the estate's zone.
+- **Context**: why a decision was needed. The forces and the facts.
+- **Decision**: what was decided and what it means in practice.
+- **Consequences**: `### Benefits` and `### Costs`. Both, always.
+- **Alternatives considered**: every option not taken, each with why it was
+  rejected.
+- **Related**: records this one leans on, as `SHOP-2001`, or `ADR-2001` for
+  one in the same registry.
+- **Governs**: the boxes and views it decides about, one line each:
+  `workspace/document box node-id`. Find ids in the document's outline.
+  Every record that governs a system links to its boxes.
+- **Cite it where it applies.** Add the record to the `decisions:` list of
+  each box it is about, and cite it in the pages that explain those parts
+  (`[[decision:SHOP-2001]]`). The hub indexes these citations: they are
+  the record's Cited by, and they are what a later move rewrites. A
+  record nothing cites is one nobody finds.
+
+Fill every section. Plain words, short sentences. No em dashes or en
+dashes. Never name a person anywhere but the decision makers.
+
+## 5. Standard alignment
+
+Check whether a `platform-standard` plugin is installed: its `consult`
+skill is listed among your skills.
+
+- **Installed**: run `platform-standard:consult` on the decision. Stamp
+  `alignment` with the stance (`follows`, `extends`, `departs`, or
+  `new-ground`), the rule id it is about (none for new ground), and a
+  short note.
+- **Not installed**: leave `alignment` out. Do not mention a standard.
+
+## 6. Hand off
+
+After a decision event (a new record, a supersede, or a change in
+substance; not a date or wording fix), check whether a
+`platform-standard:capture` skill exists. If it does, call it with:
+
+- the record's machine id (`adr:<ULID>`, the `id:` line of its header)
+  and its citation (`SHOP-2001`);
+- the scope kind, `organization` or `program`;
+- the full Context, Decision, Consequences, and Alternatives;
+- the alignment line, as a hint.
+
+Make no judgment about whether the record is a standard; capture decides.
+If capture is absent, do nothing. This skill never writes to a book, a
+standard, or any standards inbox itself.
+
+## 7. Refactor
+
+Renumber a record, move it to another category, or move it to another
+registry, when a registry is cleaned up or reorganized. The record keeps
+its id; its old citation stays an alias that resolves, and the number is
+never handed out again.
+
+1. **Read what cites it.** The record's outline ends with cited by:
+   every document (with its boxes and pages) and record that cites it,
+   and a count of places you cannot open.
+2. **Dry run.** Call `vantage_decision_move` with the record, the target
+   (a `number`, a `category` for the next number there, a `registry`, or
+   a mix), and `dryRun: true`. Read the new citation, what it would rewrite, and
+   what it cannot.
+3. **Move** with the same arguments and a `message` saying why. Every
+   citation it can write is rewritten to the new citation, as a version or
+   revision by you.
+4. **Read the report.** For each place it could not rewrite, tell its
+   owner the new citation. The old one keeps working until they change it.
+   Repoint links outside the hub (repositories, docs) the same way.
+5. **Hand off** as in step 6 only if the move changed what the decision
+   means; a renumber does not.
+
+## 8. Migrate a repository
+
+Move a repository's in-repo records into its program's registry, in one
+commit.
+
+1. **Find them.** At each project root (the repository root, and every
+   `projects/*/`), look in `docs/decisions/`, `docs/adr/`, `adr/`,
+   `docs/architecture/decisions/`, `records/adr/`, and `projects/*/adr/`.
+2. **Pick the registry**: the program whose `repositories` lists this one;
+   ask when none does. A monorepo with projects for several programs maps
+   each project root on its own.
+3. **Dry run.** Call `vantage_decision_import` with `dir`, the absolute
+   path of the folder, and `dryRun: true`. The tool reads the files;
+   never read them yourself to send their text. Read what it could not map. Where a record names no
+   decision makers, or names a role or a team there, ask who decided
+   before you import, and set the names after it, or report it.
+4. **Import** with the same `dir`. Each record keeps its number, dates,
+   status, decision makers, and supersede links, and every word the
+   author wrote: lead text and a status note go into Context, Related
+   prose and References keep their own headings. The answer lists each
+   file with its new citation and link.
+5. **Repoint links.** Search the repository for links to each moved file
+   (by path, relative path, and file name) and replace them with the
+   record's link from the answer. Repoint `AGENTS.md`, `README.md`, docs,
+   and code comments alike.
+6. **Remove the folder entirely.** Leave nothing in it: no README, no
+   pointer file. A folder left behind keeps the repository flagged.
+7. **Point to the registry** in `vantage.yaml` at the repository root:
+   add `decisions: <PREFIX>`, or write the file with that line when there
+   is none. The hub and workspace stay where the pointer already finds
+   them; when nothing maps them, add the repository to the estate's
+   `repos.yaml` the way `vantage-onboard` does, never to a `vantage.yaml`
+   other estates read. `AGENTS.md` names the pointer and never restates a
+   record.
+8. **Commit** steps 5 to 7 together, as one commit, with the repository's
+   own commit rules.
+9. **Report** what moved (file to citation), what was already there, what
+   was skipped, and everything the import could not map.
+
+## Rules
+
+- A record is never deleted and a number is never reused, not even after
+  a move. To retire a decision, set its status to `deprecated`.
+- Read a record before you change it, and change only what the decision
+  changed.
+- Cite records as `SHOP-2001` in diagrams and pages: a box's `decisions:`
+  list, `[[decision:SHOP-2001]]` in prose.

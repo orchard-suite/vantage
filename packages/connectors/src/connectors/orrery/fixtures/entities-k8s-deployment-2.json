@@ -1,0 +1,29 @@
+{
+  "entities": [
+    {
+      "id": "01J0000000000000000000DP03",
+      "blueprint": "k8s-deployment",
+      "key": "secrets/sealer",
+      "title": "Sealer",
+      "icon": null,
+      "state": "active",
+      "hidden": false,
+      "fields": { "image": "registry.example.test/sealer:0.9.0", "replicas": 1, "ready": 0 },
+      "relations": {
+        "namespace": [{ "blueprint": "k8s-namespace", "key": "secrets", "restricted": true }],
+        "service": [{ "blueprint": "k8s-service", "key": "secrets/sealer", "restricted": true }]
+      },
+      "owner": "kube-sync",
+      "scope": null,
+      "createdAt": "2026-10-01T00:00:00Z",
+      "updatedAt": "2026-10-27T09:00:00Z",
+      "lastSeenAt": "2026-10-28T09:00:00Z",
+      "missingSince": null,
+      "deletedAt": null,
+      "status": "amber"
+    }
+  ],
+  "total": 3,
+  "limit": 2,
+  "offset": 2
+}

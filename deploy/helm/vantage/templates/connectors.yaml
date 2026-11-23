@@ -1,0 +1,90 @@
+{{- /*
+Workspace connectors run outside the hub, each as its own app
+(docs/deploy.md, Connectors). The chart runs one CronJob per runner with the
+hub's own image, so a runner always matches the hub it pushes to. A runner
+signs in through workload identity: its service account's projected token
+is the assertion, and the connector's app trusts that service account with
+a federated credential.
+*/ -}}
+{{- $c := .Values.connectors }}
+{{- range $c.runners }}
+{{- $sa := default (printf "connector-%s" .name) .serviceAccount }}
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: {{ $sa }}
+  labels:
+    {{- include "vantage.labels" $ | nindent 4 }}
+    app.kubernetes.io/component: connector
+---
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: {{ include "vantage.fullname" $ }}-connector-{{ .name }}
+  labels:
+    {{- include "vantage.labels" $ | nindent 4 }}
+    app.kubernetes.io/component: connector
+spec:
+  schedule: {{ default $c.schedule .schedule | quote }}
+  concurrencyPolicy: Forbid
+  successfulJobsHistoryLimit: 1
+  failedJobsHistoryLimit: 3
+  jobTemplate:
+    spec:
+      backoffLimit: 0
+      activeDeadlineSeconds: {{ add $c.timeoutSeconds 60 }}
+      ttlSecondsAfterFinished: 86400
+      template:
+        metadata:
+          labels:
+            {{- include "vantage.selector" (dict "root" $ "component" "connector") | nindent 12 }}
+            vantage.dev/connector: {{ .name }}
+            {{- with $c.podLabels }}
+            {{- toYaml . | nindent 12 }}
+            {{- end }}
+        spec:
+          restartPolicy: Never
+          serviceAccountName: {{ $sa }}
+          {{- with $.Values.imagePullSecrets }}
+          imagePullSecrets:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          securityContext:
+            {{- toYaml $.Values.podSecurityContext | nindent 12 }}
+          {{- with $c.nodeSelector }}
+          nodeSelector:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          containers:
+            - name: connector
+              image: {{ include "vantage.image" $ }}
+              imagePullPolicy: {{ $.Values.image.pullPolicy }}
+              args: ["connector", "run", {{ required "connectors.runners[].id is required" .id | quote }}, "--timeout", {{ $c.timeoutSeconds | quote }}]
+              env:
+                - { name: VANTAGE_HUB, value: {{ default $.Values.publicUrl $c.hub | quote }} }
+                - { name: VANTAGE_TOKEN_URL, value: {{ required "connectors.tokenUrl is required" $c.tokenUrl | quote }} }
+                - { name: VANTAGE_SCOPE, value: {{ required "connectors.scope is required" $c.scope | quote }} }
+                - { name: AZURE_CLIENT_ID, value: {{ required "connectors.runners[].clientId is required" .clientId | quote }} }
+                - { name: AZURE_FEDERATED_TOKEN_FILE, value: /var/run/secrets/azure/tokens/azure-identity-token }
+                {{- with .env }}
+                {{- toYaml . | nindent 16 }}
+                {{- end }}
+              securityContext:
+                {{- toYaml $.Values.securityContext | nindent 16 }}
+              resources:
+                {{- toYaml $c.resources | nindent 16 }}
+              volumeMounts:
+                - { name: azure-identity-token, mountPath: /var/run/secrets/azure/tokens, readOnly: true }
+                - { name: tmp, mountPath: /tmp }
+          volumes:
+            - name: azure-identity-token
+              projected:
+                sources:
+                  - serviceAccountToken:
+                      path: azure-identity-token
+                      audience: {{ $c.tokenAudience }}
+                      expirationSeconds: 3600
+            - name: tmp
+              emptyDir: {}
+{{- end }}

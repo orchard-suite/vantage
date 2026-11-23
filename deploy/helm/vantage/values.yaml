@@ -1,0 +1,338 @@
+# Vantage: the recommended install is two web pods, two worker pods,
+# a Postgres cluster with a standby (CloudNativePG), and one volume for
+# rendered files that every pod mounts. Every value below has a default
+# that works; docs/deploy.md explains each choice and the measured sizes.
+
+# The prefix of every resource name; defaults to the release name with `-vantage`.
+fullnameOverride: ""
+
+image:
+  repository: ghcr.io/orchard-suite/vantage
+  # Defaults to v<appVersion>.
+  tag: ""
+  pullPolicy: IfNotPresent
+imagePullSecrets: []
+
+# The URL readers use; links, embeds, and sign-in redirects are built from it.
+publicUrl: https://vantage.example.com
+
+auth:
+  # oidc (any issuer), proxy (trusted X-Forwarded-User and X-Forwarded-Groups
+  # from a front door), or none (local development only).
+  mode: oidc
+  oidc:
+    issuer: ""
+    clientId: ""
+    groupsClaim: groups
+    # Sign the client in with a token file instead of OIDC_CLIENT_SECRET, for
+    # a tenant that allows no client secrets. With Entra workload identity:
+    # /var/run/secrets/azure/tokens/azure-identity-token, the app's client id
+    # on serviceAccount.annotations (azure.workload.identity/client-id), and
+    # the label azure.workload.identity/use: "true" in web.podLabels.
+    clientAssertionFile: ""
+    # The scope the hub exposes at the issuer (Entra: access_as_user). Set,
+    # /mcp also takes the issuer's access tokens for it, so an agent such as
+    # Copilot Studio signs people in itself. apiAudience defaults to
+    # api://<clientId>.
+    apiScope: ""
+    apiAudience: ""
+  # Groups a person must be in to sign in (OIDC groups claim, or the front
+  # door's groups header). Empty lets in everyone the issuer signs in.
+  signInGroups: []
+
+# Who may share and grow the hub. The defaults suit a small team; a hub for
+# one organization's people sets all three. docs/deploy.md, "Keeping a hub
+# inside the organization".
+governance:
+  # everyone, or granted: only admins and the people an admin lets make team workspaces.
+  teamWorkspaces: everyone
+  # true: a publication runs only once an admin approves it on the Admin page.
+  publicationApproval: false
+  # true: a connector's pushes are taken only once an admin approves it on the Admin page.
+  connectorApproval: false
+  # false: no guest links anywhere on the hub; people export a copy to share outside.
+  guestLinks: true
+
+# Settings passed to the hub as environment variables, beside the ones the
+# chart sets. Any variable in docs/deploy.md.
+config:
+  LOG_LEVEL: info
+  FRESHNESS_DAYS: "7"
+  RETENTION_VERSIONS: "100"
+  HISTORY_DAYS: "30"
+  OBSERVED_RETENTION_DAYS: "3"
+
+# Secrets the hub reads: SESSION_SECRET and SECRETS_KEY (32+ characters each),
+# OIDC_CLIENT_SECRET with auth.mode oidc (unless auth.oidc.clientAssertionFile), and DATABASE_URL (and optionally
+# DATABASE_READ_URL) with database.mode external.
+secrets:
+  # A Secret you manage (an ExternalSecret, a sealed secret, kubectl), for example:
+  #   kubectl create secret generic vantage-secrets \
+  #     --from-literal=SESSION_SECRET=$(openssl rand -hex 32) --from-literal=SECRETS_KEY=$(openssl rand -hex 32)
+  existingSecret: ""
+  # With `helm install` only: the chart makes SESSION_SECRET and SECRETS_KEY
+  # once and keeps them across upgrades. Never with Argo CD or `helm template`,
+  # which cannot see the cluster and would make new keys on every render;
+  # losing SECRETS_KEY loses the sealed publication secrets.
+  generate: false
+
+web:
+  # Two or more, so a rolling upgrade or a lost node never takes the site down.
+  replicas: 2
+  # One thread draws what a request asks for (drift views, PNGs, MCP pictures).
+  renderThreads: 1
+  # Seconds the pod fails readiness before it closes, so the load balancer stops sending it requests first.
+  drainSeconds: 5
+  terminationGracePeriodSeconds: 30
+  resources:
+    requests: { cpu: 200m, memory: 384Mi }
+    limits: { cpu: "2", memory: 1Gi }
+  autoscaling:
+    enabled: false
+    minReplicas: 2
+    maxReplicas: 6
+    targetCPUUtilizationPercentage: 70
+  podDisruptionBudget: { minAvailable: 1 }
+  nodeSelector: {}
+  tolerations: []
+  affinity: {}
+  podAnnotations: {}
+  podLabels: {}
+  extraEnv: []
+
+worker:
+  # Two, so renders and source runs go on through an upgrade or a lost node.
+  replicas: 2
+  # Unset: one per core of the CPU limit, at most 8. A document's views draw across all of them,
+  # so the CPU limit is how fast a large save draws.
+  renderThreads: null
+  # Jobs one worker runs at once; source runs keep going while renders draw.
+  concurrency: 4
+  # Seconds a stopping worker waits for its jobs before it hands them back; keep it under the termination grace.
+  shutdownGraceSeconds: 20
+  terminationGracePeriodSeconds: 40
+  resources:
+    requests: { cpu: 250m, memory: 512Mi }
+    limits: { cpu: "2", memory: 2Gi }
+  autoscaling:
+    enabled: false
+    minReplicas: 2
+    maxReplicas: 6
+    targetCPUUtilizationPercentage: 70
+  podDisruptionBudget: { minAvailable: 1 }
+  nodeSelector: {}
+  tolerations: []
+  affinity: {}
+  podAnnotations: {}
+  podLabels: {}
+  extraEnv: []
+
+# Where rendered files, document pictures, and icons live.
+storage:
+  # fs: a volume every pod mounts (ReadWriteMany: Longhorn, NFS, CephFS, Azure Files, EFS).
+  # azure: an Azure Blob container, signed in with workload identity.
+  driver: fs
+  fs:
+    existingClaim: ""
+    storageClass: ""
+    # ReadWriteOnce only works with one web and one worker on one node.
+    accessMode: ReadWriteMany
+    size: 20Gi
+    # Applied to the volume the chart makes, for example a backup group label.
+    labels: {}
+  azure:
+    # https://<account>.blob.core.windows.net/<container>
+    containerUrl: ""
+
+serviceAccount:
+  create: true
+  name: ""
+  # For example azure.workload.identity/client-id with storage.driver azure.
+  annotations: {}
+  labels: {}
+
+# Workspace connectors this chart runs beside the hub (docs/deploy.md,
+# Connectors), with the hub's image, each signing in as the connector's own
+# app through workload identity. The shared pool runs every connector with an
+# interval; a runner of its own (runners) is for a kind that reads as the
+# machine it runs on, such as kubectl in-cluster. Federate each connector's
+# app with system:serviceaccount:<namespace>:<serviceAccount> (the pool's,
+# or the runner's own), issuer the cluster's service account issuer,
+# audience tokenAudience.
+connectors:
+  # The hub the runners push to; default publicUrl.
+  hub: ""
+  # https://login.microsoftonline.com/<tenant id>/oauth2/v2.0/token
+  tokenUrl: ""
+  # The hub app's application ID URI with /.default, for example api://<hub client id>/.default.
+  scope: ""
+  tokenAudience: api://AzureADTokenExchange
+  schedule: "*/10 * * * *"
+  # Seconds one run may take.
+  timeoutSeconds: 600
+  podLabels: {}
+  nodeSelector: {}
+  resources:
+    requests: { cpu: 50m, memory: 128Mi }
+    limits: { memory: 1Gi }
+  # The shared pool: memory follows replicas x concurrency, not how many connectors exist.
+  pool:
+    enabled: false
+    # The pool's own app, granted the hub's pool role (CONNECTOR_POOL_ROLE, default Vantage.ConnectorPool).
+    clientId: ""
+    # Default connector-pool. Every connector app the pool runs trusts this service account.
+    serviceAccount: ""
+    replicas: 1
+    # Runs at once in each pod.
+    concurrency: 2
+    # Seconds the running runs get to finish when a pod stops; the rest go back to the queue.
+    graceSeconds: 30
+    resources:
+      requests: { cpu: 100m, memory: 256Mi }
+      limits: { memory: 1Gi }
+  runners: []
+  # - name: catalog                      # the CronJob and default service account connector-<name>
+  #   id: <connector id>                 # from the workspace's Connectors tab or API
+  #   clientId: <the connector app's client id>
+  #   schedule: "*/10 * * * *"           # default connectors.schedule
+  #   serviceAccount: ""                 # default connector-<name>
+  #   env:                               # secrets a connector names by reference, by that name
+  #     - name: ORRERY_TOKEN
+  #       valueFrom: { secretKeyRef: { name: connector-secrets, key: orrery } }
+
+database:
+  # cnpg: a Postgres cluster run by the CloudNativePG operator (installed separately).
+  # external: a Postgres you run; DATABASE_URL comes from secrets.existingSecret.
+  mode: cnpg
+  # How the hub signs in to Postgres.
+  # password: the password in DATABASE_URL.
+  # azure: an Entra token for the pods' workload identity, with database.mode external (an Azure
+  #   Database for PostgreSQL that takes Entra sign-in). The URL carries the user, which is the
+  #   identity's name, and no password. The pods need azure.workload.identity/client-id in
+  #   serviceAccount.annotations and the label azure.workload.identity/use: "true" in
+  #   web.podLabels and worker.podLabels.
+  auth: password
+  external:
+    # The connection string, when it holds no secret (auth: azure):
+    #   postgresql://<identity name>@<server>.postgres.database.azure.com:5432/vantage?sslmode=require
+    # Empty reads DATABASE_URL from secrets.existingSecret.
+    url: ""
+  # Connections in each pod's pool. Postgres needs (web + worker pods) x 2 x pool, plus headroom.
+  pool: 10
+  cnpg:
+    # A primary and a standby: the standby takes over when the primary's node goes, and serves reads.
+    instances: 2
+    imageName: ghcr.io/cloudnative-pg/postgresql:17
+    database: vantage
+    owner: vantage
+    storage:
+      size: 10Gi
+      storageClass: ""
+    resources:
+      requests: { cpu: 250m, memory: 512Mi }
+      limits: { cpu: "2", memory: 2Gi }
+    parameters:
+      max_connections: "200"
+      shared_buffers: 128MB
+    # Send reads that tolerate a moment of lag (page lists, search, bundles) to any instance, standbys included.
+    readReplicas: true
+    # Seconds a stopping primary waits for clients to leave before it shuts down
+    # fast, and a switchover waits for it. The hub's pools never leave on their
+    # own, so a long wait only delays the standby taking over.
+    smartShutdownTimeout: 10
+    switchoverDelay: 60
+    # Pods spread across nodes, so one node never holds both copies.
+    podAntiAffinityType: required
+    nodeSelector: {}
+    tolerations: []
+    # Copy a database in on first install (a move from another Postgres); off afterwards.
+    import:
+      enabled: false
+      host: ""
+      port: 5432
+      database: vantage
+      user: vantage
+      # A Secret with key `password` for that user.
+      passwordSecret: ""
+    # Labels on the cluster's volumes, for example a backup group.
+    inheritedLabels: {}
+    # A PodMonitor for the instances' metrics; needs the Prometheus operator.
+    podMonitor: false
+  # A nightly pg_dump to a volume, for a backup tier that copies files.
+  dumps:
+    enabled: false
+    schedule: "0 2 * * *"
+    keep: 7
+    storageClass: ""
+    size: 10Gi
+
+service:
+  port: 80
+
+ingress:
+  enabled: false
+  className: ""
+  annotations: {}
+  host: vantage.example.com
+  tlsSecret: ""
+
+# Lets in only the ingress controller's namespace, and lets pods reach only
+# DNS, Postgres, and the addresses listed (sources, OIDC, OTLP).
+networkPolicy:
+  enabled: false
+  ingressNamespace: ""
+  egressCidrs: [0.0.0.0/0]
+
+# Dispatch delivers the hub's notifications (email, Teams, people, groups,
+# escalation chains). With a URL (Dispatch's API base) and a token its desk
+# issued, workers and web pods send each notification there as an event.
+# The token comes from tokenSecret, or from DISPATCH_TOKEN in
+# secrets.existingSecret when that is empty. Leave url empty to store
+# notifications only.
+dispatch:
+  url: ""
+  tokenSecret:
+    # A Secret you manage, holding the token under `key`.
+    name: ""
+    key: DISPATCH_TOKEN
+
+# Revisions from comments: the model API the organization pays for. With a
+# base URL (ending in its version, https://gateway.example/v1) and a default
+# model, authors may send open comments to the model and accept its edits.
+# The key is AI_API_KEY in secrets.existingSecret; everyone shares it, and the
+# hub counts each person's tokens. Leave baseUrl empty to keep it off.
+ai:
+  baseUrl: ""
+  model: ""
+  # The header the key goes in; "Authorization" sends it as a bearer token.
+  keyHeader: x-api-key
+  # Each person's daily token limit until an admin sets the limits on the
+  # admin page's Revisions tab, which then replace it.
+  dailyTokens: 1000000
+
+# How readers connect an agent, shown in the sidebar's "Let an agent draw it"
+# box: one way per assistant your organization offers. A way has a client
+# (claude-code, claude-desktop, copilot, or other) and exactly one of `run`
+# (a command the reader copies) or `open` (an https link the reader opens).
+# `name`, `hint`, and `label` (the open button's words) are optional. A
+# claude-desktop way with neither shows the hub's address to paste as a
+# custom connector, which signs in through the hub. Leave it empty to show
+# the hub's MCP address instead.
+#   agents:
+#     - { client: copilot, open: "https://teams.microsoft.com/l/chat/0/0?users=28:<agent id>" }
+#     - { client: claude-code, run: "claude plugin install vantage@<marketplace>" }
+#     - { client: claude-desktop }
+agents: []
+
+# Standard OpenTelemetry exporter variables, for example OTEL_EXPORTER_OTLP_ENDPOINT.
+otel: {}
+
+podSecurityContext:
+  runAsNonRoot: true
+  runAsUser: 1000
+  runAsGroup: 1000
+  fsGroup: 1000
+  seccompProfile: { type: RuntimeDefault }
+securityContext:
+  allowPrivilegeEscalation: false
+  capabilities: { drop: [ALL] }

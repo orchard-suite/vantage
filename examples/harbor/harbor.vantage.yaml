@@ -1,0 +1,900 @@
+title: Harbor Storefront Migration
+author: Ada Example
+updated: 2026-10-27
+description: >
+  Harbor Goods moves its storefront from the Pier 9 colocation datacenter to an
+  Azure landing zone. Two subscriptions, a hub and spoke network with a VPN back
+  to the datacenter, Front Door in front, Terraform from GitHub Actions.
+
+nodes:
+  # People
+  - name: Shoppers
+    type: users
+    subtitle: harbor.example
+  - id: digital-commerce
+    name: Digital Commerce
+    type: group
+    subtitle: Department
+    icon: generic/building
+  - id: platform-eng
+    name: Platform Engineering
+    type: group
+    subtitle: Department
+    icon: generic/building
+  - id: product-owner
+    name: Product Owner
+    type: users
+    subtitle: grp-harbor-product
+    count: 1
+  - id: developers
+    name: Developers
+    type: users
+    subtitle: grp-harbor-dev
+    count: 6
+  - id: qa
+    name: QA
+    type: users
+    subtitle: grp-harbor-qa
+    count: 2
+  - id: platform-team
+    name: Platform Team
+    type: users
+    subtitle: grp-harbor-platform
+    count: 3
+  - id: platform-lead
+    name: Platform Lead
+    type: actor
+    subtitle: Runs the cutover
+
+  # Roles
+  - id: reader
+    name: Reader
+    type: identity
+    subtitle: Built-in role
+    icon: azure/entra-identity-roles-and-administrators
+  - id: contributor
+    name: Contributor
+    type: identity
+    subtitle: Built-in role
+    icon: azure/entra-identity-roles-and-administrators
+  - id: owner
+    name: Owner
+    type: identity
+    subtitle: Built-in role
+    icon: azure/entra-identity-roles-and-administrators
+
+  # Today: the colocation datacenter
+  - id: pier9
+    name: Pier 9 Datacenter
+    type: zone
+    subtitle: Colocation, Ashburn
+    icon: generic/building
+    facts: ["Lease ends: 2027-03-31", "Cabinets: 2", "Monthly: $4,800", "LAN: 10.10.0.0/16"]
+    children:
+      - id: legacy-web
+        name: Legacy Storefront
+        type: vm
+        subtitle: IIS on Windows Server 2016
+      - id: legacy-sql
+        name: Legacy SQL
+        type: vm
+        subtitle: SQL Server 2016
+      - id: legacy-adfs
+        name: Legacy ADFS
+        type: vm
+        subtitle: Federation server
+
+  # Tomorrow: the landing zone
+  - id: landing-zone
+    name: Harbor Landing Zone
+    type: cloud
+    subtitle: mg-harbor
+    icon: azure/management-group
+    facts: ["Region: East US", "Subscriptions: 2"]
+    children:
+      - id: prod-sub
+        name: Production
+        type: subscription
+        subtitle: sub-harbor-prod
+        facts: ["Cost center: 4410", "Criticality: High", "Spoke: 10.50.8.0/21"]
+        children:
+          - id: prod-budget
+            name: Prod Budget
+            type: note
+            value: $6,500
+            subtitle: per month
+            icon: azure/cost-budgets
+          - id: rg-prod-web
+            name: Prod Web
+            type: resourcegroup
+            subtitle: rg-harbor-prod-web
+            children:
+              - id: prod-web
+                name: Storefront Web
+                type: web
+                subtitle: App Service, ASP.NET
+                icon: azure/app-service
+                facts: ["Plan: P1v3", "Instances: 2"]
+                tags: [public]
+              - id: prod-api
+                name: Storefront API
+                type: api
+                subtitle: App Service, ASP.NET
+                icon: azure/app-service
+                facts: ["Plan: P1v3", "Instances: 2"]
+              - id: prod-identity
+                name: Identity Server
+                type: identity
+                subtitle: App Service, OpenID Connect
+                icon: azure/app-service
+                facts: ["Plan: P1v3", "Instances: 1"]
+                tags: [public]
+              - id: prod-worker
+                name: Nightly Worker
+                type: worker
+                subtitle: Function App, timer trigger
+                icon: azure/function-app
+                bullets: ["Runs at 02:00 UTC", "Reconciles stock counts", "Mails the daily sales report", "Purges carts older than 30 days"]
+          - id: rg-prod-data
+            name: Prod Data
+            type: resourcegroup
+            subtitle: rg-harbor-prod-data
+            children:
+              - id: prod-sql
+                name: Storefront DB
+                type: database
+                subtitle: Azure SQL
+                icon: azure/azure-sql
+                facts: ["SKU: GP_Gen5_2", "Size: 250 GB", "Backup: 35 days"]
+                note: Private endpoint only. No public IP.
+              - id: prod-storage
+                name: Media Storage
+                type: storage
+                subtitle: Storage account
+                icon: azure/storage-account
+                facts: ["SKU: Standard_ZRS"]
+              - id: prod-kv
+                name: Prod Key Vault
+                type: secret
+                subtitle: kv-harbor-prod
+                icon: azure/key-vault
+          - id: rg-shared
+            name: Shared Services
+            type: resourcegroup
+            subtitle: rg-harbor-shared
+            children:
+              - id: law
+                name: Log Analytics
+                type: monitoring
+                subtitle: law-harbor
+                icon: azure/log-analytics-workspaces
+                size: icon
+              - id: private-dns
+                name: Private DNS
+                type: dns
+                subtitle: privatelink zones
+                icon: azure/dns-zones
+                size: icon
+              - id: recovery-vault
+                name: Recovery Vault
+                type: storage
+                subtitle: rsv-harbor
+                icon: azure/storage-account
+                size: icon
+              - id: action-group
+                name: Action Group
+                type: monitoring
+                subtitle: ag-harbor-platform
+                icon: azure/cost-alerts
+                size: icon
+      - id: devtest-sub
+        name: Dev and Test
+        type: subscription
+        subtitle: sub-harbor-devtest
+        facts: ["Cost center: 4420", "Criticality: Low", "Spoke: 10.50.16.0/21"]
+        children:
+          - id: devtest-budget
+            name: Dev and Test Budget
+            type: note
+            value: $2,200
+            subtitle: per month
+            icon: azure/cost-budgets
+          - id: rg-test-web
+            name: Test Web
+            type: resourcegroup
+            subtitle: rg-harbor-test-web
+            children:
+              - id: test-web
+                name: Storefront Web
+                type: web
+                subtitle: App Service, ASP.NET
+                icon: azure/app-service
+                facts: ["Plan: B1", "Instances: 1"]
+                tags: [public]
+              - id: test-api
+                name: Storefront API
+                type: api
+                subtitle: App Service, ASP.NET
+                icon: azure/app-service
+                facts: ["Plan: B1", "Instances: 1"]
+              - id: test-identity
+                name: Identity Server
+                type: identity
+                subtitle: App Service, OpenID Connect
+                icon: azure/app-service
+                facts: ["Plan: B1", "Instances: 1"]
+                tags: [public]
+              - id: test-worker
+                name: Nightly Worker
+                type: worker
+                subtitle: Function App, timer trigger
+                icon: azure/function-app
+          - id: rg-test-data
+            name: Test Data
+            type: resourcegroup
+            subtitle: rg-harbor-test-data
+            children:
+              - id: test-sql
+                name: Storefront DB
+                type: database
+                subtitle: Azure SQL
+                icon: azure/azure-sql
+                facts: ["SKU: GP_S_Gen5_1", "Size: 32 GB"]
+              - id: test-storage
+                name: Media Storage
+                type: storage
+                subtitle: Storage account
+                icon: azure/storage-account
+                facts: ["SKU: Standard_LRS"]
+              - id: test-kv
+                name: Test Key Vault
+                type: secret
+                subtitle: kv-harbor-test
+                icon: azure/key-vault
+
+  # The network, drawn as its own seam
+  - id: network
+    name: Harbor Network
+    type: network
+    subtitle: Hub and spoke, East US
+    style: { frame: dashed }
+    children:
+      - id: hub
+        name: Hub
+        type: network
+        subtitle: vnet-hub-eus
+        icon: azure/virtual-networks
+        facts: ["Address space: 10.50.0.0/22", "Firewall: afw-harbor-hub", "VPN: vgw-harbor-hub, VpnGw1", "Bastion: bas-harbor-hub"]
+        children:
+          - id: firewall
+            name: Azure Firewall
+            type: firewall
+            subtitle: afw-harbor-hub
+            icon: azure/firewall
+            facts: ["SKU: Standard"]
+          - id: vpn-gateway
+            name: VPN Gateway
+            type: tunnel
+            subtitle: vgw-harbor-hub
+            icon: azure/vpn-gateway
+            facts: ["SKU: VpnGw1", "Peer: 203.0.113.10"]
+          - id: bastion
+            name: Bastion
+            type: host
+            subtitle: bas-harbor-hub
+            icon: azure/bastion
+      - id: prod-vnet
+        name: Prod Spoke
+        type: network
+        subtitle: vnet-prod-eus
+        icon: azure/virtual-networks
+        facts: ["Address space: 10.50.8.0/21", "Subnets: apps, data, endpoints"]
+      - id: devtest-vnet
+        name: Dev and Test Spoke
+        type: network
+        subtitle: vnet-devtest-eus
+        icon: azure/virtual-networks
+        facts: ["Address space: 10.50.16.0/21", "Subnets: apps, data, endpoints"]
+      - id: pier9-lan
+        name: Pier 9 LAN
+        type: network
+        subtitle: On premises
+        icon: generic/building
+        facts: ["Address space: 10.10.0.0/16", "Edge: dual 1 Gb circuits"]
+
+  # Edge
+  - id: dns-zone
+    name: Public DNS
+    type: dns
+    subtitle: harbor.example
+    icon: azure/dns-zone
+  - id: front-door
+    name: Front Door
+    type: cdn
+    subtitle: afd-harbor, Standard
+    icon: azure/front-door
+    facts: ["Endpoint: harbor-prod.z01.azurefd.net", "WAF: Prevention"]
+    children:
+      - id: fd-endpoint
+        name: Endpoint
+        type: gateway
+        subtitle: harbor-prod.z01.azurefd.net
+        icon: azure/front-door
+      - id: rules-engine
+        name: Rules Engine
+        type: config
+        subtitle: rs-legacy-redirect
+        bullets: ["Match host shop.harbor.example", "Answer 301", "Keep path and query"]
+      - id: origin-group
+        name: Origin Group
+        type: loadbalancer
+        subtitle: og-storefront
+        icon: azure/load-balancer
+
+  # Hostnames, placed by tags in the matrix view
+  - id: hostnames
+    name: Hostnames
+    type: group
+    subtitle: Every URL Harbor answers
+    style: { frame: none }
+    children:
+      - id: host-prod-www
+        name: Storefront
+        type: dns
+        value: www.harbor.example
+        tags: [prod, public]
+      - id: host-prod-login
+        name: Sign In
+        type: dns
+        value: login.harbor.example
+        tags: [prod, public]
+      - id: host-prod-api
+        name: API
+        type: dns
+        value: api.prod.harbor.internal
+        tags: [prod, internal]
+      - id: host-prod-admin
+        name: Back Office
+        type: dns
+        value: admin.harbor.example
+        tags: [prod, admin]
+      - id: host-test-www
+        name: Storefront
+        type: dns
+        value: test.harbor.example
+        tags: [test, public]
+      - id: host-test-login
+        name: Sign In
+        type: dns
+        value: login-test.harbor.example
+        tags: [test, public]
+      - id: host-test-api
+        name: API
+        type: dns
+        value: api.test.harbor.internal
+        tags: [test, internal]
+      - id: host-test-admin
+        name: Back Office
+        type: dns
+        value: admin-test.harbor.example
+        tags: [test, admin]
+      - id: host-dev-www
+        name: Storefront
+        type: dns
+        value: dev.harbor.example
+        tags: [dev, public]
+      - id: host-dev-api
+        name: API
+        type: dns
+        value: api.dev.harbor.internal
+        tags: [dev, internal]
+
+  # Identity and delivery
+  - id: entra
+    name: Entra ID
+    type: identity
+    subtitle: harbor.example
+    icon: azure/entra-id
+    children:
+      - id: sp-prod
+        name: Prod Deployer
+        type: identity
+        subtitle: sp-harbor-tf-prod
+        icon: azure/app-registrations
+        facts: ["Role: Contributor", "Scope: sub-harbor-prod", "Auth: OIDC federated"]
+      - id: sp-devtest
+        name: Dev and Test Deployer
+        type: identity
+        subtitle: sp-harbor-tf-devtest
+        icon: azure/app-registrations
+        facts: ["Role: Contributor", "Scope: sub-harbor-devtest", "Auth: OIDC federated"]
+  - id: harbor-infra
+    name: harbor-infra
+    type: repo
+    subtitle: Terraform, one root per subscription
+    icon: brand/terraform
+    style: { frame: none }
+    children:
+      - id: tf-landing-zone
+        name: landing-zone
+        type: group
+        icon: generic/folder
+        children:
+          - id: tf-network
+            name: modules/network
+            type: package
+            subtitle: Hub, spokes, VPN, firewall
+            icon: brand/terraform
+          - id: tf-storefront
+            name: modules/storefront
+            type: package
+            subtitle: App Service plan, web, API, worker
+            icon: brand/terraform
+          - id: tf-identity
+            name: modules/identity
+            type: package
+            subtitle: Identity Server, Key Vault
+            icon: brand/terraform
+          - id: tf-data
+            name: modules/data
+            type: package
+            subtitle: SQL, storage, private endpoints
+            icon: brand/terraform
+          - id: tf-budget
+            name: modules/budget
+            type: package
+            subtitle: Budget and action group
+            icon: brand/terraform
+      - id: tf-workflows
+        name: .github/workflows
+        type: group
+        icon: generic/folder
+        children:
+          - id: wf-plan
+            name: plan.yml
+            type: file
+            subtitle: On pull request
+          - id: wf-apply
+            name: apply.yml
+            type: file
+            subtitle: On merge to main
+  - id: github-actions
+    name: GitHub Actions
+    type: pipeline
+    subtitle: harbor-goods org
+    icon: brand/github
+    bullets: ["Plan on every pull request", "Apply on merge to main", "One job per subscription", "State in a locked storage account"]
+
+relations:
+  # Context
+  - from: shoppers
+    to: pier9
+    label: shop today at
+    tags: [context]
+  - from: shoppers
+    to: landing-zone
+    label: shop after cutover at
+    tags: [context]
+  - from: pier9
+    to: landing-zone
+    label: moves to
+    kind: manage
+    tags: [context]
+  - from: platform-team
+    to: landing-zone
+    label: builds and runs
+    kind: manage
+    tags: [context]
+  - from: github-actions
+    to: landing-zone
+    label: deploys Terraform to
+    kind: deploy
+    tags: [context]
+  - from: landing-zone
+    to: entra
+    label: signs people and apps in with
+    kind: auth
+    tags: [context]
+
+  # Requests (prod)
+  - from: shoppers
+    to: dns-zone
+    label: resolves www.harbor.example
+    tags: [requests]
+  - from: dns-zone
+    to: front-door
+    label: points at
+    tags: [requests]
+  - from: front-door
+    to: prod-web
+    label: routes
+    tags: [requests]
+  - from: prod-web
+    to: prod-api
+    label: calls
+    tags: [requests]
+  - from: prod-web
+    to: prod-identity
+    label: signs shoppers in with
+    kind: auth
+    tags: [requests]
+  - from: prod-api
+    to: prod-sql
+    label: reads and writes orders
+    kind: data
+    tags: [requests]
+  - from: prod-api
+    to: prod-storage
+    label: serves product images from
+    kind: data
+    tags: [requests]
+  - from: prod-worker
+    to: prod-sql
+    label: reconciles stock
+    kind: data
+    tags: [requests]
+  - from: [prod-api, prod-identity, prod-worker]
+    to: prod-kv
+    label: reads secrets
+    kind: auth
+    tags: [requests]
+
+  # Public services in both environments
+  - from: front-door
+    to: [prod-web, prod-identity, test-web, test-identity]
+    label: routes to
+    tags: [public]
+  - from: prod-web
+    to: prod-api
+    label: calls
+    tags: [public]
+  - from: test-web
+    to: test-api
+    label: calls
+    tags: [public]
+
+  # Subscriptions
+  - from: rg-prod-web
+    to: rg-prod-data
+    label: reads and writes
+    kind: data
+    tags: [subscriptions]
+  - from: rg-test-web
+    to: rg-test-data
+    label: reads and writes
+    kind: data
+    tags: [subscriptions]
+  - from: [prod-budget, devtest-budget]
+    to: platform-team
+    label: alerts at 80 percent
+    kind: observe
+    tags: [subscriptions]
+
+  # Network
+  - from: hub
+    to: [prod-vnet, devtest-vnet]
+    label: peers with
+    both: true
+    tags: [network]
+  - from: vpn-gateway
+    to: pier9-lan
+    label: site-to-site IPsec
+    kind: sync
+    tags: [network]
+  - from: [prod-vnet, devtest-vnet]
+    to: firewall
+    label: routes egress through
+    tags: [network]
+  - from: bastion
+    to: [prod-vnet, devtest-vnet]
+    label: opens SSH and RDP into
+    kind: manage
+    tags: [network]
+
+  # Shared services
+  - from: [rg-prod-web, rg-test-web]
+    to: law
+    label: sends logs and metrics
+    kind: observe
+    tags: [shared]
+  - from: [rg-prod-data, rg-test-data]
+    to: private-dns
+    label: registers private endpoints in
+    kind: manage
+    tags: [shared]
+  - from: rg-prod-data
+    to: recovery-vault
+    label: backed up nightly to
+    kind: data
+    tags: [shared]
+  - from: law
+    to: action-group
+    label: fires alerts through
+    kind: observe
+    tags: [shared]
+  - from: action-group
+    to: platform-team
+    label: pages
+    kind: observe
+    tags: [shared]
+
+  # Hostnames
+  - from: front-door
+    to: [host-prod-www, host-prod-login, host-test-www, host-test-login, host-dev-www]
+    label: terminates TLS for
+    tags: [hostnames]
+  - from: front-door
+    to: [host-prod-admin, host-test-admin]
+    label: allows office IPs only to
+    kind: auth
+    tags: [hostnames]
+  - from: private-dns
+    to: [host-prod-api, host-test-api, host-dev-api]
+    label: resolves inside the VPN
+    kind: manage
+    tags: [hostnames]
+
+  # Access
+  - from: digital-commerce
+    to: [product-owner, developers, qa]
+    label: staffs
+    tags: [access]
+  - from: platform-eng
+    to: platform-team
+    label: staffs
+    tags: [access]
+  - from: [product-owner, qa]
+    to: reader
+    label: holds
+    kind: auth
+    tags: [access]
+  - from: developers
+    to: [reader, contributor]
+    label: holds
+    kind: auth
+    tags: [access]
+  - from: platform-team
+    to: owner
+    label: holds
+    kind: auth
+    tags: [access]
+  - from: reader
+    to: [rg-prod-web, rg-prod-data, rg-test-web]
+    label: on
+    kind: auth
+    tags: [access]
+  - from: contributor
+    to: [rg-test-web, rg-test-data]
+    label: on
+    kind: auth
+    tags: [access]
+  - from: owner
+    to: [prod-sub, devtest-sub]
+    label: on
+    kind: auth
+    tags: [access]
+
+  # Delivery
+  - from: developers
+    to: harbor-infra
+    label: open pull requests to
+    kind: deploy
+    tags: [delivery]
+  - from: harbor-infra
+    to: github-actions
+    label: triggers
+    kind: deploy
+    tags: [delivery]
+  - from: github-actions
+    to: [sp-prod, sp-devtest]
+    label: signs in as
+    kind: auth
+    tags: [delivery]
+  - from: sp-prod
+    to: prod-sub
+    label: applies to
+    kind: deploy
+    tags: [delivery]
+  - from: sp-devtest
+    to: devtest-sub
+    label: applies to
+    kind: deploy
+    tags: [delivery]
+
+views:
+  - id: context
+    title: Context
+    group: Overview
+    question: Who uses Harbor, where does it run today, and where is it going?
+    include: { tags: [context] }
+    collapse: [pier9, landing-zone]
+    annotations:
+      - { text: Nothing new is built here., at: pier9, kind: callout, side: bottom }
+      - { text: Why move, kind: heading }
+      - { text: "The Pier 9 lease ends in March 2027. The landing zone is ready before then, and the storefront moves in one cutover night." }
+
+  - id: subscriptions
+    title: Subscriptions
+    group: Platform
+    question: What does each subscription hold, and how much may it spend each month?
+    include: { tags: [subscriptions] }
+    collapse: [rg-prod-web, rg-prod-data, rg-test-web, rg-test-data]
+    hide: [rg-shared]
+    arrange:
+      - node: landing-zone
+        as: mirror
+        order: [prod-sub, devtest-sub]
+        divider: true
+    annotations:
+      - { text: "Budgets are the cap, not the forecast. Prod runs near $5,100 today.", at: prod-budget, side: bottom }
+
+  - id: network
+    title: Network
+    group: Platform
+    question: How do the spokes and the datacenter hang off the hub?
+    include: { tags: [network] }
+    collapse: [hub]
+    arrange:
+      - node: network
+        as: ring
+        center: hub
+        gap: 72
+    annotations:
+      - { text: Every route out of a spoke goes through the firewall., at: hub, kind: callout, side: bottom }
+
+  - id: requests
+    title: Requests
+    group: Platform
+    question: How does a shopper's request reach the storefront in prod, and what runs beside it?
+    include: { tags: [requests] }
+    direction: right
+    annotations:
+      - { text: Only public entry point., at: front-door, kind: callout, side: top }
+
+  - id: public
+    title: Public Services
+    group: Platform
+    question: Which services face the internet, in prod and in test alike?
+    include: { tags: [public] }
+    collapse: [front-door]
+    highlights:
+      - { nodes: [prod-web, prod-identity, test-web, test-identity], label: Public, style: band, color: amber }
+
+  - id: hostnames
+    title: Hostnames
+    group: Slices
+    question: Which URL does each environment answer, and who terminates it?
+    include: { tags: [hostnames] }
+    collapse: [front-door]
+    arrange:
+      - node: hostnames
+        as: matrix
+        matrix: { rows: [prod, test, dev], columns: [public, internal, admin] }
+        divider: true
+
+  - id: legacy-redirect
+    title: Legacy Redirect
+    group: Slices
+    question: What happens when a shopper opens the old address, shop.harbor.example?
+    paths:
+      - title: A visit to the legacy host
+        color: blue
+        steps:
+          - { from: shoppers, to: dns-zone, text: "The shopper opens shop.harbor.example, the old address." }
+          - { from: dns-zone, to: fd-endpoint, text: DNS answers with a CNAME to the Front Door endpoint. Both hostnames point at it. }
+          - { from: fd-endpoint, to: rules-engine, text: The endpoint runs the rules engine before it picks an origin. }
+          - { from: rules-engine, to: shoppers, id: 4a, text: The host matches shop.harbor.example. Front Door answers 301 to www.harbor.example and keeps the path. }
+          - { from: rules-engine, to: origin-group, id: 4b, text: "The host is www.harbor.example. No rule matches, and the request goes to the origin group." }
+          - { from: origin-group, to: prod-web, text: The origin group forwards to Storefront Web. }
+    legend: true
+    annotations:
+      - { text: The old host stays in DNS for a year so saved links and search results keep working., at: dns-zone, side: bottom }
+
+  - id: access
+    title: Access
+    group: Slices
+    question: Who may touch which resource group, and through which role?
+    include: { tags: [access] }
+    direction: down
+    collapse: [rg-prod-web, rg-prod-data, rg-test-web, rg-test-data]
+    hide: [rg-shared]
+    arrange:
+      - node: root
+        layers: [[digital-commerce, platform-eng], [product-owner, developers, qa, platform-team], [reader, contributor, owner], [landing-zone]]
+    highlights:
+      - { nodes: [rg-test-web, rg-test-data], label: Developers write here, color: blue }
+      - { nodes: [rg-prod-web, rg-prod-data], label: Read only below Owner, color: emerald }
+    paths:
+      - title: A developer
+        color: blue
+        steps:
+          - { from: developers, to: contributor, text: A developer holds Contributor. }
+          - { from: contributor, to: rg-test-web, text: Contributor is scoped to the test resource groups. Prod is read only. }
+      - title: A tester
+        color: amber
+        steps:
+          - { from: qa, to: reader, text: QA holds Reader. }
+          - { from: reader, to: rg-test-web, text: "Reader covers test and prod web, enough to read logs and configuration." }
+      - title: The platform team
+        color: emerald
+        steps:
+          - { from: platform-team, to: owner, text: The platform team holds Owner. }
+          - { from: owner, to: prod-sub, text: "Owner is scoped to each subscription, so it is the only role that can change prod." }
+
+  - id: delivery
+    title: Delivery
+    group: Slices
+    question: How does a Terraform change reach each subscription?
+    include: { tags: [delivery] }
+    direction: right
+    collapse: [prod-sub, devtest-sub]
+    arrange:
+      - node: harbor-infra
+        as: outline
+    annotations:
+      - { text: Each deployer may touch only its own subscription. A bad plan cannot cross the line., at: entra, side: bottom }
+
+  - id: shared
+    title: Shared Services
+    group: Slices
+    question: What does every environment lean on, and who gets paged?
+    include: { tags: [shared] }
+    collapse: [rg-prod-web, rg-prod-data, rg-test-web, rg-test-data]
+    direction: right
+    arrange:
+      - node: rg-shared
+        as: column
+
+  - id: cutover
+    kind: sequence
+    title: Cutover Night
+    group: Processes
+    question: What happens, in order, on the night the storefront moves?
+    participants: [platform-lead, legacy-web, legacy-sql, prod-sql, dns-zone, front-door, prod-web]
+    steps:
+      - from: platform-lead
+        to: legacy-web
+        label: put up the maintenance page
+      - from: platform-lead
+        to: legacy-sql
+        label: take the final backup
+        reply: harbor-final.bak
+      - from: platform-lead
+        to: prod-sql
+        label: restore harbor-final.bak
+        reply: restore complete
+      - from: platform-lead
+        to: prod-web
+        label: run smoke tests
+        steps:
+          - from: prod-web
+            to: prod-sql
+            label: read a known order
+            reply: order found
+        reply: 24 of 24 passed
+      - alt: smoke tests pass
+        steps:
+          - from: platform-lead
+            to: dns-zone
+            label: point www at Front Door
+          - from: dns-zone
+            to: front-door
+            label: CNAME harbor-prod.z01.azurefd.net
+            kind: async
+        else:
+          - from: platform-lead
+            to: legacy-web
+            label: take down the maintenance page
+      - note: TTL was lowered to 300 seconds a week before, so the swap takes minutes.
+        over: [dns-zone, front-door]
+
+  - id: poster
+    kind: page
+    title: Landing Zone Poster
+    group: Overview
+    question: One page for the steering meeting. What are we building, how is it wired, and who may touch what?
+    columns: 2
+    panels:
+      - { heading: Two subscriptions, text: Prod and dev-and-test have the same shape. Each has its own budget and cost center., view: subscriptions, span: 2 }
+      - { heading: Hub and spoke, text: "One hub carries the firewall, the VPN to Pier 9, and Bastion.", view: network }
+      - { heading: Who may touch what, text: Roles are scoped to resource groups. Only Owner reaches prod., view: access }

@@ -1,0 +1,28 @@
+{
+  "issues": [
+    {
+      "id": "10001",
+      "key": "OPS-101",
+      "fields": {
+        "summary": "Relay drops long-lived connections",
+        "status": { "name": "In Progress" },
+        "priority": { "name": "Highest" },
+        "updated": "2026-10-28T08:15:00.000+0000",
+        "labels": ["svc:relay", "customer"]
+      }
+    },
+    {
+      "id": "10002",
+      "key": "OPS-102",
+      "fields": {
+        "summary": "Rotate the shop database password",
+        "status": { "name": "To Do" },
+        "priority": { "name": "Medium" },
+        "updated": "2026-10-27T16:00:00.000+0000",
+        "labels": ["svc:shop-db", "svc:shop-api"]
+      }
+    }
+  ],
+  "nextPageToken": "page-2",
+  "isLast": false
+}

@@ -1,0 +1,85 @@
+{
+  "entities": [
+    {
+      "blueprint": "sw_connection",
+      "key": "shop-auth-prod>shop-sql.database.example.net/shop-prod@setting",
+      "title": "shop-auth-prod to shop-prod",
+      "state": "active",
+      "fields": { "host": "shop-sql.database.example.net", "kind": "sql", "evidence": "setting", "setting_names": ["SQL_CONNECTION"], "health": "green" },
+      "relations": {
+        "app": [{ "blueprint": "azure_app_service", "key": "/subscriptions/0000/resourcegroups/rg-shop-prod/providers/microsoft.web/sites/shop-auth-prod" }],
+        "to_database": [{ "blueprint": "azure_database", "key": "/subscriptions/0000/resourcegroups/rg-data/providers/microsoft.sql/servers/shop-sql/databases/shop-prod" }]
+      }
+    },
+    {
+      "blueprint": "sw_connection",
+      "key": "shop-auth-prod>shop-sql.database.example.net/shop-prod@telemetry",
+      "title": "shop-auth-prod to shop-prod",
+      "state": "active",
+      "fields": { "host": "shop-sql.database.example.net", "kind": "sql", "evidence": "telemetry", "calls_7d": 2043, "health": "green" },
+      "relations": {
+        "app": [{ "blueprint": "azure_app_service", "key": "/subscriptions/0000/resourcegroups/rg-shop-prod/providers/microsoft.web/sites/shop-auth-prod" }],
+        "to_database": [{ "blueprint": "azure_database", "key": "/subscriptions/0000/resourcegroups/rg-data/providers/microsoft.sql/servers/shop-sql/databases/shop-prod" }]
+      }
+    },
+    {
+      "blueprint": "sw_connection",
+      "key": "shop-auth-prod>shop-sql.database.example.net/shop-prod@code",
+      "title": "auth to shop-prod",
+      "state": "active",
+      "fields": { "host": "shop-sql.database.example.net", "kind": "sql", "evidence": "code", "setting_names": ["ConnectionStrings:Shop", "SQL_CONNECTION"], "health": "green" },
+      "relations": {
+        "app": [],
+        "service": [{ "blueprint": "service", "key": "auth" }],
+        "to_database": [{ "blueprint": "azure_database", "key": "/subscriptions/0000/resourcegroups/rg-data/providers/microsoft.sql/servers/shop-sql/databases/shop-prod" }]
+      }
+    },
+    {
+      "blueprint": "sw_connection",
+      "key": "shop-web-prod>legacy.example.net@setting",
+      "title": "shop-web-prod to legacy.example.net",
+      "state": "active",
+      "fields": { "host": "legacy.example.net", "kind": "http", "evidence": "setting", "setting_names": ["LEGACY_URL"], "health": "green" },
+      "relations": {
+        "app": [{ "blueprint": "azure_app_service", "key": "/subscriptions/0000/resourcegroups/rg-shop-prod/providers/microsoft.web/sites/shop-web-prod" }],
+        "to_app": []
+      }
+    },
+    {
+      "blueprint": "sw_connection",
+      "key": "shop-web-prod>kv-shop.vault.example.net@setting",
+      "title": "shop-web-prod to kv-shop",
+      "state": "active",
+      "fields": { "host": "kv-shop.vault.example.net", "kind": "keyvault", "evidence": "setting", "setting_names": ["DB_PASSWORD"], "health": "amber" },
+      "relations": {
+        "app": [{ "blueprint": "azure_app_service", "key": "/subscriptions/0000/resourcegroups/rg-shop-prod/providers/microsoft.web/sites/shop-web-prod" }],
+        "to_database": [{ "blueprint": "azure_database", "key": "/subscriptions/0000/resourcegroups/rg-data/providers/microsoft.sql/servers/shop-sql/databases/shop-prod" }]
+      }
+    },
+    {
+      "blueprint": "sw_connection",
+      "key": "kv-shop/db-password@vault",
+      "title": "kv-shop secret db-password",
+      "state": "active",
+      "fields": { "host": "shop-sql.database.example.net", "kind": "sql", "evidence": "vault", "health": "green" },
+      "relations": {
+        "vault": [{ "blueprint": "azure_key_vault", "key": "kv-shop" }],
+        "to_database": [{ "blueprint": "azure_database", "key": "/subscriptions/0000/resourcegroups/rg-data/providers/microsoft.sql/servers/shop-sql/databases/shop-prod" }]
+      }
+    },
+    {
+      "blueprint": "sw_connection",
+      "key": "shop-web-prod>secret.example.net@setting",
+      "title": "shop-web-prod to a restricted app",
+      "state": "active",
+      "fields": { "host": "secret.example.net", "kind": "http", "evidence": "setting", "health": "green" },
+      "relations": {
+        "app": [{ "blueprint": "azure_app_service", "key": "/subscriptions/0000/resourcegroups/rg-shop-prod/providers/microsoft.web/sites/shop-web-prod" }],
+        "to_app": [{ "blueprint": "azure_app_service", "key": "hidden", "restricted": true }]
+      }
+    }
+  ],
+  "total": 7,
+  "limit": 200,
+  "offset": 0
+}

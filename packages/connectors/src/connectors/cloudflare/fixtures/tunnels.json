@@ -1,0 +1,7 @@
+{ "success": true, "errors": [], "messages": [],
+  "result": [
+    { "id": "7c9e6679-7425-40de-944b-e07fc1f90ae7", "name": "edge-ingress", "status": "healthy", "remote_config": true,
+      "connections": [{ "colo_name": "AMS", "client_version": "2026.9.1" }, { "colo_name": "AMS", "client_version": "2026.9.1" }] },
+    { "id": "1b4e28ba-2fa1-11d2-883f-0016d3cca427", "name": "lab", "status": "down", "remote_config": false, "connections": [] }
+  ],
+  "result_info": { "page": 1, "per_page": 100, "total_pages": 1, "count": 2, "total_count": 2 } }

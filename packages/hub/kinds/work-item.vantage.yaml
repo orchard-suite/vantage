@@ -1,0 +1,33 @@
+vantage: 1
+title: Work item
+description: The kind of tracked work the hub ships. A workspace builds on it with a kind block of its own (prefix, name, base work-item) and gets these labels and this lifecycle.
+kind:
+  prefix: WORK
+  name: Work item
+  labels:
+    - { name: due, type: date, title: Due }
+    - { name: size, type: choice, title: Size, choices: [small, medium, large] }
+  lifecycle: lifecycle
+views:
+  - id: lifecycle
+    kind: lifecycle
+    title: How a work item moves
+    question: Who moves a work item, and what does each move need?
+    direction: down
+    states:
+      - { id: open, text: Open, class: not-started }
+      - { id: doing, text: Doing, class: in-progress }
+      - { id: review, text: In review, class: in-progress }
+      - { id: waiting, text: Waiting on a person, class: parked, waits: true, description: A question is asked on the item and it waits for an answer }
+      - { id: done, text: Done, class: done }
+      - { id: dropped, text: Dropped, class: parked }
+    moves:
+      - { from: open, to: doing, label: start, who: [author] }
+      - { from: doing, to: review, label: ask for review, who: [holder], needs: [note] }
+      - { from: review, to: done, label: approve, who: [author], approval: true }
+      - { from: review, to: doing, label: send back, who: [author], needs: [note] }
+      - { from: doing, to: done, label: finish, who: [holder] }
+      - { from: doing, to: waiting, label: ask, who: [holder], needs: [note] }
+      - { from: waiting, to: doing, label: answer, who: [author, asker], needs: [note] }
+      - { from: open, to: dropped, label: drop, who: [author], needs: [note] }
+      - { from: done, to: doing, label: reopen, who: [author], needs: [note] }

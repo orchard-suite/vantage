@@ -1,0 +1,15 @@
+resources:
+  - name: Cloud
+    abstract: true
+    icon: AWS/_Group Icons/Cloud.svg
+  - name: Gateway
+    abstract: true
+    icon: Azure/Networking/Front Doors.svg
+    subtitle: Azure Front Door
+  - name: App
+    abstract: true
+    icon: Azure/Web/App Services.svg
+  - name: Database
+    abstract: true
+    icon: Azure/Databases/SQL Database.svg
+    color: ForestGreen

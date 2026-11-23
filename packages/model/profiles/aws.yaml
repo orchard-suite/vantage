@@ -1,0 +1,99 @@
+name: aws
+description: "Amazon Web Services: the generic vocabulary drawn with AWS architecture icons, plus one type per common AWS service."
+types:
+  # The generic vocabulary, restyled.
+  function: { extends: function, icon: aws/lambda }
+  database: { extends: database, icon: aws/rds }
+  cache: { extends: cache, icon: aws/elasticache }
+  storage: { extends: storage, icon: aws/simple-storage-service }
+  queue: { extends: queue, icon: aws/simple-queue-service }
+  topic: { extends: topic, icon: aws/simple-notification-service }
+  search: { extends: search, icon: aws/opensearch-service }
+  secret: { extends: secret, icon: aws/secrets-manager }
+  identity: { extends: identity, icon: aws/identity-and-access-management }
+  monitoring: { extends: monitoring, icon: aws/cloudwatch }
+  config: { extends: config, icon: aws/appconfig }
+  registry: { extends: registry, icon: aws/elastic-container-registry }
+  gateway: { extends: gateway, icon: aws/api-gateway }
+  loadbalancer: { extends: loadbalancer, icon: aws/elastic-load-balancing }
+  cdn: { extends: cdn, icon: aws/cloudfront }
+  dns: { extends: dns, icon: aws/route-53 }
+  firewall: { extends: firewall, icon: aws/waf }
+  tunnel: { extends: tunnel, icon: aws/site-to-site-vpn }
+  model: { extends: model, icon: aws/bedrock }
+  cloud: { extends: cloud, icon: aws/group-aws-cloud }
+  subscription: { extends: subscription, icon: aws/group-aws-account }
+  region: { extends: region, icon: aws/group-region }
+  network: { extends: network, icon: aws/group-virtual-private-cloud-vpc }
+  subnet: { extends: subnet, icon: aws/group-private-subnet }
+  cluster: { extends: cluster, icon: aws/elastic-kubernetes-service }
+  vm: { extends: vm, icon: aws/ec2 }
+
+  # Accounts and identity.
+  organization: { extends: subscription, icon: aws/organizations, description: An AWS organization }
+  account: { extends: subscription, icon: aws/group-aws-account, description: An AWS account }
+  iam: { extends: identity, icon: aws/identity-and-access-management, description: IAM roles and policies }
+  identitycenter: { extends: identity, icon: aws/iam-identity-center, description: IAM Identity Center }
+  cognito: { extends: identity, icon: aws/cognito, description: A Cognito user pool }
+  kms: { extends: secret, icon: aws/key-management-service, description: A KMS key }
+  secretsmanager: { extends: secret, icon: aws/secrets-manager, description: Secrets Manager }
+
+  # Compute.
+  ec2: { extends: vm, icon: aws/ec2, description: An EC2 instance }
+  autoscaling: { extends: vm, icon: aws/ec2-auto-scaling, description: An auto scaling group }
+  lambda: { extends: function, icon: aws/lambda, description: A Lambda function }
+  ecs: { extends: cluster, icon: aws/elastic-container-service, description: An ECS cluster or service }
+  fargate: { extends: container, icon: aws/fargate, description: A Fargate task }
+  eks: { extends: cluster, icon: aws/elastic-kubernetes-service, description: An EKS cluster }
+  ecr: { extends: registry, icon: aws/elastic-container-registry, description: An ECR repository }
+  apprunner: { extends: service, icon: aws/app-runner, description: An App Runner service }
+  beanstalk: { extends: service, icon: aws/elastic-beanstalk, description: An Elastic Beanstalk environment }
+  batch: { extends: job, icon: aws/batch, description: An AWS Batch queue }
+  stepfunctions: { extends: job, icon: aws/step-functions, description: A Step Functions state machine }
+
+  # Data.
+  s3: { extends: storage, icon: aws/simple-storage-service, description: An S3 bucket }
+  efs: { extends: storage, icon: aws/efs, description: An EFS file system }
+  ebs: { extends: storage, icon: aws/elastic-block-store, description: An EBS volume }
+  rds: { extends: database, icon: aws/rds, description: An RDS instance }
+  aurora: { extends: database, icon: aws/aurora, description: An Aurora cluster }
+  dynamodb: { extends: database, icon: aws/dynamodb, description: A DynamoDB table }
+  documentdb: { extends: database, icon: aws/documentdb, description: A DocumentDB cluster }
+  redshift: { extends: database, icon: aws/redshift, description: A Redshift cluster }
+  elasticache: { extends: cache, icon: aws/elasticache, description: An ElastiCache cluster }
+  sqs: { extends: queue, icon: aws/simple-queue-service, description: An SQS queue }
+  sns: { extends: topic, icon: aws/simple-notification-service, description: An SNS topic }
+  eventbridge: { extends: topic, icon: aws/eventbridge, description: An EventBridge bus }
+  kinesis: { extends: topic, icon: aws/kinesis-data-streams, description: A Kinesis data stream }
+  msk: { extends: topic, icon: aws/managed-streaming-for-apache-kafka, description: An MSK cluster }
+  opensearch: { extends: search, icon: aws/opensearch-service, description: An OpenSearch domain }
+  glue: { extends: pipeline, icon: aws/glue, description: A Glue job or catalog }
+  athena: { extends: search, icon: aws/athena, description: Athena }
+  bedrock: { extends: model, icon: aws/bedrock, description: Bedrock }
+  sagemaker: { extends: model, icon: aws/sagemaker-ai, description: A SageMaker endpoint }
+
+  # Networking.
+  vpc: { extends: network, icon: aws/group-virtual-private-cloud-vpc, description: A VPC }
+  publicsubnet: { extends: subnet, icon: aws/group-public-subnet, description: A public subnet }
+  privatesubnet: { extends: subnet, icon: aws/group-private-subnet, description: A private subnet }
+  apigateway: { extends: gateway, icon: aws/api-gateway, description: An API Gateway }
+  elb: { extends: loadbalancer, icon: aws/elastic-load-balancing, description: An application or network load balancer }
+  cloudfront: { extends: cdn, icon: aws/cloudfront, description: A CloudFront distribution }
+  route53: { extends: dns, icon: aws/route-53, description: A Route 53 hosted zone }
+  waf: { extends: firewall, icon: aws/waf, description: A WAF web ACL }
+  networkfirewall: { extends: firewall, icon: aws/network-firewall, description: A Network Firewall }
+  transitgateway: { extends: tunnel, icon: aws/transit-gateway, description: A transit gateway }
+  directconnect: { extends: tunnel, icon: aws/direct-connect, description: A Direct Connect link }
+  privatelink: { extends: tunnel, icon: aws/privatelink, description: A PrivateLink endpoint }
+  globalaccelerator: { extends: edge, icon: aws/global-accelerator, description: A Global Accelerator }
+
+  # Operations.
+  cloudwatch: { extends: monitoring, icon: aws/cloudwatch, description: CloudWatch }
+  cloudtrail: { extends: monitoring, icon: aws/cloudtrail, description: CloudTrail }
+  xray: { extends: monitoring, icon: aws/x-ray, description: X-Ray }
+  systemsmanager: { extends: config, icon: aws/systems-manager, description: Systems Manager }
+  cloudformation: { extends: pipeline, icon: aws/cloudformation, description: A CloudFormation stack }
+  codepipeline: { extends: pipeline, icon: aws/codepipeline, description: A CodePipeline }
+  backup: { extends: storage, icon: aws/backup, description: An AWS Backup vault }
+  guardduty: { extends: monitoring, icon: aws/guardduty, description: GuardDuty }
+  securityhub: { extends: monitoring, icon: aws/security-hub, description: Security Hub }

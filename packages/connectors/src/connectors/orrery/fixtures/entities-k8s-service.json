@@ -1,0 +1,26 @@
+{
+  "entities": [
+    {
+      "id": "01J0000000000000000000SV01",
+      "blueprint": "k8s-service",
+      "key": "relay/relay",
+      "title": "relay",
+      "icon": null,
+      "state": "active",
+      "hidden": false,
+      "fields": { "type": "ClusterIP", "ports": [{ "port": 443, "targetPort": 8443 }] },
+      "relations": { "namespace": [{ "blueprint": "k8s-namespace", "key": "relay", "title": "relay" }] },
+      "owner": "kube-sync",
+      "scope": null,
+      "createdAt": "2026-10-01T00:00:00Z",
+      "updatedAt": "2026-10-27T09:00:00Z",
+      "lastSeenAt": "2026-10-28T09:00:00Z",
+      "missingSince": null,
+      "deletedAt": null,
+      "status": "green"
+    }
+  ],
+  "total": 1,
+  "limit": 2,
+  "offset": 0
+}

@@ -1,0 +1,190 @@
+name: Build
+
+on:
+  workflow_call:
+    inputs:
+      tag:
+        required: true
+        type: string
+
+permissions:
+  contents: write
+  packages: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.tag }}
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.4.4
+      - run: bun install --frozen-lockfile
+      - run: bun run --filter @vantage/viewer build
+      - name: Render the examples
+        run: |
+          for f in examples/*/*.vantage.yaml; do
+            grep -q '^views:' "$f" || continue   # shared model files have no views
+            bun packages/cli/src/main.ts render "$f" --format html --out dist/examples
+          done
+      - name: Attach to the release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release upload "${{ inputs.tag }}" dist/examples/*.html --clobber
+
+  # The hub image is signed with cosign keyless as this workflow's GitHub
+  # identity, with a syft SBOM attested, so the cluster's image policy
+  # admits it. Its tags are published last: the image is pushed by digest
+  # alone, signed, attested, and verified, and only then tagged, so nothing
+  # that follows a tag ever sees one it cannot run.
+  image:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+      # Needed to get an OIDC token for keyless signing.
+      id-token: write
+    env:
+      IMAGE: ghcr.io/orchard-suite/vantage
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.tag }}
+      - uses: docker/setup-buildx-action@v3
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Build and push the hub image
+        id: push
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          platforms: linux/amd64
+          # By digest only: the tags come last, once the image is signed.
+          outputs: type=image,name=${{ env.IMAGE }},push-by-digest=true,name-canonical=true,push=true
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+      - uses: sigstore/cosign-installer@v3
+      - uses: anchore/sbom-action/download-syft@v0
+      # Sign and attest by digest, never by tag: a tag can move.
+      - name: Sign the image
+        env:
+          DIGEST: ${{ steps.push.outputs.digest }}
+        run: cosign sign --yes "${IMAGE}@${DIGEST}"
+      - name: Attest the SBOM
+        env:
+          DIGEST: ${{ steps.push.outputs.digest }}
+        run: |
+          syft "${IMAGE}@${DIGEST}" -o spdx-json > sbom.spdx.json
+          cosign attest --yes --predicate sbom.spdx.json --type spdxjson "${IMAGE}@${DIGEST}"
+      - name: Verify what was published
+        env:
+          DIGEST: ${{ steps.push.outputs.digest }}
+        run: |
+          cosign verify "${IMAGE}@${DIGEST}" \
+            --certificate-oidc-issuer https://token.actions.githubusercontent.com \
+            --certificate-identity-regexp '^https://github.com/${{ github.repository }}/'
+          cosign verify-attestation "${IMAGE}@${DIGEST}" --type spdxjson \
+            --certificate-oidc-issuer https://token.actions.githubusercontent.com \
+            --certificate-identity-regexp '^https://github.com/${{ github.repository }}/' > /dev/null
+      - name: Tag the release
+        env:
+          DIGEST: ${{ steps.push.outputs.digest }}
+          TAG: ${{ inputs.tag }}
+        run: |
+          docker buildx imagetools create --tag "${IMAGE}:${TAG}" --tag "${IMAGE}:latest" "${IMAGE}@${DIGEST}"
+          tagged=$(docker buildx imagetools inspect "${IMAGE}:${TAG}" --format '{{json .Manifest.Digest}}' | tr -d '"')
+          if [ "$tagged" != "$DIGEST" ]; then
+            echo "${IMAGE}:${TAG} is $tagged, not the signed $DIGEST" >&2
+            exit 1
+          fi
+
+  # The agent plugin, published on its own so an estate that must not point
+  # its marketplace at this repository can still install it: a zip pushed as
+  # an OCI artifact to the same public package as the hub image,
+  #   ghcr.io/orchard-suite/vantage:plugin-<version>
+  # signed like the image. It carries the remote MCP wiring, which connects
+  # to a hosted hub's /mcp; the repository's own .mcp.json runs the local
+  # bridge from a checkout and is not in the zip. The zip's sha256 is the
+  # artifact's single layer digest.
+  plugin:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+      id-token: write
+    env:
+      IMAGE: ghcr.io/orchard-suite/vantage
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.tag }}
+      - name: Check the tag matches the plugin manifest
+        id: version
+        env:
+          TAG: ${{ inputs.tag }}
+        run: |
+          version=$(jq -r .version .claude-plugin/plugin.json)
+          if [ "v$version" != "$TAG" ]; then
+            echo "Tag $TAG does not match .claude-plugin/plugin.json version $version" >&2
+            exit 1
+          fi
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+      - name: Zip the plugin
+        id: zip
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          set -eu
+          stage=$(mktemp -d)
+          mkdir -p "$stage/.claude-plugin" "$stage/scripts"
+          cp .claude-plugin/plugin.json .claude-plugin/icon.svg "$stage/.claude-plugin/"
+          cp -R skills "$stage/skills"
+          cp .claude-plugin/mcp.remote.json "$stage/.mcp.json"
+          cp scripts/mcp-headers.sh scripts/onboard-check.sh scripts/pointer.sh "$stage/scripts/"
+          cp -R hooks "$stage/hooks"
+          zip="vantage-plugin-$VERSION.zip"
+          (cd "$stage" && zip -qr -X "$GITHUB_WORKSPACE/$zip" .)
+          echo "file=$zip" >> "$GITHUB_OUTPUT"
+          echo "sha256=$(sha256sum "$zip" | cut -d' ' -f1)" >> "$GITHUB_OUTPUT"
+      - uses: oras-project/setup-oras@v1
+      - name: Push the plugin as an OCI artifact
+        id: push
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+          FILE: ${{ steps.zip.outputs.file }}
+        run: |
+          set -eu
+          echo "${{ secrets.GITHUB_TOKEN }}" | oras login ghcr.io -u "${{ github.actor }}" --password-stdin
+          oras push "$IMAGE:plugin-$VERSION" \
+            --artifact-type application/vnd.orchard-suite.claude-plugin.v1+zip \
+            --annotation "org.opencontainers.image.source=https://github.com/${{ github.repository }}" \
+            --annotation "org.opencontainers.image.version=$VERSION" \
+            --format go-template='{{.digest}}' \
+            "$FILE:application/zip" > digest.txt
+          echo "digest=$(cat digest.txt)" >> "$GITHUB_OUTPUT"
+      - uses: sigstore/cosign-installer@v3
+      - name: Sign and verify the plugin artifact
+        env:
+          DIGEST: ${{ steps.push.outputs.digest }}
+        run: |
+          cosign sign --yes "${IMAGE}@${DIGEST}"
+          cosign verify "${IMAGE}@${DIGEST}" \
+            --certificate-oidc-issuer https://token.actions.githubusercontent.com \
+            --certificate-identity-regexp '^https://github.com/${{ github.repository }}/' > /dev/null
+      - name: Record what was published
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+          SHA256: ${{ steps.zip.outputs.sha256 }}
+          DIGEST: ${{ steps.push.outputs.digest }}
+        run: |
+          {
+            echo "## Agent plugin"
+            echo
+            echo "- \`$IMAGE:plugin-$VERSION\` ($DIGEST)"
+            echo "- zip sha256 \`$SHA256\`"
+          } >> "$GITHUB_STEP_SUMMARY"

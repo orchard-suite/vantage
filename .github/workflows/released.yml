@@ -1,0 +1,64 @@
+name: Released
+
+# Moves the branch `released` to a release's commit once the hub image its
+# chart names is published and signed. An estate's deploy tool follows that
+# branch, so a release reaches a cluster only after its image exists. The
+# release workflow calls this last. It can also be run by hand, to move the
+# branch to any later commit whose chart still names a published image.
+on:
+  workflow_call:
+    inputs:
+      ref:
+        type: string
+        required: true
+  workflow_dispatch:
+    inputs:
+      ref:
+        description: The tag, branch, or commit to move `released` to
+        type: string
+        required: true
+
+env:
+  IMAGE: ghcr.io/orchard-suite/vantage
+
+jobs:
+  move:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      packages: read
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.ref }}
+          fetch-depth: 0
+      - name: Read the version the chart names
+        id: pin
+        run: |
+          version=$(sed -n 's/^appVersion: *"\{0,1\}\([^" ]*\)"\{0,1\}.*/\1/p' deploy/helm/vantage/Chart.yaml)
+          test -n "$version" || { echo "deploy/helm/vantage/Chart.yaml names no appVersion" >&2; exit 1; }
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          echo "commit=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+      - uses: sigstore/cosign-installer@v3
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      # The image must exist and carry this repository's signature, or the
+      # branch stays where it is.
+      - name: Check the image is published and signed
+        env:
+          VERSION: ${{ steps.pin.outputs.version }}
+        run: |
+          cosign verify "${IMAGE}:v${VERSION}" \
+            --certificate-oidc-issuer https://token.actions.githubusercontent.com \
+            --certificate-identity-regexp '^https://github.com/${{ github.repository }}/' > /dev/null
+      # A plain push: the branch only ever moves forward.
+      - name: Move the branch
+        env:
+          COMMIT: ${{ steps.pin.outputs.commit }}
+          VERSION: ${{ steps.pin.outputs.version }}
+        run: |
+          git push origin "${COMMIT}:refs/heads/released"
+          echo "released is now ${COMMIT}, which names ${IMAGE}:v${VERSION}"

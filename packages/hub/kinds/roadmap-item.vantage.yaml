@@ -1,0 +1,32 @@
+vantage: 1
+title: Roadmap item
+description: The kind of planned outcome the hub ships. Its state is worked out from its proof, never typed. A workspace builds on it with a kind block of its own (prefix, name, base roadmap-item).
+kind:
+  prefix: ROAD
+  name: Roadmap item
+  labels:
+    - { name: horizon, type: choice, title: Horizon, choices: [now, next, later] }
+    - { name: promised, type: date, title: Promised by }
+  lifecycle: lifecycle
+views:
+  - id: lifecycle
+    kind: lifecycle
+    title: How a roadmap item moves
+    question: What moves a roadmap item, and what can a person move by hand?
+    direction: down
+    states:
+      - { id: planned, text: Planned, class: not-started }
+      - { id: building, text: Building, class: in-progress, description: Its proof shows work under way }
+      - { id: reported, text: Reported done, class: in-progress, description: Someone says it is done and no machine has read proof of it }
+      - { id: shipped, text: Shipped, class: done, description: Every piece of its proof says done }
+      - { id: dropped, text: Dropped, class: parked }
+    moves:
+      - { from: planned, to: building, label: work starts, who: [proof] }
+      - { from: building, to: shipped, label: proof lands, who: [proof] }
+      - { from: shipped, to: building, label: proof reopens, who: [proof] }
+      - { from: planned, to: reported, label: report done, who: [author], needs: [note] }
+      - { from: building, to: reported, label: report done, who: [author], needs: [note] }
+      - { from: reported, to: shipped, label: proof lands, who: [proof] }
+      - { from: planned, to: dropped, label: drop, who: [author], needs: [note] }
+      - { from: building, to: dropped, label: drop, who: [author], needs: [note] }
+      - { from: dropped, to: planned, label: restore, who: [author], needs: [note] }

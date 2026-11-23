@@ -1,0 +1,11 @@
+{
+  "blueprints": [
+    { "id": "azure_app_service", "title": "App Service" },
+    { "id": "azure_database", "title": "Database" },
+    { "id": "service", "title": "Service" },
+    { "id": "sw_connection", "title": "Connection" }
+  ],
+  "counts": {},
+  "layout": {},
+  "adminOnly": []
+}

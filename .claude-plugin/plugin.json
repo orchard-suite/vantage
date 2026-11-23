@@ -1,0 +1,19 @@
+{
+  "name": "vantage",
+  "description": "Code-first software and infrastructure diagrams that tell a story. MCP tools to validate, render, explore layouts, and export, plus skills for finding the story, authoring, and reviewing.",
+  "version": "3.3.1",
+  "author": { "name": "The Orchard authors" },
+  "homepage": "https://github.com/orchard-suite/vantage",
+  "repository": "https://github.com/orchard-suite/vantage",
+  "license": "MIT",
+  "keywords": ["diagrams", "architecture", "infrastructure", "c4", "mcp"],
+  "userConfig": {
+    "hub_token": {
+      "type": "string",
+      "title": "Vantage hub token",
+      "description": "Make one on your Vantage hub: open your name at the foot of the sidebar, then Account and tokens. Kept in your system's secure store.",
+      "sensitive": true,
+      "required": false
+    }
+  }
+}

@@ -1,0 +1,17 @@
+name: uml
+description: "Unified modeling language: classes, interfaces, packages, states, actors."
+types:
+  class: { role: compute, shape: box, color: slate, description: "A class; facts are attributes, bullets are operations" }
+  abstract: { extends: class, frame: dashed, description: An abstract class }
+  interface: { role: compute, shape: pill, color: violet, description: An interface }
+  enum: { extends: class, color: amber, description: An enumeration }
+  package: { role: boundary, shape: box, color: slate, description: A package or namespace }
+  state: { role: compute, shape: rounded, color: blue, description: A state }
+  initial: { role: actor, shape: circle, color: slate, description: The initial pseudo state }
+  final: { role: data, shape: circle, color: red, description: The final state }
+  choice: { role: compute, shape: diamond, color: amber, description: A guarded choice }
+  actor: { role: actor, shape: person, color: slate, icon: generic/user, description: An actor }
+  usecase: { role: compute, shape: ellipse, color: blue, description: A use case }
+  component: { role: compute, shape: rounded, color: slate, icon: generic/component, description: A component }
+  node: { role: compute, shape: box, color: slate, icon: generic/host, description: A deployment node }
+  artifact: { role: data, shape: document, color: slate, description: An artifact }

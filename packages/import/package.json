@@ -1,0 +1,21 @@
+{
+  "name": "@vantage/import",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "main": "src/index.ts",
+  "types": "src/index.ts",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "dependencies": {
+    "@vantage/layout": "workspace:*",
+    "@vantage/model": "workspace:*",
+    "fflate": "^0.8.2",
+    "yaml": "^2.9.1"
+  },
+  "devDependencies": {
+    "@vantage/export": "workspace:*",
+    "@vantage/render": "workspace:*"
+  }
+}

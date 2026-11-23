@@ -1,0 +1,16 @@
+{
+  "id": "azure_app_service",
+  "title": "App Service",
+  "fields": {
+    "app_name": { "type": "string", "title": "App name" },
+    "cost_last_month_cents": { "type": "number", "title": "Cost last month", "format": { "kind": "currency", "currency": "USD", "minor": true } },
+    "requests_7d": { "type": "number" },
+    "always_on": { "type": "boolean", "title": "Always on" },
+    "health": { "type": "string" }
+  },
+  "relations": {
+    "resource_group": { "target": "azure_resource_group" },
+    "service": { "target": "service" },
+    "environment": { "target": "environment" }
+  }
+}

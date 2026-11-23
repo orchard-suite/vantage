@@ -1,0 +1,46 @@
+[
+  {
+    "source": "shop-orrery",
+    "observed": "2026-11-06T03:00:00Z",
+    "entities": [
+      { "id": "service:shop-web", "type": "web", "name": "Web App", "facts": { "repository": "https://github.com/acme/shop-web" } },
+      {
+        "id": "service:orders-api", "type": "api", "name": "Orders API", "facts": { "repository": "https://github.com/acme/orders-api" },
+        "items": [
+          { "id": "f1a2", "kind": "alert", "title": "Orders API 5xx above 2%", "url": "https://runbooks.example.com/orders-5xx", "severity": "critical", "status": "firing", "updated": "2026-11-06T02:55:00Z" }
+        ]
+      },
+      { "id": "service:catalog-api", "type": "api", "name": "Catalog API", "facts": { "repository": "https://github.com/acme/catalog-api" } },
+      { "id": "service:order-worker", "type": "worker", "name": "Order Worker", "facts": { "repository": "https://github.com/acme/order-worker" } },
+      {
+        "id": "database:orders-db", "type": "database", "name": "Orders DB",
+        "items": [
+          { "id": "b7c9", "kind": "alert", "title": "Orders DB DTU above 80%", "severity": "medium", "status": "firing", "updated": "2026-11-06T02:40:00Z" }
+        ]
+      }
+    ],
+    "relations": []
+  },
+  {
+    "source": "ops-jira",
+    "observed": "2026-11-06T03:00:00Z",
+    "entities": [],
+    "relations": [],
+    "items": [
+      { "id": "OPS-412", "kind": "issue", "title": "OPS-412 Orders API times out on large carts", "url": "https://example.atlassian.net/browse/OPS-412", "severity": "high", "status": "In Progress", "updated": "2026-11-05T16:20:00Z", "target": { "key": "shop-orrery:service:orders-api" } },
+      { "id": "INC-31", "kind": "incident", "title": "INC-31 Catalog search returns stale prices", "url": "https://example.atlassian.net/browse/INC-31", "severity": "high", "status": "Investigating", "updated": "2026-11-06T01:10:00Z", "target": { "key": "shop-orrery:service:catalog-api" } },
+      { "id": "OPS-398", "kind": "issue", "title": "OPS-398 Rotate the Orders DB admin password", "url": "https://example.atlassian.net/browse/OPS-398", "severity": "low", "status": "To Do", "updated": "2026-11-02T10:00:00Z", "target": { "key": "shop-orrery:database:orders-db" } }
+    ]
+  },
+  {
+    "source": "shop-github",
+    "observed": "2026-10-20T09:00:00Z",
+    "entities": [],
+    "relations": [],
+    "items": [
+      { "id": "acme/shop-web#91", "kind": "pr", "title": "#91 New checkout summary", "url": "https://github.com/acme/shop-web/pull/91", "status": "open", "updated": "2026-10-19T15:00:00Z", "target": { "fact": "repository", "value": "acme/shop-web" } },
+      { "id": "acme/shop-web#88", "kind": "pr", "title": "#88 Spike: edge caching", "url": "https://github.com/acme/shop-web/pull/88", "status": "draft", "updated": "2026-10-12T11:00:00Z", "target": { "fact": "repository", "value": "acme/shop-web" } },
+      { "id": "acme/order-worker#12", "kind": "issue", "title": "#12 Poison messages retry forever", "url": "https://github.com/acme/order-worker/issues/12", "severity": "medium", "status": "open", "updated": "2026-10-18T08:00:00Z", "target": { "fact": "repository", "value": "acme/order-worker" } }
+    ]
+  }
+]
