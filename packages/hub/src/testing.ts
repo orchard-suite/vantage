@@ -1,6 +1,7 @@
 /** Test fixtures: an app context over PGlite and an in-memory blob store. */
 import { trace } from '@opentelemetry/api';
 import { connectPglite } from './db/pglite.ts';
+import { scoped } from './db/test-scope.ts';
 import { migrate } from './db/migrate.ts';
 import { memoryBlobStore } from './blob/blob.ts';
 import { loadConfig, type Config } from './config.ts';
@@ -74,7 +75,7 @@ export interface TestOptions {
 
 export async function testContext(opts: TestOptions = {}): Promise<AppContext> {
   const config: Config = loadConfig({ ...TEST_ENV, ...(opts.env ?? {}) });
-  const db = connectPglite();
+  const db = scoped(connectPglite());
   await migrate(db, silentLogger);
   const fetchImpl: typeof fetch = opts.fetch ?? noNetwork();
   const render = createRenderPool({ threads: config.RENDER_THREADS, timeoutMs: config.RENDER_TIMEOUT_SECONDS * 1000, maxQueue: config.RENDER_QUEUE, log: silentLogger });
