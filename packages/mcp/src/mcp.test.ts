@@ -29,7 +29,7 @@ describe('mcp', () => {
     expect(pdfContent[0]!.resource!.mimeType).toBe('application/pdf');
     expect(Buffer.from(pdfContent[0]!.resource!.blob, 'base64').subarray(0, 4).toString()).toBe('%PDF');
     const drawio = await client.callTool({ name: 'vantage_render', arguments: { file: shop, view: 'context', format: 'drawio' } });
-    expect((drawio.content as { text: string }[])[0]!.text).toContain('<mxfile');
+    expect((drawio.content as { resource: { text: string } }[])[0]!.resource.text).toContain('<mxfile');
     const out = join(import.meta.dir, '..', '..', '..', 'out', 'mcp-test.vsdx');
     const exported = await client.callTool({ name: 'vantage_export', arguments: { file: shop, out, format: 'vsdx', views: ['context', 'data'] } });
     expect((exported.content as { text: string }[])[0]!.text).toContain('2 views');

@@ -13,7 +13,7 @@ import { formatReport, importFile, searchIcons, type TitleBlock, type Validation
 import { DOCUMENT_ADDRESS, OUTLINE, READ } from './verbs.ts';
 import { guideOutline, guidePart, schemaOutline, schemaPart } from './guide-text.ts';
 import { inlineEngine, type LocalEngine } from './engine.ts';
-import { drawnContent, type DocumentArgs, type Drawn, type DrawOutcome, type ExploreArgs, type ViewArgs } from './draw.ts';
+import { drawnContent, type Content, type DocumentArgs, type Drawn, type DrawOutcome, type ExploreArgs, type ViewArgs } from './draw.ts';
 
 export interface LocalToolOptions {
   /** Allow `file` and `out` arguments that touch the local filesystem. */
@@ -24,7 +24,7 @@ export interface LocalToolOptions {
   readonly saved?: SavedDocuments;
 }
 
-type ToolAnswer = { content: ({ type: 'text'; text: string } | { type: 'image'; data: string; mimeType: string } | { type: 'resource'; resource: { uri: string; mimeType: string; blob: string } })[]; isError?: boolean };
+type ToolAnswer = { content: Content[]; isError?: boolean };
 
 /** A saved document drawn, or the hub's refusal as it answered it. */
 export type SavedDrawing = { readonly drawn: Drawn } | { readonly refused: ToolAnswer };

@@ -94,14 +94,17 @@ export function drawExplore(model: Model, res: Resources, a: ExploreArgs, diagno
 /** Whether a format's file is text an agent can read in the answer. */
 export const isText = (extension: string): boolean => extension === 'svg' || extension === 'drawio';
 
-type Content = { type: 'text'; text: string } | { type: 'image'; data: string; mimeType: string } | { type: 'resource'; resource: { uri: string; mimeType: string; blob: string } };
+/** What a tool answers: text for the model, a picture, or a file as a resource. */
+export type Content = { type: 'text'; text: string } | { type: 'image'; data: string; mimeType: string } | { type: 'resource'; resource: { uri: string; mimeType: string; blob: string } | { uri: string; mimeType: string; text: string } };
 
 /** A drawn file as a tool answers it: the file first, then its notes. A PNG is a picture, svg and drawio are text, the rest a file. */
 export function drawnContent(d: Drawn): Content[] {
   const notes: Content = { type: 'text', text: d.notes };
   if (d.extension === 'png') return [{ type: 'image', data: Buffer.from(d.bytes).toString('base64'), mimeType: d.contentType }, notes];
-  if (isText(d.extension)) return [{ type: 'text', text: new TextDecoder().decode(d.bytes) }, notes];
-  return [{ type: 'resource', resource: { uri: `vantage://${d.name}.${d.extension}`, mimeType: d.contentType, blob: Buffer.from(d.bytes).toString('base64') } }, notes];
+  // A drawn file is a resource, never answer text: the size limit on answers (VAN-0002) bounds what the model is told, not the file it asked for.
+  const uri = `vantage://${d.name}.${d.extension}`;
+  if (isText(d.extension)) return [{ type: 'resource', resource: { uri, mimeType: d.contentType, text: new TextDecoder().decode(d.bytes) } }, notes];
+  return [{ type: 'resource', resource: { uri, mimeType: d.contentType, blob: Buffer.from(d.bytes).toString('base64') } }, notes];
 }
 
 /** The drawn file back out of a tool's answer: the inverse of `drawnContent`, for a door that writes it to a path. */
@@ -111,6 +114,7 @@ export function drawnFrom(content: CallToolResult['content'], extension: string)
   const drawn = (bytes: Uint8Array, contentType: string): Drawn => ({ bytes, contentType, extension, notes, name: 'view' });
   if (file?.type === 'image') return drawn(Buffer.from(file.data, 'base64'), file.mimeType);
   if (file?.type === 'resource' && 'blob' in file.resource) return drawn(Buffer.from(file.resource.blob, 'base64'), file.resource.mimeType ?? 'application/octet-stream');
+  if (file?.type === 'resource' && 'text' in file.resource && isText(extension)) return drawn(enc.encode(file.resource.text), file.resource.mimeType ?? TEXT_TYPES[extension]!);
   if (file?.type === 'text' && isText(extension)) return drawn(enc.encode(file.text), TEXT_TYPES[extension]!);
   return undefined;
 }
