@@ -62,9 +62,10 @@ describe('decision records', () => {
     expect(dec((await patch({ decision: 'Only the Shop API writes orders, and it owns the schema.', updatedOn: '2026-11-10' })).body).updatedOn).toBe('2026-11-10');
     const fixed = dec((await patch({ title: 'Orders go through one API only', minor: true })).body);
     expect(fixed.updatedOn).toBe('2026-11-10');
+    expect(dec((await patch({ updatedOn: '2026-11-08', minor: true })).body).updatedOn).toBe('2026-11-08');
     expect((await patch({ status: 'superseded' })).status).toBe(400);
     const history = (await t.json('/api/v1/decisions/SHOP-2001/history', { headers: me.headers })).body['revisions'] as { message: string }[];
-    expect(history.map((h) => h.message)).toEqual(['fixed wording', 'refined', 'created']);
+    expect(history.map((h) => h.message)).toEqual(['fixed wording', 'fixed wording', 'refined', 'created']);
   });
 
   test('the OpenAPI document lists the refine fields flat, as the hub reads them', async () => {
