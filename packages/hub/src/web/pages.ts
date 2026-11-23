@@ -360,7 +360,7 @@ export function pageRoutes(ctx: AppContext, apiReference: readonly RouteDoc[]): 
     if (!(data['views'] as unknown[]).length) throw notFound('view');
     const theme = c.req.query('theme');
     const html = embedHtml({ ...data, ...(theme === 'dark' || theme === 'light' ? { theme } : {}) }, c.get('nonce'));
-    return c.html(html, 200, { 'content-security-policy': csp(c.get('nonce'), { embed: true }) });
+    return c.html(html, 200, { 'content-security-policy': csp(c.get('nonce'), { embedIn: ctx.config.EMBED_ORIGINS }) });
   });
 
   app.get('/g/:token', async (c) => {

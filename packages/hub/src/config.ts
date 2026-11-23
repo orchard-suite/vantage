@@ -123,7 +123,7 @@ export const ConfigSchema = z
     /** The Grafana Faro collector readers' browser telemetry is relayed to; with FARO_API_KEY. Without both, batches are accepted and dropped. */
     FARO_URL: z.url().optional(),
     FARO_API_KEY: z.string().min(1).optional(),
-    /** Origins (comma separated) that published HTML copies may fetch the live bundle from with credentials; empty allows none. */
+    /** The organization's allowed origins (comma separated): the sites that may frame an embed, and that published HTML copies may fetch the live bundle from with credentials; empty allows none but the hub. */
     EMBED_ORIGINS: list.transform((v) => v.map((o) => o.replace(/\/$/, ''))),
     /** The model API the organization pays for, ending in its version (https://gateway.example/v1). Set, authors may revise a document from its open comments. */
     AI_BASE_URL: z.url().transform((u) => u.replace(/\/$/, '')).optional(),

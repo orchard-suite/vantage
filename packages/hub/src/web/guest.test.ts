@@ -3,8 +3,8 @@ import { testApp, SAMPLE_YAML, withReader } from '../testing.ts';
 import { createWorker } from '../worker/loop.ts';
 import { GUEST_LIMIT } from './pages.ts';
 
-async function seeded() {
-  const t = await testApp();
+async function seeded(env?: Record<string, string>) {
+  const t = await testApp(env ? { env } : {});
   const me = await t.bearer('author');
   const ws = ((await t.json('/api/v1/workspaces', { headers: me.headers })).body['workspaces'] as { slug: string }[])[0]!;
   const created = await t.json(`/api/v1/workspaces/${ws.slug}/documents`, { method: 'POST', headers: me.headers, body: JSON.stringify({ yaml: SAMPLE_YAML }) });
@@ -59,15 +59,23 @@ describe('viewer, guest links, embed, live', () => {
     await t.ctx.db.close();
   });
 
-  test('embed serves one read-only view with a frameable policy', async () => {
-    const { t, me, ws } = await seeded();
+  test('embed serves one read-only view, frameable only by the allowed origins', async () => {
+    const { t, me, ws } = await seeded({ EMBED_ORIGINS: 'https://docs.example.test/' });
     const res = await t.app.request(`/embed/${ws.slug}/sample/context`, { headers: me.headers });
     expect(res.status).toBe(200);
     const html = await res.text();
     expect(html).toContain('window.__VANTAGE__=');
     expect(html).not.toContain('"live":true');
-    expect(res.headers.get('content-security-policy')).toContain('frame-ancestors *');
+    expect(res.headers.get('content-security-policy')).toMatch(/frame-ancestors 'self' https:\/\/docs\.example\.test(;|$)/);
     expect((await t.app.request(`/embed/${ws.slug}/sample/nope`, { headers: me.headers })).status).toBe(404);
+    await t.ctx.db.close();
+  });
+
+  test('an embed with no allowed origins is framed by the hub alone', async () => {
+    const { t, me, ws } = await seeded();
+    const res = await t.app.request(`/embed/${ws.slug}/sample/context`, { headers: me.headers });
+    expect(res.status).toBe(200);
+    expect(res.headers.get('content-security-policy')).toMatch(/frame-ancestors 'self'(;|$)/);
     await t.ctx.db.close();
   });
 

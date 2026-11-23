@@ -421,7 +421,9 @@ viewer fetches the current bundle and swaps it in, updating the stamp.
 Otherwise it shows the embedded copy and its publish date.
 
 Embeds: `GET /embed/:workspace/:set/:view` serves the viewer in read-only
-mode for iframes, with the org's allowed origins.
+mode for iframes, with the org's allowed origins: its `frame-ancestors` is
+the hub and the origins `EMBED_ORIGINS` lists, so no other site can frame
+it. With none listed, only the hub frames it.
 
 Voice walkthroughs are hub only: the standalone and self-refreshing HTML,
 embeds, and exports carry no audio and no play control.
@@ -1010,7 +1012,8 @@ VAN-0001 sets. The code is `packages/hub/src/tracking/`.
 - A publication run that fails is a recorded run and a notification, not a
   retry; the schedule or a person queues the next one.
   `REVIEW_CRON` sets the nightly review minute; `EMBED_ORIGINS` lists the
-  origins a published HTML copy may fetch the live bundle from.
+  organization's allowed origins: the sites that may frame an embed, and
+  that a published HTML copy may fetch the live bundle from.
 
 ### Scalability
 

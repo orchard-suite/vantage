@@ -59,13 +59,17 @@ export function securityHeaders(): MiddlewareHandler<HubEnv> {
     // A page names the viewer script by the hub's version, so a browser must ask for the page again to get a new release.
     if (c.res.headers.get('content-type')?.startsWith('text/html') && !c.res.headers.has('cache-control')) c.res.headers.set('cache-control', 'no-cache');
     if (!c.res.headers.has('content-security-policy')) {
-      c.res.headers.set('content-security-policy', csp(c.get('nonce'), { embed: false }));
+      c.res.headers.set('content-security-policy', csp(c.get('nonce')));
     }
   };
 }
 
-/** The policy the viewer runs under: self plus a nonce for the inline boot script; fonts and images may be data URIs. */
-export function csp(nonce: string, opts: { embed: boolean }): string {
+/**
+ * The policy the viewer runs under: self plus a nonce for the inline boot
+ * script; fonts and images may be data URIs. A page frames nowhere, and an
+ * embed frames in the hub and the origins it is given.
+ */
+export function csp(nonce: string, opts: { embedIn?: readonly string[] } = {}): string {
   return [
     "default-src 'self'",
     `script-src 'self' 'nonce-${nonce}'`,
@@ -77,7 +81,7 @@ export function csp(nonce: string, opts: { embed: boolean }): string {
     "connect-src 'self'",
     "object-src 'none'",
     "base-uri 'none'",
-    `frame-ancestors ${opts.embed ? '*' : "'none'"}`,
+    `frame-ancestors ${opts.embedIn ? ["'self'", ...opts.embedIn].join(' ') : "'none'"}`,
   ].join('; ');
 }
 
