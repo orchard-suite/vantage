@@ -5,9 +5,9 @@
  */
 import type { AppContext } from '../context.ts';
 import type { Principal } from '../auth/principal.ts';
-import { HttpError } from '../http.ts';
 import { BUDGET, guideOutline, schemaOutline } from '@vantage/mcp';
-import { parseAddress, partOf } from './address.ts';
+import { parseAddress, partOf, type Address } from './address.ts';
+import { taught, topicOf } from './teach.ts';
 import { partOfThing } from './parts.ts';
 import { readThing } from './things.ts';
 import { itemPart, placeAddress } from './items.ts';
@@ -27,8 +27,10 @@ export async function read(ctx: AppContext, p: Principal, addresses: readonly st
       later.push(raw);
       continue;
     }
+    let placed: Address | undefined;
     try {
       const a = await placeAddress(ctx, p, parseAddress(raw));
+      placed = a;
       const part = partOf(a);
       const special = a.kind === 'item' && part !== undefined ? await itemPart(ctx, p, a.key, part) : undefined;
       if (special !== undefined) {
@@ -68,7 +70,7 @@ export async function read(ctx: AppContext, p: Principal, addresses: readonly st
       }
     } catch (err) {
       failed += 1;
-      out.push(`=== ${raw}: ${err instanceof HttpError ? err.message : (err as Error).message} ===`);
+      out.push(`=== ${raw}: ${taught(err, topicOf(placed))} ===`);
     }
   }
   if (later.length) out.push(`--- not read, the answer was full. more: vantage_read {"addresses":${JSON.stringify(later)}} ---`);

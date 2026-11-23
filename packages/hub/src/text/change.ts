@@ -22,6 +22,7 @@ import { changedFields, createInput, parseRecordText, recordText } from './recor
 import { documentAt, pagePaths, recordAt, workspaceAt, type DocumentAt } from './things.ts';
 import { pathLines } from '../documents/edit.ts';
 import { commitItem, itemThing, placeAddress } from './items.ts';
+import { taught, topicOf, type Topic } from './teach.ts';
 
 export interface ChangeResult {
   /** The thing as the hub names it now; a new record's is the citation it was given. */
@@ -63,7 +64,6 @@ interface RecordWork {
   base: string | undefined;
 }
 
-const reason = (err: unknown): string => (err instanceof HttpError ? err.message : (err as Error).message);
 const link = (ctx: AppContext, ws: string, doc: string): string => `${ctx.config.PUBLIC_URL}/w/${encodeURIComponent(ws)}/${encodeURIComponent(doc)}`;
 
 async function commitDocument(ctx: AppContext, p: Principal, w: DocumentWork, assets: Readonly<Record<string, Uint8Array>> | undefined, opts: ChangeOptions): Promise<ChangeResult> {
@@ -116,11 +116,11 @@ async function commitRecord(ctx: AppContext, p: Principal, w: RecordWork, opts: 
   return { address: d.ref, status: 'saved', version: (await recordAt(ctx, p, d.ref)).version, link: recordLink(ctx, d), message: `saved ${d.ref} (${Object.keys(patch).join(', ')}); last updated ${d.updatedOn}` };
 }
 
-async function settle(run: () => Promise<ChangeResult>, address: string): Promise<ChangeResult> {
+async function settle(run: () => Promise<ChangeResult>, address: string, topic: Topic): Promise<ChangeResult> {
   try {
     return await run();
   } catch (err) {
-    return { address, status: 'refused', message: `${address} was not saved: ${reason(err)}` };
+    return { address, status: 'refused', message: `${address} was not saved: ${taught(err, topic)}` };
   }
 }
 
@@ -159,15 +159,15 @@ export async function write(ctx: AppContext, p: Principal, writes: readonly Writ
       else if (a.kind === 'registry') records.push({ target: a.prefix, create: true, text: x.text, base: undefined });
       else throw badRequest(`${x.address} is not a thing a write can make`);
     } catch (err) {
-      refused.push({ address: x.address, status: 'refused', message: `${x.address} was not saved: ${reason(err)}` });
+      refused.push({ address: x.address, status: 'refused', message: `${x.address} was not saved: ${taught(err, 'working-in-a-hub')}` });
     }
   }
   const decoded = decodeAssets(assets);
   if (decoded && docs.size !== 1) refused.push({ address: 'assets', status: 'refused', message: 'assets go with the one document the call writes; this call writes ' + docs.size });
   const out: ChangeResult[] = [...refused];
-  for (const w of docs.values()) out.push(await settle(() => commitDocument(ctx, p, w, docs.size === 1 ? decoded : undefined, opts), w.slug ? `${w.workspace}/${w.slug}` : w.workspace));
-  for (const r of records) out.push(await settle(() => commitRecord(ctx, p, r, opts), r.target));
-  for (const i of items) out.push(await settle(() => commitItem(ctx, p, i.target, i.text, i.base), i.address));
+  for (const w of docs.values()) out.push(await settle(() => commitDocument(ctx, p, w, docs.size === 1 ? decoded : undefined, opts), w.slug ? `${w.workspace}/${w.slug}` : w.workspace, 'working-in-a-hub'));
+  for (const r of records) out.push(await settle(() => commitRecord(ctx, p, r, opts), r.target, 'decision-records-in-a-hub'));
+  for (const i of items) out.push(await settle(() => commitItem(ctx, p, i.target, i.text, i.base), i.address, 'working-with-items'));
   return out;
 }
 
@@ -248,8 +248,10 @@ export async function patch(ctx: AppContext, p: Principal, edits: readonly Edit[
   const stray: ChangeResult[] = [];
   for (const [i, e] of edits.entries()) {
     let o: Open | undefined;
+    let placed: Address | undefined;
     try {
       const a = await placeAddress(ctx, p, parseAddress(e.address));
+      placed = a;
       o = await thing(a);
       if (o.failed) continue;
       const part = partOf(a);
@@ -278,7 +280,7 @@ export async function patch(ctx: AppContext, p: Principal, edits: readonly Edit[
         d.yamlTouched = true;
       }
     } catch (err) {
-      const why = `edit ${i + 1} (${e.address}): ${reason(err)}`;
+      const why = `edit ${i + 1} (${e.address}): ${taught(err, topicOf(placed))}`;
       if (o) o.failed = why;
       else stray.push({ address: e.address, status: 'refused', message: why });
     }
@@ -292,17 +294,17 @@ export async function patch(ctx: AppContext, p: Principal, edits: readonly Edit[
     }
     if (o.kind === 'record') {
       const r = o.record!;
-      out.push(await settle(() => commitRecord(ctx, p, { target: o.key, create: false, text: r.text, base: undefined }, opts), o.key));
+      out.push(await settle(() => commitRecord(ctx, p, { target: o.key, create: false, text: r.text, base: undefined }, opts), o.key, 'decision-records-in-a-hub'));
       continue;
     }
     if (o.kind === 'item') {
       const r = o.record!;
-      out.push(await settle(() => commitItem(ctx, p, { create: false, key: o.key }, r.text, undefined), o.key));
+      out.push(await settle(() => commitItem(ctx, p, { create: false, key: o.key }, r.text, undefined), o.key, 'working-with-items'));
       continue;
     }
     const d = o.doc!;
     const work: DocumentWork = { key: o.key, workspace: d.at.ws.slug, slug: d.at.doc.slug, yaml: d.yamlTouched ? d.yaml : undefined, pages: new Map([...d.pages].filter(([path]) => d.touched.has(path))), base: d.at.head!.id };
-    out.push(await settle(() => commitDocument(ctx, p, work, undefined, opts), o.key));
+    out.push(await settle(() => commitDocument(ctx, p, work, undefined, opts), o.key, 'working-in-a-hub'));
   }
   return out;
 }

@@ -1139,7 +1139,8 @@ Every write is checked first. A version with errors (text that does not
 parse, a `type` that is neither built in nor declared under `types:`, a
 name that points at nothing) saves nothing; the answer lists each error as
 `code at path, line N: message (guide#topic)`. Read that topic, fix them
-all, and save again. Warnings save.
+all, and save again. Warnings save. Every other refusal ends the same
+way, with the topic that explains its rule.
 
 `vantage_write` takes whole texts. A document and its pages in one call
 are one version. Write to `~` for a new diagram in the person's own
