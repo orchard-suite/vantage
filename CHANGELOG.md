@@ -2,6 +2,12 @@
 
 All notable changes to this project will be documented in this file.
 
+## [4.0.1](https://github.com/orchard-suite/vantage/compare/v4.0.0...v4.0.1) (2026-11-23)
+
+### Bug Fixes
+
+* **vantage:** sign git connectors in as an app ([6ce0b5d](https://github.com/orchard-suite/vantage/commit/6ce0b5d6c822f64e09ea6b98add1272998047fe5))
+
 ## [4.0.0](https://github.com/orchard-suite/vantage/compare/v3.3.1...v4.0.0) (2026-11-23)
 
 ### ⚠ BREAKING CHANGES
