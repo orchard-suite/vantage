@@ -2,9 +2,9 @@
 import type { Extra, TextBlock } from '@vantage/layout';
 import { familyOf, type Theme } from './theme.ts';
 import { esc, EDGE_STYLE } from './svg.ts';
+import { RULES } from '@vantage/layout/core';
 
-/** Side of a story badge's hit square, in canvas pixels: 24 screen pixels at the viewer's readable opening zoom of one half. */
-const BADGE_HIT = 48;
+const BADGE_HIT = RULES.badgeHit;
 
 const r2 = (n: number): string => String(Math.round(n * 100) / 100);
 

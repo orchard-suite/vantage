@@ -5,7 +5,7 @@
  */
 import type { Model, ResolvedPageView, ResolvedView } from '@vantage/model';
 import type { Extra, Layout, LayoutBox, LayoutEdge } from './types.ts';
-import { DEFAULT_STYLE, type LayoutStyle } from './style.ts';
+import { DEFAULT_STYLE, type LayoutStyle, RULES } from './style.ts';
 import { wrapText } from './text/measure.ts';
 import { shiftLayout } from './shift.ts';
 import { measureQuality } from './metrics.ts';
@@ -19,8 +19,7 @@ interface PanelSized {
   readonly span: number;
 }
 
-/** Widest a page may be and still read on a laptop screen; wider, it drops a column. */
-export const PAGE_MAX_WIDTH = 2400;
+export const PAGE_MAX_WIDTH = RULES.pageMaxWidth;
 
 export function layoutPageView(model: Model, view: ResolvedPageView, layoutInner: (v: ResolvedView) => Layout, style: LayoutStyle = DEFAULT_STYLE): Layout {
   const pad = style.containerPad;

@@ -8,7 +8,7 @@
 import type { Point, Rect } from './geometry.ts';
 import { rectsOverlap, segmentCrossesRect } from './geometry.ts';
 import { textWidth } from './text/measure.ts';
-import { chipWidth } from './style.ts';
+import { chipWidth, RULES } from './style.ts';
 import type { Extra, LayoutBox, LayoutEdge } from './types.ts';
 
 export interface Legibility {
@@ -42,17 +42,16 @@ export interface Legibility {
   readonly detours: number;
 }
 
-export const LABEL_REACH = 12;
-/** Another edge nearer a label than this makes it ambiguous, however close its own line is. */
-export const LABEL_CLEAR = 14;
-export const HUG = 16;
-export const JOG = 14;
-export const CROWD = 12;
+export const LABEL_REACH = RULES.legibility.labelReach;
+export const LABEL_CLEAR = RULES.legibility.labelClear;
+export const HUG = RULES.legibility.hug;
+export const JOG = RULES.legibility.jog;
+export const CROWD = RULES.legibility.crowd;
 export const DETOUR = 2.6;
-export const SHARED = 20;
-export const BORDER = 8;
-export const FRAME_NEAR = 28;
-export const FRAME_RUN = 160;
+export const SHARED = RULES.legibility.shared;
+export const BORDER = RULES.legibility.border;
+export const FRAME_NEAR = RULES.legibility.frameNear;
+export const FRAME_RUN = RULES.legibility.frameRun;
 
 function distToSegment(p: Point, a: Point, b: Point): number {
   const dx = b.x - a.x, dy = b.y - a.y;

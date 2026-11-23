@@ -28,7 +28,7 @@ export const ADMIN_CSS = `
 .disk>i+i{box-shadow:inset 1px 0 0 var(--panel)}
 .adm-disk .disk{height:12px}
 .disk-key{display:flex;flex-wrap:wrap;gap:4px 18px;margin:8px 0 0;font-size:var(--fs-s);color:var(--muted)}
-.disk-key i{display:inline-block;width:9px;height:9px;border-radius:2px;margin-right:6px;vertical-align:-1px}
+.disk-key i{display:inline-block;width:9px;height:9px;border-radius:var(--r-2xs);margin-right:6px;vertical-align:-1px}
 .disk-key b{font:500 var(--fs-s) var(--mono);color:var(--ink2)}
 .attn{display:flex;flex-wrap:wrap;gap:8px;margin:0}
 .attn a.pill{text-decoration:none;font-size:var(--fs-s);padding:3px 10px}
@@ -43,7 +43,7 @@ export const ADMIN_CSS = `
 .tone-doc{--tone:var(--path-violet)}
 .a-dot{display:inline-block;flex:none;width:8px;height:8px;border-radius:50%;background:var(--tone)}
 .a-map{position:relative;width:100%;border-radius:var(--r-l);background:var(--well);overflow:hidden}
-.a-tile{position:absolute;display:flex;flex-direction:column;align-items:flex-start;gap:2px;padding:10px 12px;border:2px solid var(--bg);border-radius:10px;overflow:hidden;color:var(--ink);text-decoration:none;font-size:var(--fs-s);line-height:1.35}
+.a-tile{position:absolute;display:flex;flex-direction:column;align-items:flex-start;gap:2px;padding:10px 12px;border:2px solid var(--bg);border-radius:var(--r-ml);overflow:hidden;color:var(--ink);text-decoration:none;font-size:var(--fs-s);line-height:1.35}
 .a-tile.team{background:color-mix(in srgb,var(--path-blue) 20%,var(--panel))}
 .a-tile.personal{background:color-mix(in srgb,var(--path-slate) 18%,var(--panel))}
 .a-tile.off{background:repeating-linear-gradient(135deg,color-mix(in srgb,var(--bad-bg) 70%,var(--panel)) 0 3px,var(--panel) 3px 12px)}

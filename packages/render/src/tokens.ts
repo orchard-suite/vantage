@@ -151,7 +151,24 @@ export const BRAND = {
   coral: '#f0645f',
   amber: '#fcae3d',
   blue: '#4a7ef0',
+  /** The full color mark's gradients (the Sunrise palette): its two nodes, their links, the blue vantage point, the shine, and the drop under them. The sign-in art and the empty states draw the same three shapes. */
+  mark: {
+    coral: ['#ff8a7a', '#e0435a'],
+    amber: ['#ffcb5c', '#f0901e'],
+    coralLink: ['#e8505f', '#ff8c80'],
+    amberLink: ['#f5a12e', '#ffd07a'],
+    blue: ['#9cc0ff', '#4a7ef0', '#2448b8'],
+    shine: '#ffffff',
+    drop: '#0b1a3a',
+  },
 } as const;
+
+/** The motion curve every eased transition uses, for code that sets one from script. */
+export const EASE = 'cubic-bezier(.2,.7,.2,1)';
+/** How long the camera glides to a new frame, in milliseconds. */
+export const GLIDE_MS = 450;
+
+const MARK = BRAND.mark;
 
 /** The plus mark the canvas draws every 48px, as a tile in the given grid color. */
 export function plusTile(color: string): string {
@@ -167,11 +184,20 @@ const STATIC = [
   '--fs-xs:11px', '--fs-s:12px', '--fs-m:13px', '--fs-l:14px', '--fs-xl:16px', '--fs-2xl:20px', '--fs-3xl:26px',
   '--caps:600 10.5px/1.2 var(--mono)', '--caps-track:.08em',
   '--tight:-.012em',
-  '--r-xs:4px', '--r-s:6px', '--r-m:8px', '--r-node:10px', '--r-l:12px', '--r-xl:16px', '--r-2xl:24px', '--r-pill:999px',
+  '--r-2xs:2px', '--r-xs:4px', '--r-s:6px', '--r-m:8px', '--r-node:10px', '--r-ml:10px', '--r-l:12px', '--r-xl:16px', '--r-2xl:24px', '--r-pill:999px',
   '--control-h:32px', '--grid-pitch:48px',
   `--logo-coral:${BRAND.coral}`, `--logo-amber:${BRAND.amber}`, `--logo-blue:${BRAND.blue}`,
-  '--ease:cubic-bezier(.2,.7,.2,1)', '--ease-in:cubic-bezier(.4,0,.6,1)',
-  '--d-1:120ms', '--d-2:180ms', '--d-3:260ms',
+  // The mark's three shapes drawn large: the sign-in art and the empty states.
+  `--art-coral:linear-gradient(135deg,${MARK.coral[0]},${MARK.coral[1]})`, `--art-amber:linear-gradient(225deg,${MARK.amber[0]},${MARK.amber[1]})`, `--art-blue:radial-gradient(circle at 34% 28%,${MARK.blue[0]},${MARK.blue[1]} 55%,${MARK.blue[2]})`,
+  '--art-shadow:0 18px 40px rgba(0,0,0,.28)',
+  '--art-shadow-coral:0 12px 30px rgba(224,67,90,.25)', '--art-shadow-amber:0 12px 30px rgba(240,144,30,.25)', '--art-shadow-blue:0 12px 30px rgba(43,79,156,.28)',
+  '--blueprint-dot:rgba(244,243,240,.14)',
+  // The raised edge on a primary button, the line between its split halves, and a button pressed on a toast.
+  '--bevel:inset 0 1px 0 rgba(255,255,255,.16),0 1px 2px rgba(28,28,26,.14)', '--on-accent-line:rgba(255,255,255,.22)', '--on-ink-press:rgba(255,255,255,.12)',
+  '--halo:0 0 0 3px var(--accent-soft)', '--halo-bad:0 0 0 3px var(--bad-bg)',
+  '--star:#e8a317',
+  `--ease:${EASE}`, '--ease-in:cubic-bezier(.4,0,.6,1)',
+  '--d-1:120ms', '--d-2:180ms', '--d-3:260ms', `--d-glide:${GLIDE_MS}ms`, '--d-flash:1.6s',
   // Nothing repaints forever: a spinner turns a set number of times and rests as an open ring, a skeleton shines a few passes and rests, the sign-in art settles once.
   '--d-spin:.7s', '--spin-turns:8', '--d-shine:1.4s', '--shine-passes:3', '--d-art:900ms',
   '--ring:0 0 0 2px var(--panel),0 0 0 4px var(--accent)',

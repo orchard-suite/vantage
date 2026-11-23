@@ -6,7 +6,7 @@
  */
 import type { Model, ResolvedSequenceView, SequenceStep } from '@vantage/model';
 import { textWidth, wrapText } from './text/measure.ts';
-import { DEFAULT_STYLE, type LayoutStyle } from './style.ts';
+import { DEFAULT_STYLE, type LayoutStyle, RULES } from './style.ts';
 import type { Extra, Layout, LayoutBox, TextBlock } from './types.ts';
 import { measureQuality } from './metrics.ts';
 import { syntheticNode } from './synthetic.ts';
@@ -31,9 +31,9 @@ interface Row {
   over?: string[];
 }
 
-const ROW = 34;
-const HEADER_H = 48;
-const FRAG_HEAD = 26;
+const ROW = RULES.sequence.row;
+const HEADER_H = RULES.sequence.header;
+const FRAG_HEAD = RULES.sequence.fragmentHead;
 
 export function layoutSequenceView(model: Model, view: ResolvedSequenceView, style: LayoutStyle = DEFAULT_STYLE): Layout {
   const order: string[] = [...(view.participants ?? [])];

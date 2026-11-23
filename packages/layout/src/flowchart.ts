@@ -31,11 +31,12 @@ const SHAPE_OF: Record<NonNullable<FlowStep['shape']>, LayoutBox['shape']> = {
 
 function sizeStep(s: FlowStep, style: LayoutStyle): { w: number; h: number; text: ReturnType<typeof wrapText> } {
   const shape = s.shape ?? 'process';
-  const maxW = shape === 'decision' ? 120 : 160;
-  const text = wrapText(s.text, style.nameSize, 'medium', maxW, 3);
-  const padX = shape === 'decision' ? 34 : shape === 'start' || shape === 'end' ? 22 : 16;
-  const padY = shape === 'decision' ? 18 : 12;
-  return { w: Math.max(shape === 'decision' ? 120 : 110, Math.ceil(text.width + padX * 2)), h: Math.ceil(text.height + padY * 2), text };
+  const f = style.flowStep;
+  const decision = shape === 'decision';
+  const text = wrapText(s.text, style.nameSize, 'medium', decision ? f.decisionMaxText : f.maxText, 3);
+  const padX = decision ? f.decisionPadX : shape === 'start' || shape === 'end' ? f.pillPadX : f.padX;
+  const padY = decision ? f.decisionPadY : f.padY;
+  return { w: Math.max(decision ? f.decisionMinWidth : f.minWidth, Math.ceil(text.width + padX * 2)), h: Math.ceil(text.height + padY * 2), text };
 }
 
 export function layoutFlowView(model: Model, view: ResolvedFlowView, style: LayoutStyle = DEFAULT_STYLE): Layout {

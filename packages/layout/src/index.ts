@@ -1,6 +1,6 @@
 export * from './types.ts';
 export * from './geometry.ts';
-export { chipWidth, DEFAULT_STYLE, type LayoutStyle } from './style.ts';
+export { chipWidth, DEFAULT_STYLE, RULES, type LayoutStyle } from './style.ts';
 export { textWidth, wrapText, type WrappedText, type FontWeight } from './text/measure.ts';
 export { layoutRelationView } from './relation.ts';
 export { layoutSequenceView } from './sequence.ts';

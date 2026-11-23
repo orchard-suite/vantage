@@ -6,16 +6,16 @@ export const NEW_CSS = `
 .tile .words{display:flex;flex-direction:column;gap:2px}
 .tile .words b{font-size:13.5px;font-weight:600}
 .tile .words span{font-size:12px;line-height:17px;color:var(--muted)}
-.art .dash{width:54px;height:34px;border-radius:8px;border:1.5px dashed var(--line2);display:inline-flex;align-items:center;justify-content:center;color:var(--muted);background:var(--raise)}
+.art .dash{width:54px;height:34px;border-radius:var(--r-m);border:1.5px dashed var(--line2);display:inline-flex;align-items:center;justify-content:center;color:var(--muted);background:var(--raise)}
 .art.code{flex-direction:column;align-items:flex-start;justify-content:flex-start;gap:4px;padding:10px 12px;background:var(--sunken);font:500 10.5px/14px var(--mono);color:var(--muted)}
 .art.code .ln{display:block;white-space:nowrap}
 .art.code .k{color:var(--violet-stroke)}.art.code .v{color:var(--ink)}.art.code .t{color:var(--emerald-stroke)}
 .art.code .caret{display:inline-block;width:6px;height:12px;background:var(--accent);vertical-align:-2px;margin-left:2px}
-.art .ext{font:600 10.5px var(--mono);padding:6px 7px;border-radius:6px;border:1px solid var(--line);background:var(--f-fill);color:var(--f-text)}
+.art .ext{font:600 10.5px var(--mono);padding:6px 7px;border-radius:var(--r-s);border:1px solid var(--line);background:var(--f-fill);color:var(--f-text)}
 .art .ext:first-child{transform:rotate(-6deg)}.art .ext:last-child{transform:rotate(6deg)}
-.art .node{width:34px;height:34px;border-radius:9px;display:inline-flex;align-items:center;justify-content:center;font:600 10px var(--font);background:var(--f-fill);border:1.25px solid var(--f-stroke);color:var(--f-text)}
+.art .node{width:34px;height:34px;border-radius:var(--r-m);display:inline-flex;align-items:center;justify-content:center;font:600 10px var(--font);background:var(--f-fill);border:1.25px solid var(--f-stroke);color:var(--f-text)}
 .art .wire{width:30px;border-top:1.25px dashed var(--edge, var(--line2))}
-.art .s{position:absolute;border-radius:8px;border:1.25px solid var(--f-stroke);background:var(--f-fill)}
+.art .s{position:absolute;border-radius:var(--r-m);border:1.25px solid var(--f-stroke);background:var(--f-fill)}
 .examples{display:flex;flex-direction:column;gap:14px}
 .examples .lib-head span{font-size:12.5px;color:var(--muted)}
 .ex-grid{list-style:none;margin:0;padding:0;display:grid;grid-template-columns:repeat(auto-fill,minmax(248px,1fr));gap:16px}
@@ -48,7 +48,7 @@ export const NEW_CSS = `
 .new-canvas .none-here{text-align:center;max-width:280px}
 .new-code{flex:1;min-height:420px;max-height:640px;border:1px solid var(--line);border-radius:var(--r-m);overflow:hidden;display:flex}
 .new-code>.cm-editor{flex:1;min-width:0}
-.new-code:focus-within{border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-soft)}
+.new-code:focus-within{border-color:var(--accent);box-shadow:var(--halo)}
 .new-prev .bar2 .score{font:600 11px var(--mono);padding:3px 7px;border-radius:var(--r-pill);background:var(--sunken);color:var(--muted)}
 .new-prev .bar2 .score:empty{display:none}
 .new-prev .bar2 .score[data-tone=ok]{background:var(--ok-bg);color:var(--ok-ink)}
@@ -75,7 +75,7 @@ export const NEW_CSS = `
 .star-btn{display:inline-flex;align-items:center;justify-content:center;width:28px;height:28px;border-radius:var(--r-pill);border:1px solid var(--line);background:var(--raise);color:var(--faint);cursor:pointer;opacity:0;transition:opacity var(--d-1) var(--ease),color var(--d-1) var(--ease)}
 .doc-card:hover .star-btn,.doc-card:focus-within .star-btn,.star-btn[aria-pressed=true],.lrow-wrap .star-btn{opacity:1}
 .star-btn:hover{color:var(--ink)}
-.star-btn[aria-pressed=true]{color:#e8a317;border-color:color-mix(in srgb,#e8a317 40%,var(--line))}
+.star-btn[aria-pressed=true]{color:var(--star);border-color:color-mix(in srgb,var(--star) 40%,var(--line))}
 .star-btn[aria-pressed=true] svg{fill:currentColor}
 .card-more{position:relative;opacity:0;transition:opacity var(--d-1) var(--ease)}
 .doc-card:hover .card-more,.doc-card:focus-within .card-more,.card-more[open]{opacity:1}

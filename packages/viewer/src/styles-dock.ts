@@ -7,7 +7,7 @@ export const DOCK_STYLES = `
 .v-tab{height:100%;padding:0 10px;border:none;border-radius:0;background:none;color:var(--muted);font-weight:500;cursor:pointer;position:relative;transition:color var(--d-1) var(--ease)}
 .v-tab:hover{color:var(--ink)}
 .v-tab:focus-visible{box-shadow:inset var(--ring)}
-.v-tab::after{content:'';position:absolute;left:10px;right:10px;bottom:-1px;height:2px;border-radius:1px;background:transparent;transition:background-color var(--d-2) var(--ease)}
+.v-tab::after{content:'';position:absolute;left:10px;right:10px;bottom:-1px;height:2px;border-radius:var(--r-2xs);background:transparent;transition:background-color var(--d-2) var(--ease)}
 .v-tab.active{color:var(--ink);font-weight:600}
 .v-tab.active::after{background:var(--accent)}
 .v-dock-body{display:none;overflow:auto;flex:1;padding:16px 16px 20px;min-height:0}
@@ -25,7 +25,7 @@ export const DOCK_STYLES = `
 .v-text::placeholder,.v-input::placeholder{color:var(--faint)}
 .v-text:hover,.v-input:hover,.v-select:hover{border-color:var(--line2)}
 .v-select{width:auto;height:32px;padding:0 8px;background:var(--panel)}
-.v-text:focus,.v-input:focus,.v-select:focus{outline:none;border-color:var(--accent);background:var(--raise);box-shadow:0 0 0 3px var(--accent-soft)}
+.v-text:focus,.v-input:focus,.v-select:focus{outline:none;border-color:var(--accent);background:var(--raise);box-shadow:var(--halo)}
 .v-order{margin:0;padding:0;list-style:none;border:1px solid var(--line);border-radius:var(--r-m);overflow:hidden;background:var(--panel)}
 .v-order li{display:flex;align-items:center;gap:2px;padding:3px 4px 3px 10px;font-size:var(--fs-s)}
 .v-order li+li{border-top:1px solid var(--line)}
@@ -125,7 +125,7 @@ export const DOCK_STYLES = `
 .v-panel.peek{overflow:hidden}
 .v-panel.dragging{transition:none;overflow:hidden;user-select:none}
 .v-panel .grip{display:block;position:sticky;top:0;z-index:1;width:calc(100% + 36px);height:24px;margin:0 -18px 2px;padding:0;border:none;background:var(--raise);cursor:grab;touch-action:none}
-.v-panel .grip::before{content:'';display:block;width:40px;height:4px;margin:10px auto 0;border-radius:2px;background:var(--line2)}
+.v-panel .grip::before{content:'';display:block;width:40px;height:4px;margin:10px auto 0;border-radius:var(--r-2xs);background:var(--line2)}
 .v-panel-head{margin-right:-10px;touch-action:none}
 .v-story,.v-inspecting .v-story{left:8px;right:8px;bottom:calc(8px + env(safe-area-inset-bottom));width:auto}
 .v-story-body{padding:6px 14px 13px 12px}

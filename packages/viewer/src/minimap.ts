@@ -6,6 +6,7 @@
 import type { BundleView } from './bundle.ts';
 import type { PanZoom } from './panzoom.ts';
 import { h } from './dom.ts';
+import { LIGHT } from '../../render/src/tokens.ts';
 
 const W = 200;
 const H = 140;
@@ -53,9 +54,9 @@ export class Minimap {
     this.ox = (W - v.width * this.k) / 2;
     this.oy = (H - v.height * this.k) / 2;
     const css = getComputedStyle(this.el);
-    const line = css.getPropertyValue('--line').trim() || '#ccc';
-    const ink = css.getPropertyValue('--muted').trim() || '#888';
-    const accent = css.getPropertyValue('--accent').trim() || '#36f';
+    const line = css.getPropertyValue('--line').trim() || LIGHT.line;
+    const ink = css.getPropertyValue('--muted').trim() || LIGHT.muted;
+    const accent = css.getPropertyValue('--accent').trim() || LIGHT.accent;
     for (const b of v.boxes) {
       ctx.fillStyle = b.kind === 'container' ? line : ink;
       ctx.globalAlpha = b.kind === 'container' ? 0.45 : 0.9;

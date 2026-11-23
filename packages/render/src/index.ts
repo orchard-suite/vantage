@@ -1,6 +1,6 @@
 export { drawSvg, edgePath, esc, freshnessOf, type RenderOptions } from './svg.ts';
 export { renderSvg } from './render-svg.ts';
-export { THEMES, familyOf, type Theme, type ThemeName, type ColorFamily } from './theme.ts';
+export { PLAIN, THEMES, familyOf, type Theme, type ThemeName, type ColorFamily } from './theme.ts';
 export { FileIconSource, MapIconSource, LayeredIconSource, type IconSource } from './icons/source.ts';
 export { symbolBody } from './icons/symbol.ts';
 export { FileAssetSource, pictureIcon, documentIcons, modelResources, resourceDiagnostics } from './assets.ts';

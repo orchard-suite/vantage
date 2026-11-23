@@ -8,15 +8,12 @@
 import type { Point, Rect } from './geometry.ts';
 import { segmentCrossesRect } from './geometry.ts';
 import { simplify } from './path.ts';
+import { RULES } from './style.ts';
 
-/** How far a run is slid to part it from another. */
-export const PART = 18;
-/** A slid run must keep at least this far from any other line beside it, and from box borders. */
-const CLEAR = 16;
-/** Runs closer than this sideways count as one line. */
-const SIDE = 3;
-/** End to end across a gap shorter than this, two runs read as one stroke. */
-const GAP = 120;
+export const PART = RULES.part;
+const CLEAR = RULES.partClear;
+const SIDE = RULES.sameLine;
+const GAP = RULES.partGap;
 
 export interface SeparateObstacle extends Rect {
   readonly id: string;

@@ -6,6 +6,7 @@
  */
 import type { Point, Rect, TextBlock } from '@vantage/layout';
 import type { NodeShape } from '@vantage/model';
+import { PLAIN } from '@vantage/render';
 import { inches, num, xmlEsc } from './common.ts';
 
 export interface ShapeText {
@@ -75,8 +76,8 @@ export function shape2d(id: number, r: Rect, pageH: number, style: ShapeStyle, t
   const cells = [
     cell('PinX', pinX), cell('PinY', pinY), cell('Width', w), cell('Height', h),
     cell('LocPinX', w / 2, ' F="Width*0.5"'), cell('LocPinY', h / 2, ' F="Height*0.5"'),
-    cell('FillForegnd', style.fill ?? '#ffffff'), cell('FillPattern', style.fill ? 1 : 0),
-    cell('LineColor', style.stroke ?? '#000000'), cell('LinePattern', style.stroke ? style.pattern ?? 1 : 0),
+    cell('FillForegnd', style.fill ?? PLAIN.paper), cell('FillPattern', style.fill ? 1 : 0),
+    cell('LineColor', style.stroke ?? PLAIN.ink), cell('LinePattern', style.stroke ? style.pattern ?? 1 : 0),
     cell('LineWeight', LINE_WEIGHT(style.strokeWidth ?? 1.25)),
     cell('Rounding', inches(style.rounding ?? 0)),
     textCells(text),
@@ -107,7 +108,7 @@ export interface ConnectorStyle {
 }
 
 /** A 1-D connector through pixel waypoints, with a Connects entry for glue when the ends are known. */
-export function connector(id: number, points: readonly Point[], pageH: number, style: ConnectorStyle, label?: TextBlock | { lines: readonly string[]; size: number }, labelColor = '#000000'): string {
+export function connector(id: number, points: readonly Point[], pageH: number, style: ConnectorStyle, label?: TextBlock | { lines: readonly string[]; size: number }, labelColor: string = PLAIN.ink): string {
   const first = points[0], last = points[points.length - 1];
   if (!first || !last) return '';
   const toIn = (p: Point): Point => ({ x: inches(p.x), y: inches(pageH - p.y) });

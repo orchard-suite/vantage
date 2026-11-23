@@ -1,4 +1,5 @@
 /** The fixed OOXML parts of a .vsdx package: content types, relationships, document, and properties. */
+import { PLAIN } from '@vantage/render';
 import { xmlEsc } from './common.ts';
 
 export const VISIO_NS = 'http://schemas.microsoft.com/office/visio/2012/main';
@@ -33,12 +34,12 @@ export function pageRels(media: readonly { readonly relId: string; readonly targ
 export function documentXml(): string {
   const cells = [
     ['EnableLineProps', '1'], ['EnableFillProps', '1'], ['EnableTextProps', '1'],
-    ['LineWeight', '0.01'], ['LinePattern', '1'], ['LineColor', '#000000'], ['Rounding', '0'],
-    ['FillForegnd', '#ffffff'], ['FillBkgnd', '#ffffff'], ['FillPattern', '1'],
+    ['LineWeight', '0.01'], ['LinePattern', '1'], ['LineColor', PLAIN.ink], ['Rounding', '0'],
+    ['FillForegnd', PLAIN.paper], ['FillBkgnd', PLAIN.paper], ['FillPattern', '1'],
     ['BeginArrow', '0'], ['EndArrow', '0'], ['BeginArrowSize', '2'], ['EndArrowSize', '2'],
     ['TextBkgnd', '0'], ['LeftMargin', '0.05'], ['RightMargin', '0.05'], ['TopMargin', '0.05'], ['BottomMargin', '0.05'], ['VerticalAlign', '1'],
   ].map(([n, v]) => `<Cell N="${n}" V="${v}"/>`).join('');
-  const character = '<Section N="Character"><Row IX="0"><Cell N="Font" V="0"/><Cell N="Color" V="#000000"/><Cell N="Style" V="0"/><Cell N="Size" V="0.1666667"/></Row></Section>';
+  const character = `<Section N="Character"><Row IX="0"><Cell N="Font" V="0"/><Cell N="Color" V="${PLAIN.ink}"/><Cell N="Style" V="0"/><Cell N="Size" V="0.1666667"/></Row></Section>`;
   const paragraph = '<Section N="Paragraph"><Row IX="0"><Cell N="IndFirst" V="0"/><Cell N="IndLeft" V="0"/><Cell N="IndRight" V="0"/><Cell N="SpLine" V="-1.2"/><Cell N="HorzAlign" V="1"/></Row></Section>';
   return `${XML_HEAD}<VisioDocument xmlns="${VISIO_NS}" xmlns:r="${REL_NS}" xml:space="preserve"><DocumentSettings TopPage="0" DefaultTextStyle="0" DefaultLineStyle="0" DefaultFillStyle="0" DefaultGuideStyle="0"/><FaceNames><FaceName NameU="Inter"/></FaceNames><StyleSheets><StyleSheet ID="0" NameU="No Style" Name="No Style">${cells}${character}${paragraph}</StyleSheet></StyleSheets></VisioDocument>`;
 }

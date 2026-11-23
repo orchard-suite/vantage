@@ -93,7 +93,7 @@ ${tile(`/new?in=${ws}`, `<span class="dash">${ico('plus', 16)}</span>`, 'Blank d
 ${tile(`/new?in=${ws}`, '<span class="ln"><span class="k">nodes</span>:</span><span class="ln">&#160;&#160;- name: <span class="v">Coffee shop app</span></span><span class="ln">&#160;&#160;&#160;&#160;type: <span class="t">web</span><span class="caret"></span></span>', 'Write YAML', 'Type what exists, Vantage lays it out')}
 ${tile(`/import/${ws}`, '<span class="ext fam-amber">.drawio</span><span class="ext fam-blue">.vsdx</span><span class="ext fam-pink">.yaml</span>', 'Import a drawing', 'draw.io, Visio, Lucidchart, Mermaid, PlantUML')}
 ${tile(`/w/${ws}?tab=sources`, `<span class="node fam-blue">ARG</span><span class="wire"></span><span class="node fam-emerald">K8s</span>`, 'From a live source', 'Azure, Kubernetes, Backstage')}
-${tile('#examples', '<span class="s fam-red" style="left:18px;top:16px;width:44px;height:30px"></span><span class="s fam-amber" style="left:74px;top:40px;width:44px;height:30px"></span><span class="s fam-blue" style="left:130px;top:18px;width:22px;height:22px;border-radius:999px"></span>', 'Try an example', 'A small shop, a cloud migration')}
+${tile('#examples', '<span class="s fam-red" style="left:18px;top:16px;width:44px;height:30px"></span><span class="s fam-amber" style="left:74px;top:40px;width:44px;height:30px"></span><span class="s fam-blue" style="left:130px;top:18px;width:22px;height:22px;border-radius:var(--r-pill)"></span>', 'Try an example', 'A small shop, a cloud migration')}
 </div></section>`;
 }
 

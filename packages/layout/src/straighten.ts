@@ -8,11 +8,10 @@
 import type { Point, Rect } from './geometry.ts';
 import { segmentCrossesRect } from './geometry.ts';
 import { simplify } from './route.ts';
+import { RULES } from './style.ts';
 
-/** Jogs shorter than this are removed when they can be. */
-export const KINK = 16;
-/** A moved port keeps this far from its side's corners and from other ports. */
-const PORT_ROOM = 16;
+export const KINK = RULES.kink;
+const PORT_ROOM = RULES.portRoom;
 
 export interface StraightenEdge {
   readonly id: string;

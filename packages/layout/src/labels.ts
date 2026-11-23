@@ -10,6 +10,7 @@ import { rectsOverlap, segmentCrossesRect } from './geometry.ts';
 import { rectToLine } from './legibility.ts';
 import { wrapText } from './text/measure.ts';
 import type { EdgeLabel } from './types.ts';
+import { RULES } from './style.ts';
 
 export interface LabelOptions {
   readonly size: number;
@@ -17,10 +18,8 @@ export interface LabelOptions {
   readonly maxWidth: number;
 }
 
-/** Another edge closer than this reads as the label's own. */
-const NEAR = 16;
-/** Room kept clear around the arrowhead. */
-const HEAD = 16;
+const NEAR = RULES.labelNear;
+const HEAD = RULES.labelHead;
 
 export interface Segment {
   readonly a: Point;

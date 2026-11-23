@@ -17,7 +17,7 @@ export const STAGE_STYLES = `
 .v-stage{position:absolute;left:0;top:0;transform-origin:0 0;will-change:transform}
 .v-stage svg{display:block}
 [data-theme=dark] .v-app[data-pic=light] .v-stage svg,[data-theme=light] .v-app[data-pic=dark] .v-stage svg{filter:invert(.92) hue-rotate(180deg)}
-.v-stage svg .v-box{transition:opacity var(--d-3) var(--ease),transform .45s var(--ease)}
+.v-stage svg .v-box{transition:opacity var(--d-3) var(--ease),transform var(--d-glide) var(--ease)}
 .v-stage svg .v-edge,.v-stage svg .v-badge-step{transition:opacity var(--d-3) var(--ease)}
 .v-stage svg .v-shape,.v-stage svg .v-edge-line{transition:stroke var(--d-1) var(--ease),stroke-width var(--d-1) var(--ease)}
 .v-stage svg .dim{opacity:.16}
@@ -79,7 +79,7 @@ export const STAGE_STYLES = `
 .v-start{width:auto;padding:0 8px 0 12px;flex-direction:row-reverse;background:var(--accent);color:var(--on-accent);border-color:var(--accent)}
 .v-start:hover{background:var(--accent-hover);border-color:var(--accent-hover)}
 .v-story-body{display:flex;gap:12px;align-items:flex-start;padding:8px 18px 15px 14px}
-.v-story-badge{flex:none;min-width:26px;height:26px;padding:0 6px;border-radius:13px;background:var(--story);color:var(--on-accent);font:600 var(--fs-s)/26px var(--font);text-align:center;margin-top:-2px;font-variant-numeric:tabular-nums}
+.v-story-badge{flex:none;min-width:26px;height:26px;padding:0 6px;border-radius:var(--r-pill);background:var(--story);color:var(--on-accent);font:600 var(--fs-s)/26px var(--font);text-align:center;margin-top:-2px;font-variant-numeric:tabular-nums}
 .v-story-words{min-width:0}
 .v-story-title{font-size:var(--fs-l);font-weight:600;line-height:1.4;overflow-wrap:anywhere;letter-spacing:-.005em}
 .v-story-text{margin:3px 0 0;font-size:13.5px;line-height:1.55;color:var(--ink2);overflow-wrap:anywhere}

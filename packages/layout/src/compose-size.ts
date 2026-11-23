@@ -31,16 +31,9 @@ interface Scale {
 }
 
 function scaleFor(node: ModelNode, style: LayoutStyle): Scale {
-  switch (node.size) {
-    case 'compact':
-      return { name: style.nameSize - 1, icon: 20, minWidth: 92, maxText: 120, padX: 10, padY: 8 };
-    case 'large':
-      return { name: style.nameSize + 2, icon: 34, minWidth: 176, maxText: 200, padX: 18, padY: 16 };
-    case 'icon':
-      return { name: style.nameSize - 1, icon: style.bigIconSize, minWidth: 0, maxText: 130, padX: 6, padY: 4 };
-    case 'normal':
-      return { name: style.nameSize, icon: style.iconSize, minWidth: style.leafMinWidth, maxText: style.leafMaxTextWidth, padX: style.leafPadX, padY: style.leafPadY };
-  }
+  if (node.size === 'normal') return { name: style.nameSize, icon: style.iconSize, minWidth: style.leafMinWidth, maxText: style.leafMaxTextWidth, padX: style.leafPadX, padY: style.leafPadY };
+  const s = style.nodeSizes[node.size];
+  return { name: style.nameSize + s.nameStep, icon: s.icon ?? style.bigIconSize, minWidth: s.minWidth, maxText: s.maxText, padX: s.padX, padY: s.padY };
 }
 
 function block(w: WrappedText, size: number, weight: TextBlock['weight'], x: number, y: number, anchor: TextBlock['anchor']): TextBlock {

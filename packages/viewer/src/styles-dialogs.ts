@@ -3,7 +3,7 @@ import { COMPACT } from './compact.ts';
 export const DIALOG_STYLES = `
 .v-hub .v-present-btn:not(.on){background:var(--panel);color:var(--ink);border-color:var(--line);box-shadow:none}
 .v-hub .v-present-btn:not(.on):hover{background:var(--hover);border-color:var(--line2)}
-.v-share-btn{box-shadow:inset 0 1px 0 rgba(255,255,255,.16),0 1px 2px rgba(28,28,26,.14)}
+.v-share-btn{box-shadow:var(--bevel)}
 .v-present .v-export-btn,.v-present .v-share-btn{display:none}
 
 .v-dlg-wrap{position:fixed;inset:0;z-index:20;display:flex;align-items:center;justify-content:center;padding:24px 16px;background:var(--scrim);animation:v-fade var(--d-2) var(--ease)}
@@ -27,10 +27,10 @@ export const DIALOG_STYLES = `
 .v-exp-formats{display:flex;flex-direction:column;gap:2px;padding:14px 12px;background:var(--panel);border-right:1px solid var(--line)}
 .v-exp-group{padding:10px 10px 6px}
 .v-exp-group:first-child{padding-top:0}
-.v-exp-fmt{display:flex;align-items:center;gap:11px;width:100%;padding:8px 10px;border:1px solid transparent;border-radius:10px;background:none;color:var(--ink);text-align:left;cursor:pointer;transition:background-color var(--d-1) var(--ease),border-color var(--d-1) var(--ease)}
+.v-exp-fmt{display:flex;align-items:center;gap:11px;width:100%;padding:8px 10px;border:1px solid transparent;border-radius:var(--r-ml);background:none;color:var(--ink);text-align:left;cursor:pointer;transition:background-color var(--d-1) var(--ease),border-color var(--d-1) var(--ease)}
 .v-exp-fmt:hover{background:var(--hover)}
-.v-exp-fmt[aria-checked=true]{background:var(--raise);border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-soft)}
-.v-exp-ext{width:38px;height:36px;flex:none;border-radius:9px;display:inline-flex;align-items:center;justify-content:center;font:600 10px var(--mono);background:var(--sunken);border:1px solid var(--line);color:var(--muted)}
+.v-exp-fmt[aria-checked=true]{background:var(--raise);border-color:var(--accent);box-shadow:var(--halo)}
+.v-exp-ext{width:38px;height:36px;flex:none;border-radius:var(--r-m);display:inline-flex;align-items:center;justify-content:center;font:600 10px var(--mono);background:var(--sunken);border:1px solid var(--line);color:var(--muted)}
 .v-exp-fmt[aria-checked=true] .v-exp-ext{background:var(--accent-soft);border-color:transparent;color:var(--accent-ink)}
 .v-exp-fmt-words{display:flex;flex-direction:column;gap:1px;min-width:0}
 .v-exp-fmt-words b{font-size:var(--fs-m);font-weight:600}
@@ -45,7 +45,7 @@ export const DIALOG_STYLES = `
 .v-share-form{display:flex;flex-direction:column}
 .v-share-form .v-dlg-row{border-top:none;padding-top:0}
 .v-share-form>.btn{align-self:flex-start;margin-top:6px}
-.v-share-url{display:flex;align-items:center;gap:8px;padding:6px 6px 6px 12px;border:1px solid var(--line);border-radius:10px;background:var(--sunken);color:var(--muted)}
+.v-share-url{display:flex;align-items:center;gap:8px;padding:6px 6px 6px 12px;border:1px solid var(--line);border-radius:var(--r-ml);background:var(--sunken);color:var(--muted)}
 .v-share-url code{flex:1;min-width:0;font:500 12px var(--mono);color:var(--ink);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .v-share-links{display:flex;flex-direction:column;gap:6px;padding-top:12px;border-top:1px solid var(--line)}
 .v-share-link{display:flex;align-items:center;gap:10px;padding:8px 8px 8px 12px;border-radius:var(--r-m);background:var(--panel);border:1px solid var(--line)}
@@ -54,7 +54,7 @@ export const DIALOG_STYLES = `
 .v-share-link-words span{font-size:var(--fs-s);color:var(--muted)}
 .v-revoke{color:var(--bad-ink)}
 .v-revoke:hover{background:var(--bad-bg)}
-.v-share-code{margin:0;padding:12px;border-radius:10px;background:var(--sunken);border:1px solid var(--line);font:400 11.5px/18px var(--mono);color:var(--ink2);white-space:pre-wrap;overflow-wrap:anywhere}
+.v-share-code{margin:0;padding:12px;border-radius:var(--r-ml);background:var(--sunken);border:1px solid var(--line);font:400 11.5px/18px var(--mono);color:var(--ink2);white-space:pre-wrap;overflow-wrap:anywhere}
 .v-share-acts{display:flex;gap:8px}
 
 @media ${COMPACT}{

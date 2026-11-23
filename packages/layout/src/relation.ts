@@ -11,7 +11,7 @@ import { separate } from './separate.ts';
 import { DETOUR, headerText, LABEL_CLEAR, LABEL_REACH, rectToLine } from './legibility.ts';
 import { loopCandidates } from './loop.ts';
 import { measureQuality } from './metrics.ts';
-import { chipWidth, DEFAULT_STYLE, type LayoutStyle } from './style.ts';
+import { chipWidth, DEFAULT_STYLE, type LayoutStyle, RULES } from './style.ts';
 import type { Layout, LayoutBox, LayoutEdge } from './types.ts';
 import { shiftLayout } from './shift.ts';
 import { rectsOverlap, segmentCrossesRect, segmentsCross, type Point, type Rect } from './geometry.ts';
@@ -88,10 +88,8 @@ export function reparented(model: Model, map: Readonly<Record<string, string>>):
   return { ...model, nodes, roots };
 }
 
-/** Sideways, closer than this reads as one line. */
-const STROKE_SIDE = 3;
-/** End to end on one line, a gap shorter than this reads as one line. */
-const STROKE_GAP = 40;
+const STROKE_SIDE = RULES.sameLine;
+const STROKE_GAP = RULES.strokeGap;
 
 /** Two parallel segments on (nearly) one line that overlap or meet end to end across a short gap: drawn, they read as a single stroke. */
 export function collinearTouch(a1: Point, a2: Point, b1: Point, b2: Point): boolean {

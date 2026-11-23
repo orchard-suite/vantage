@@ -8,6 +8,7 @@ import { startPresence } from './follow.ts';
 import { wireEditor, type EditPanel } from './edit-panel.ts';
 import { reportError, reportReady } from './report.ts';
 import { LayoutEngine, type EngineSource } from './engine.ts';
+import { LIGHT } from '../../render/src/tokens.ts';
 import type { LayoutKit } from '@vantage/render/engine';
 
 /** Read while this script first runs: the viewer's own address, beside which the engine bundle sits. */
@@ -142,7 +143,7 @@ boot().catch((err: unknown) => {
   // A blank page tells nobody anything; say what broke.
   const mount = document.getElementById('vantage') ?? document.body;
   const pre = document.createElement('pre');
-  pre.style.cssText = 'padding:16px;font:13px/1.5 ui-monospace,Menlo,monospace;color:#7a1f1f;white-space:pre-wrap';
+  pre.style.cssText = `padding:16px;font:13px/1.5 ui-monospace,Menlo,monospace;color:var(--bad-ink,${LIGHT.bad.ink});white-space:pre-wrap`;
   pre.textContent = `Vantage could not start.\n${err instanceof Error ? `${err.name}: ${err.message}\n${err.stack ?? ''}` : String(err)}`;
   mount.replaceChildren(pre);
 });

@@ -6,6 +6,7 @@
  */
 import type { Direction } from '@vantage/model';
 import type { Point, Rect } from './geometry.ts';
+import { RULES } from './style.ts';
 
 export type Side = 'left' | 'right' | 'top' | 'bottom';
 
@@ -138,8 +139,7 @@ function sweep(s: { rect: Rect; other: Point }, side: Side): number {
   }
 }
 
-/** Ports on one side keep this far apart, and this far from the side's corners. */
-export const PORT_GAP = 16;
+export const PORT_GAP = RULES.portGap;
 
 /**
  * Two boxes that face each other with room to spare are joined by a straight

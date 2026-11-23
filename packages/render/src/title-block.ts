@@ -5,6 +5,7 @@
  */
 import type { Theme } from './theme.ts';
 import { esc } from './svg.ts';
+import { RULES } from '@vantage/layout/core';
 
 export interface TitleBlock {
   readonly title?: string;
@@ -18,11 +19,11 @@ export interface TitleBlock {
   readonly published?: string;
 }
 
-const PAD = 20;
-const TITLE_SIZE = 18;
-const SUBTITLE_SIZE = 12;
-const META_SIZE = 11;
-const META_LINE = 16;
+const PAD = RULES.titleBlock.pad;
+const TITLE_SIZE = RULES.titleBlock.title;
+const SUBTITLE_SIZE = RULES.titleBlock.subtitle;
+const META_SIZE = RULES.titleBlock.meta;
+const META_LINE = RULES.titleBlock.metaLine;
 
 function metaLines(tb: TitleBlock): { text: string; href?: string }[] {
   const lines: { text: string; href?: string }[] = [];

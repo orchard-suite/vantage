@@ -129,6 +129,9 @@ const colorblind: Theme = {
 export type ThemeName = 'light' | 'dark' | 'print' | 'colorblind';
 export const THEMES: Record<ThemeName, Theme> = { light, dark, print, colorblind };
 
+/** The plain black on white an exported file falls back to where a shape sets no color of its own: a Visio stylesheet's defaults. */
+export const PLAIN = { paper: '#ffffff', ink: '#000000' } as const;
+
 export function familyOf(theme: Theme, color: string): FamilyColors {
   const f = theme.families[color as ColorFamily];
   if (f) return f;

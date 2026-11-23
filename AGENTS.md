@@ -31,7 +31,9 @@ same pass.
 - Every size lives in `packages/layout/src/style.ts`. Every color, radius,
   shadow, and motion value lives in `packages/render/src/tokens.ts` (the
   chrome and the hub pages) and `packages/render/src/theme.ts` (the
-  picture). Do not scatter constants.
+  picture). Do not scatter constants; `scripts/one-home.test.ts` fails on
+  one that lives elsewhere, and `scripts/motion.test.ts` on an animation
+  that never stops.
 - Files stay under 600 lines; `scripts/check-file-sizes.sh` enforces it.
 - Golden layouts: `packages/layout/goldens/*.json` hold a signature per
   example view. A layout change that moves anything fails `bun run test` until

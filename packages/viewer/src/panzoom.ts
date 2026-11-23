@@ -5,6 +5,7 @@
  */
 import { fitAll, frame, wholeFrame, MAX_FIT, NO_INSETS, opening, READABLE, regionCamera, reveal, visibleRegion, type Camera, type Insets, type Rect, type Viewport } from './camera.ts';
 import { wheelZoom } from './wheel.ts';
+import { EASE, GLIDE_MS } from '../../render/src/tokens.ts';
 
 const MIN_SCALE = 0.1;
 const MAX_SCALE = 4;
@@ -167,9 +168,9 @@ export class PanZoom {
     this.tx = cam.tx;
     this.ty = cam.ty;
     const glide = animate && !matchMedia('(prefers-reduced-motion: reduce)').matches;
-    this.stage.style.transition = glide ? 'transform .45s cubic-bezier(.2,.7,.2,1)' : '';
+    this.stage.style.transition = glide ? `transform ${GLIDE_MS}ms ${EASE}` : '';
     this.apply();
-    if (glide) setTimeout(() => (this.stage.style.transition = ''), 460);
+    if (glide) setTimeout(() => (this.stage.style.transition = ''), GLIDE_MS + 10);
   }
 
   /** Zooms around the centre by a factor, gliding there. */
