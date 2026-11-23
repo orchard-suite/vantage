@@ -1,5 +1,5 @@
 /**
- * Kinds (VAN-3008). A kind is a document with a kind block, and
+ * Kinds (VAN-3015). A kind is a document with a kind block, and
  * its lifecycle is a view of kind `lifecycle` in it, or the one a shipped
  * kind draws when it builds on one. Saving the document registers the kind
  * in the same transaction as the version, so a kind the hub enforces is
@@ -11,6 +11,7 @@ import { BUILT_IN_ROLES, parseDocumentText, type BaseKind, type Document, type K
 import type { Db } from '../db/db.ts';
 import { maybe } from '../db/db.ts';
 import { randomId } from '../crypto.ts';
+import { renameKinds } from './roster.ts';
 import { badRequest } from '../http.ts';
 
 /** A kind as the hub enforces it: the kind block with its base laid under it and its lifecycle read out of the view. */
@@ -183,6 +184,8 @@ export async function registerKind(tx: Db, input: { orgId: string; workspaceId: 
   }
   if (existing) {
     await tx.query('update item_kinds set prefix = $2, name = $3, definition = $4, version_id = $5, workspace_id = $6, updated_at = now() where id = $1', [existing.id, def.prefix, def.name, JSON.stringify(def), input.versionId, input.workspaceId]);
+    // A changed roster or lifecycle names the kind's items again, so who sees them follows the file.
+    if (items && (JSON.stringify(existing.definition.roles) !== JSON.stringify(def.roles) || JSON.stringify(existing.definition.moves) !== JSON.stringify(def.moves))) await renameKinds(tx, input.orgId, [existing.id]);
     return { ...existing, prefix: def.prefix, name: def.name, definition: def, version_id: input.versionId, workspace_id: input.workspaceId };
   }
   const id = randomId();

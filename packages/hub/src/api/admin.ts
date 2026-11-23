@@ -1,4 +1,5 @@
 /** Organization administration: users, teams, workspace lifecycle, publications and connectors across every workspace, retention, jobs. */
+import { renameFor } from '../tracking/roster.ts';
 import { Hono } from 'hono';
 import { z } from 'zod';
 import { slug as slugOf } from '@vantage/model';
@@ -69,7 +70,10 @@ export function adminRoutes(ctx: AppContext, reg: OpenApiRegistry): Hono<HubEnv>
     const slug = input.slug ?? slugOf(input.name);
     if (await maybe(ctx.db, 'select id from teams where org_id = $1 and slug = $2', [p.orgId, slug])) throw badRequest(`team slug ${slug} is taken`);
     const id = randomId();
-    await ctx.db.query('insert into teams (id, org_id, name, slug) values ($1, $2, $3, $4)', [id, p.orgId, input.name, slug]);
+    await ctx.db.transaction(async (tx) => {
+      await tx.query('insert into teams (id, org_id, name, slug) values ($1, $2, $3, $4)', [id, p.orgId, input.name, slug]);
+      await renameFor(tx, p.orgId, { team: slug });
+    });
     await audit(ctx.db, ctx.log, { orgId: p.orgId, who: who(p), what: 'team.create', surface: p.surface, target: `team:${id}`, details: { slug } });
     return c.json({ id, name: input.name, slug, members: [] }, 201);
   });

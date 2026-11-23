@@ -897,7 +897,7 @@ VAN-0001 sets. The code is `packages/hub/src/tracking/`.
   they need. One gate refuses every move the view does not draw. A parent
   state can be worked out from its parts. A state can have a page, and
   the view shows a live count per state. The hub ships work item and
-  roadmap item (VAN-3008).
+  roadmap item (VAN-3015).
 - **Roadmaps.** A roadmap item names its outcome, who owes it, a horizon
   (now, next, later), what it waits on, the decision it came from, the
   boxes and arrows it adds, changes, or retires, and its proof. Board,
@@ -912,8 +912,9 @@ VAN-0001 sets. The code is `packages/hub/src/tracking/`.
   makes the item wait for a person (VAN-3010).
 - **Access.** A workspace grant, or being named on the item: the person
   who asked, a holder, or a person a waiting move's role resolves to.
-  Being named shows that item only. Every list, search, count, feed read,
-  tool, and page embed judges the caller (VAN-2004). A
+  Being named shows that item only, and a role's person may also claim
+  it and finish its run. Every list, search, count, feed read,
+  tool, and page embed judges the caller (VAN-2008). A
   module makes a person's move as that person, with a token the issuer
   gives it for them, and its own reads and writes under an app role
   scoped to its kinds (VAN-2005). The hub knows a person by

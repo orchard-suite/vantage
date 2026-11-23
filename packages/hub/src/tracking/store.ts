@@ -154,7 +154,8 @@ async function writeState(tx: Db, s: ItemState, fresh: boolean): Promise<void> {
   for (const l of s.links) await tx.query('insert into item_links (item_id, rel, target) values ($1, $2, $3)', [s.id, l.rel, l.target]);
 }
 
-async function writeNamed(tx: Db, itemId: string, named: readonly Named[]): Promise<void> {
+/** Replaces who an item names; written with each event, and again when its kind's roster resolves differently. */
+export async function writeNamed(tx: Db, itemId: string, named: readonly Named[]): Promise<void> {
   await tx.query('delete from item_named where item_id = $1', [itemId]);
   const seen = new Set<string>();
   for (const n of named) {

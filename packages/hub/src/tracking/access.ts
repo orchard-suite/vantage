@@ -1,5 +1,5 @@
 /**
- * Who sees an item (VAN-2004): the people its workspace lets
+ * Who sees an item (VAN-2008): the people its workspace lets
  * in, and the people it names. Every read path goes through here: one item
  * by its key, and the condition a list puts in its own query, so a page of
  * twenty rows is twenty the caller may see.
@@ -13,7 +13,7 @@ import { kindById, kindByPrefix, type KindRow } from './kinds.ts';
 import { stateById } from './store.ts';
 import { appOf } from './apps.ts';
 import type { ItemState } from './state.ts';
-import type { Caller } from './gate.ts';
+import { worksBy, type Caller, type Members } from './gate.ts';
 
 /** `VAN-12`, the hub's key. */
 export const ITEM_KEY = /^([A-Z][A-Z0-9]{1,11})-(\d{1,9})$/;
@@ -82,6 +82,18 @@ export async function findItem(ctx: AppContext, p: Principal, ref: string, r?: R
 export function requireAuthor(f: Found): void {
   if (f.app) return;
   if (f.caller.role !== 'author') throw forbidden(`${f.item.key} names you, which lets you make the moves its lifecycle gives you and nothing else; other changes are for people who write its workspace`);
+}
+
+/**
+ * Throws 403 unless the caller may work the item (VAN-3010): claim it, renew
+ * the claim, and write the run that finishes it. Its workspace's authors and
+ * the app that works its kind may; so may a person a role on a move out of
+ * its state names, which is how the queue offers it. Being named as asker or
+ * holder grants moves alone.
+ */
+export function requireWorker(f: Found, members: Members): void {
+  if (f.app || f.caller.role === 'author') return;
+  if (!worksBy(f.kind.definition, f.item, f.caller, members)) throw forbidden(`${f.item.key} names you, which lets you make the moves its lifecycle gives you; claiming it and writing its runs are for its workspace's authors and the roles its next moves name`);
 }
 
 async function isNamed(ctx: AppContext, itemId: string, r: Reach): Promise<boolean> {

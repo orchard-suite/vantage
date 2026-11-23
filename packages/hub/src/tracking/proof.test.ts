@@ -1,6 +1,6 @@
 /**
  * The proofs the tracking records name in their Verification sections:
- * VAN-2004, VAN-3005, VAN-3006, VAN-3007, VAN-3008, and VAN-5001.
+ * VAN-2008, VAN-3005, VAN-3006, VAN-3007, VAN-3015, and VAN-5001.
  */
 import { describe, expect, test } from 'bun:test';
 import { readFileSync, writeFileSync } from 'node:fs';
@@ -88,7 +88,7 @@ describe('the proofs the tracking records name', () => {
     expect(Number(events[0]!.n)).toBe(9);
   });
 
-  test('2004: on every read path a named person sees their item and nothing else, and a person named nowhere sees nothing', async () => {
+  test('2008: on every read path a named person sees their item and nothing else, and a person named nowhere sees nothing', async () => {
     const { t, me, boss, stranger } = await seeded();
     await put(t.ctx, me.principal, { kind: 'REQ', title: 'Waits for the boss: disk' }, 'k1');
     await put(t.ctx, me.principal, { kind: 'REQ', title: 'Moved past the boss: memory' }, 'k2');
@@ -138,7 +138,7 @@ describe('the proofs the tracking records name', () => {
     expect(Math.abs(JSON.stringify(loud.card).length - JSON.stringify(quiet.card).length)).toBeLessThan(16);
   }, 120_000);
 
-  test('3008: the gate refuses every move the lifecycle does not draw, and one of the moves a refusal names goes through', async () => {
+  test('3015: the gate refuses every move the lifecycle does not draw, and one of the moves a refusal names goes through', async () => {
     const { t, me, boss } = await seeded();
     // The boss writes the workspace too, so an item the boss moved stays in sight.
     await t.ctx.db.query("insert into grants (id, org_id, workspace_id, subject_kind, subject_id, role) select 'g1', org_id, id, 'user', $1, 'author' from workspaces where owner_user_id = $2", [boss.principal.userId, me.principal.userId]);

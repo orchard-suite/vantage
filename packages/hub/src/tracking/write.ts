@@ -15,7 +15,7 @@ import { classOf, kindByPrefix, startState, type KindDef, type KindRow } from '.
 import { checkMove, membersOf, namedBy, type Members } from './gate.ts';
 import { answered, append, lockFeed, stateById, type Actor } from './store.ts';
 import { CLAIM_MINUTES, LABEL_TEXT_MAX, LINK_RELS, NOTE_MAX, RUN_TEXT_MAX, TITLE_MAX, type EventData, type ItemState, type LabelValue, type LinkRel, type RunRecord } from './state.ts';
-import { findItem, requireAuthor, type Found } from './access.ts';
+import { findItem, requireAuthor, requireWorker, type Found } from './access.ts';
 import { linkTarget } from './links.ts';
 import { requireApp, requirePerson } from './apps.ts';
 import { dependents, rework } from './worked.ts';
@@ -345,9 +345,9 @@ export async function claim(ctx: AppContext, p: Principal, ref: string, minutes:
   const again = await repeat(ctx, p, key);
   if (again) return again;
   const f = await findItem(ctx, p, ref);
-  requireAuthor(f);
-  const mins = Math.min(Math.max(1, minutes ?? CLAIM_MINUTES), 240);
   const members = await membersOf(ctx.db, p.orgId, f.kind.definition);
+  requireWorker(f, members);
+  const mins = Math.min(Math.max(1, minutes ?? CLAIM_MINUTES), 240);
   return commit({ ctx, p, key }, f.item.id, async (_tx, before) => {
     const s = before!;
     const named = (x: ItemState): ReturnType<typeof namedBy> => namedBy(f.kind.definition, x, members);
@@ -391,6 +391,8 @@ export async function finish(ctx: AppContext, p: Principal, ref: string, input: 
   const f = await findItem(ctx, p, ref);
   const def = f.kind.definition;
   const members = await membersOf(ctx.db, p.orgId, def);
+  // The claimant may finish what it took, even when its move already left the state the role was named on.
+  if (f.item.claim?.userId !== p.userId) requireWorker(f, members);
   return commit({ ctx, p, key }, f.item.id, async (_tx, before) => {
     const s = before!;
     const events: { id: string; data: EventData }[] = [{ id: s.id, data: { type: 'ran', run: { summary: r.summary.trim(), proof: r.proof, ...(r.handoff?.trim() ? { handoff: r.handoff.trim() } : {}), ...(r.seconds !== undefined ? { seconds: r.seconds } : {}), ...(r.cost ? { cost: r.cost } : {}) } } }];

@@ -1,5 +1,5 @@
 /**
- * The one gate every move passes (VAN-3008). It answers which
+ * The one gate every move passes (VAN-3015). It answers which
  * moves a caller may make from where an item stands, and refuses any other
  * with that same list, so a refusal and the way forward cannot disagree.
  * A lifecycle that does not draw a move makes it impossible.
@@ -70,6 +70,11 @@ function holds(who: string, item: ItemState, caller: Caller, members: Members): 
 export function mayMake(move: LifecycleMove, item: ItemState, caller: Caller, members: Members): boolean {
   if (move.approval && item.askerId === caller.userId) return false;
   return (move.who ?? ['author']).some((w) => holds(w, item, caller, members));
+}
+
+/** Whether a role the kind declares, on a move out of the item's state, names the caller: the roles the queue offers an item to. */
+export function worksBy(def: KindDef, item: ItemState, caller: Caller, members: Members): boolean {
+  return def.moves.some((m) => m.from === item.state && (m.who ?? []).some((w) => !BUILT_IN_ROLES.includes(w) && holds(w, item, caller, members)));
 }
 
 const option = (def: KindDef, m: LifecycleMove): MoveOption => ({ to: m.to, toText: stateOf(def, m.to)?.text ?? m.to, label: m.label ?? `to ${m.to}`, needs: [...(m.needs ?? [])], approval: !!m.approval });

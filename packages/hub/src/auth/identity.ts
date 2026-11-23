@@ -4,6 +4,7 @@
  * provider groups to teams. The first person in an organization becomes
  * its admin.
  */
+import { renameFor } from '../tracking/roster.ts';
 import type { Db } from '../db/db.ts';
 import { maybe } from '../db/db.ts';
 import { randomId } from '../crypto.ts';
@@ -60,6 +61,9 @@ export async function ensureUser(db: Db, log: Logger, orgId: string, signIn: Sig
     }
     // Waiting invites match by address, which only appears or changes here; an existing user is granted when invited.
     if (fresh) await acceptInvites(tx, log, orgId, { id: user.id, email: signIn.email ?? user.email, subject: user.subject });
+    // A kind's roster names people by address, so a new address may be named on items already open.
+    const address = signIn.email ?? user.email;
+    if (fresh && address) await renameFor(tx, orgId, { email: address });
     const teamIds = signIn.groups ? await syncTeams(tx, orgId, user.id, signIn.groups, log) : await memberTeams(tx, user.id);
     return { user, teamIds };
   });
@@ -120,6 +124,7 @@ export async function syncTeams(tx: Db, orgId: string, userId: string, groups: r
       await tx.query('insert into teams (id, org_id, name, slug, external_group) values ($1, $2, $3, $4, $5)', [id, orgId, group, s, group]);
       team = { id };
       log.info('identity.team.created', { teamId: id, group });
+      await renameFor(tx, orgId, { team: s });
     }
     ids.push(team.id);
   }

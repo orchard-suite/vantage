@@ -1450,8 +1450,9 @@ views:
   with a disk, `attach` takes the file's path.
 - People see an item when they can open its workspace, or when it names
   them: who asked, who holds it, or a role a move out of its state waits
-  for. Being named lets a person make the moves the lifecycle gives them,
-  and nothing else.
+  for. Being named lets a person make the moves the lifecycle gives them.
+  A person a role on a move out of its state names may also work it:
+  claim it, and finish the run. Nothing else.
 
 ### Agents on items
 

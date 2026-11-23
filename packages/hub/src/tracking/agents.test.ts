@@ -9,7 +9,7 @@ import { HttpError } from '../http.ts';
 import { findItem } from './access.ts';
 import { get } from './read.ts';
 import { queue } from './queue.ts';
-import { ask, claim, finish, move, note, put } from './write.ts';
+import { ask, claim, finish, hold, move, note, put } from './write.ts';
 
 const WORK = `title: Shop work
 kind: { prefix: SW, name: Shop work, base: work-item }
@@ -27,6 +27,26 @@ async function seeded() {
   for (const [i, title] of ['Cache the prices', 'Read through the cache', 'Retire the old reports'].entries()) await put(t.ctx, me.principal, { kind: 'SW', title }, `p${i}`);
   return { t, me, other, ws };
 }
+
+const BUILDS = `title: Builds
+kind:
+  prefix: BLD
+  name: Builds
+  roles:
+    builder: [builder@example.com]
+  lifecycle: flow
+views:
+  - id: flow
+    kind: lifecycle
+    title: How a build moves
+    states:
+      - { id: open, text: Open, class: not-started }
+      - { id: doing, text: Doing, class: in-progress }
+      - { id: done, text: Done, class: done }
+    moves:
+      - { from: open, to: doing, label: start, who: [builder] }
+      - { from: doing, to: done, label: finish, who: [holder] }
+`;
 
 const refusal = (run: Promise<unknown>): Promise<HttpError> => run.then(() => { throw new Error('not refused'); }, (e: unknown) => e as HttpError);
 const lapse = (t: Awaited<ReturnType<typeof seeded>>['t'], key: string) => t.ctx.db.query("update items set claim_until = now() - interval '1 minute' where key = $1", [key]);
@@ -95,6 +115,50 @@ describe('agents on items', () => {
     const end = await hub.call('vantage_tool', { tool: 'vantage_item', arguments: { actions: [{ item: 'SW-1', finish: { move: 'done', summary: 'Cached it.', proof: ['commit abc1234'] } }] } });
     expect(end).toBe('SW-1 run recorded, moved doing → done, and released');
     expect(hub.cost.calls).toBe(4);
+  });
+
+  test('a person a role names takes the item the queue offers, works it, and finishes it, with no grant on its workspace', async () => {
+    const { t, me, ws } = await seeded();
+    expect((await t.json(`/api/v1/workspaces/${ws.slug}/documents`, { method: 'POST', headers: me.headers, body: JSON.stringify({ yaml: BUILDS }) })).status).toBe(201);
+    const builder = await t.bearer('builder');
+    await put(t.ctx, me.principal, { kind: 'BLD', title: 'Build the price cache' }, 'b1');
+    expect((await queue(t.ctx, builder.principal)).cards.map((c) => c.key)).toEqual(['BLD-1']);
+    expect((await claim(t.ctx, builder.principal, 'BLD-1', undefined, 'c1')).line).toContain('BLD-1 is claimed by you');
+    await move(t.ctx, builder.principal, 'BLD-1', { to: 'doing' }, 'm1');
+    expect((await finish(t.ctx, builder.principal, 'BLD-1', { move: 'done', run: { summary: 'Built it.', proof: [] } }, 'f1')).line).toBe('BLD-1 run recorded, moved doing → done, and released');
+  });
+
+  test('a person a role names who first signs in after the item was made is offered it, and so is a team made later', async () => {
+    const { t, me, ws } = await seeded();
+    const yaml = BUILDS.replace('builder: [builder@example.com]', 'builder: [builder@example.com, team:night-shift]');
+    expect((await t.json(`/api/v1/workspaces/${ws.slug}/documents`, { method: 'POST', headers: me.headers, body: JSON.stringify({ yaml }) })).status).toBe(201);
+    await put(t.ctx, me.principal, { kind: 'BLD', title: 'Build the price cache' }, 'b1');
+    const builder = await t.bearer('builder');
+    expect((await queue(t.ctx, builder.principal)).cards.map((c) => c.key)).toEqual(['BLD-1']);
+    const night = await t.bearer('night-owl', { groups: ['night-shift'] });
+    expect((await queue(t.ctx, night.principal)).cards.map((c) => c.key)).toEqual(['BLD-1']);
+  });
+
+  test('a kind saved with another roster names its open items again', async () => {
+    const { t, me, ws } = await seeded();
+    expect((await t.json(`/api/v1/workspaces/${ws.slug}/documents`, { method: 'POST', headers: me.headers, body: JSON.stringify({ yaml: BUILDS }) })).status).toBe(201);
+    const builder = await t.bearer('builder');
+    const second = await t.bearer('second-builder');
+    await put(t.ctx, me.principal, { kind: 'BLD', title: 'Build the price cache' }, 'b1');
+    expect((await queue(t.ctx, second.principal)).cards).toEqual([]);
+    const hub = await agent(t, me.headers);
+    expect(await hub.call('vantage_patch', { edits: [{ address: `${ws.slug}/builds`, old: 'builder: [builder@example.com]', new: 'builder: [second-builder@example.com]' }] })).toContain('saved');
+    expect((await queue(t.ctx, second.principal)).cards.map((c) => c.key)).toEqual(['BLD-1']);
+    expect((await queue(t.ctx, builder.principal)).cards).toEqual([]);
+  });
+
+  test('a person named only as a holder makes their moves, but neither claims the item nor writes its runs', async () => {
+    const { t, me } = await seeded();
+    const helper = await t.bearer('helper');
+    await hold(t.ctx, me.principal, 'SW-1', 'helper@example.com', 'h1');
+    expect((await refusal(finish(t.ctx, helper.principal, 'SW-1', { run: { summary: 'I did it.', proof: [] } }, 'f1'))).status).toBe(403);
+    expect((await refusal(claim(t.ctx, helper.principal, 'SW-1', undefined, 'c1'))).status).toBe(403);
+    expect(Number((await t.ctx.db.query<{ n: number }>("select count(*)::int as n from item_events e join items i on i.id = e.item_id where i.key = 'SW-1' and e.type = 'ran'"))[0]!.n)).toBe(0);
   });
 
   test('the bridge keeps a claim alive while its session lives, and stops when it ends', async () => {
