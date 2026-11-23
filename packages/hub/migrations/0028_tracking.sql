@@ -1,4 +1,4 @@
--- Tracked work (docs/decisions/3005 to 3008, 2004). A kind is a document
+-- Tracked work (VAN-3005 to VAN-3008, VAN-2004). A kind is a document
 -- with a kind block; its lifecycle is a view in it. An item's events are
 -- the truth: every change appends one, and the current-state tables (items,
 -- item_named, item_links) are written in the same transaction and can be

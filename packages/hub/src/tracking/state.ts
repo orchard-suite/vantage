@@ -1,5 +1,5 @@
 /**
- * An item's state is what its events say (docs/decisions/3006). Every verb
+ * An item's state is what its events say (VAN-3006). Every verb
  * makes events, and one pure function folds an event into the state before
  * it. The store writes what the fold answers; a rebuild folds the log from
  * the start and must answer the same. No other code sets an item's state.
@@ -162,7 +162,7 @@ export function fold(before: ItemState | undefined, e: ItemEvent, orgId: string)
 export const ERASED = '(erased)';
 
 /**
- * An event with what it said blanked, for a hard delete (docs/decisions/3006):
+ * An event with what it said blanked, for a hard delete (VAN-3006):
  * every value a person wrote goes, and what the history needs to keep its
  * order and fold (types, states, who, when) stays.
  */

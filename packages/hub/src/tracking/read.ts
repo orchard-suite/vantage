@@ -1,5 +1,5 @@
 /**
- * The verbs that read (docs/decisions/5001): get, find, changes, describe.
+ * The verbs that read (VAN-5001): get, find, changes, describe.
  * An item reads as a card of a fixed size; its notes, history, links, and
  * files are parts read in pages. A list is asked for by field and by page,
  * filled after the access check in its own query, and answers its total.
@@ -259,6 +259,8 @@ export function eventLine(c: Pick<Change, 'type' | 'data' | 'actor' | 'at'>): st
         return `renewed the claim until ${d.until.slice(11, 16)} UTC`;
       case 'ran':
         return `ran: ${d.run.summary.split('\n')[0]!.slice(0, 160)}`;
+      case 'erased':
+        return `erased: ${d.reason.split('\n')[0]!.slice(0, 160)}`;
     }
   })();
   return `${c.at.slice(0, 16).replace('T', ' ')} UTC ${c.actor ?? 'the hub'}: ${what}`;

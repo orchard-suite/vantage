@@ -1,4 +1,4 @@
--- The issuer's stable id for a person (docs/decisions/2006): the claim
+-- The issuer's stable id for a person (VAN-2006): the claim
 -- OIDC_PERSON_CLAIM names, the same in every token the issuer signs for any
 -- app. A browser sign-in, a front door, and a module's token for the same
 -- person meet on it. Null until the person first signs in with a claim

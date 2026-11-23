@@ -4,7 +4,7 @@ import { join } from 'node:path';
 import { fixture, measureFixed, measureStanding, measureTasks, type Fixture } from './agent-cost/tasks.ts';
 
 /**
- * The bar of docs/decisions/0002, held in the check gate: working in the
+ * The bar of VAN-0002, held in the check gate: working in the
  * hub costs an agent no more than working on a disk, and what it holds
  * before it works stays inside its budget.
  */

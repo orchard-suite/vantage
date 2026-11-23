@@ -1,6 +1,6 @@
 /**
  * Where an item's events and its current state are written, in one
- * transaction (docs/decisions/3006, 3007). An append takes the
+ * transaction (VAN-3006, VAN-3007). An append takes the
  * organization's feed lock, so positions commit in the order they were
  * handed out; answers a write sent twice with the line it answered the first
  * time; folds the event into the state; and writes the state, its links, and

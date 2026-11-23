@@ -58,7 +58,7 @@ export const ConfigSchema = z
     OIDC_API_SCOPE: z.string().min(1).optional(),
     /** The hub's application URI at the issuer, accepted as an audience beside OIDC_CLIENT_ID; default api://<OIDC_CLIENT_ID>. */
     OIDC_API_AUDIENCE: z.string().min(1).optional(),
-    /** The claim that names a person the same in every token the issuer signs, for any app: "oid" on Entra, whose sub differs per app (docs/decisions/2006). */
+    /** The claim that names a person the same in every token the issuer signs, for any app: "oid" on Entra, whose sub differs per app (VAN-2006). */
     OIDC_PERSON_CLAIM: z.string().min(1).default('sub'),
     /** Groups (comma separated) a person must be in to sign in, from the OIDC groups claim or the front door's groups header; empty lets everyone the issuer signs in. */
     SIGN_IN_GROUPS: list,

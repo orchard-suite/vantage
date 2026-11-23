@@ -2,11 +2,11 @@
  * Access tokens the OIDC issuer signs for this hub, accepted as bearers on
  * every bearer route, so an agent platform that signs a person in with the
  * issuer itself (Microsoft Copilot Studio), or a module acting for the
- * person who used it (docs/decisions/2005), needs no Vantage token. The
+ * person who used it (VAN-2005), needs no Vantage token. The
  * token must be signed by the issuer's keys, name the issuer, name this hub
  * as its audience, and carry the scope the hub exposes. The person is named
  * by OIDC_PERSON_CLAIM, the id the issuer gives them in every app's tokens,
- * so each client's token reaches the same user (docs/decisions/2006).
+ * so each client's token reaches the same user (VAN-2006).
  */
 import { createRemoteJWKSet, customFetch, errors, jwtVerify, type JWTPayload, type JWTVerifyGetKey } from 'jose';
 import type { Config } from '../config.ts';

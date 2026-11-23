@@ -1,5 +1,5 @@
 /**
- * Worked-out state (docs/decisions/3009). A kind whose lifecycle gives
+ * Worked-out state (VAN-3009). A kind whose lifecycle gives
  * moves to `proof` is moved by the hub, never by a person, when its proof
  * says so: its parts and the items it names as proof, by their state, and
  * the boxes it names as proof, by whether a connector saw their real thing.

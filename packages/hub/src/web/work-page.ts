@@ -142,20 +142,23 @@ export function itemBody(ws: AccessibleWorkspace | undefined, wsName: string, m:
   return `<div class="dec-page">${head}${actions}<div class="dec-meta">${meta.join('')}</div><article class="dec-body">${body}<h2>Notes</h2>${noteForm}${notes}<h2>Links</h2>${list(m.links, 'No links.')}<h2>Files</h2>${files}<h2>History</h2>${list(m.history, 'Nothing yet.')}</article></div>`;
 }
 
-/** The page's one script: each move, hold, and note calls the API with a key it makes, then shows the item as it stands. */
+/** The page's one script: each move, hold, and note calls the API with one key per control until it fails, so a double click lands once, then shows the item as it stands. */
 export const WORK_SCRIPT = `
 (() => {
   const csrf = document.querySelector('meta[name=csrf]')?.content ?? '';
   const err = document.querySelector('.work-error');
-  const call = async (url, body) => {
-    const res = await fetch(url, { method: 'POST', headers: { 'content-type': 'application/json', 'x-csrf-token': csrf, 'idempotency-key': crypto.randomUUID() }, body: JSON.stringify(body) });
+  const keys = new WeakMap();
+  const call = async (el, url, body) => {
+    if (!keys.has(el)) keys.set(el, crypto.randomUUID());
+    const res = await fetch(url, { method: 'POST', headers: { 'content-type': 'application/json', 'x-csrf-token': csrf, 'idempotency-key': keys.get(el) }, body: JSON.stringify(body) });
     if (res.ok) return location.reload();
+    keys.delete(el);
     const j = await res.json().catch(() => ({}));
     if (err) { err.textContent = j.message || j.error || 'That did not land; try again.'; err.hidden = false; }
   };
-  for (const f of document.querySelectorAll('form.work-move')) f.addEventListener('submit', (e) => { e.preventDefault(); const note = f.querySelector('[name=note]')?.value; call(f.dataset.api, { to: f.dataset.to, ...(note ? { note } : {}) }); });
-  for (const f of document.querySelectorAll('form.work-note')) f.addEventListener('submit', (e) => { e.preventDefault(); call(f.dataset.api, { text: f.querySelector('[name=text]').value }); });
-  for (const b of document.querySelectorAll('button[data-work]')) b.addEventListener('click', () => call(b.dataset.work, { person: 'me' }));
+  for (const f of document.querySelectorAll('form.work-move')) f.addEventListener('submit', (e) => { e.preventDefault(); const note = f.querySelector('[name=note]')?.value; call(f, f.dataset.api, { to: f.dataset.to, ...(note ? { note } : {}) }); });
+  for (const f of document.querySelectorAll('form.work-note')) f.addEventListener('submit', (e) => { e.preventDefault(); call(f, f.dataset.api, { text: f.querySelector('[name=text]').value }); });
+  for (const b of document.querySelectorAll('button[data-work]')) b.addEventListener('click', () => call(b, b.dataset.work, { person: 'me' }));
 })();
 `;
 

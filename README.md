@@ -6,7 +6,7 @@ Built for agents to write, built for people to read.
 One YAML file holds a model (what exists, as a tree of boundaries), the
 relations (what talks to what, tagged), and any number of views. Each view
 answers one question with arrows: a relation view, a sequence, a flowchart
-with swimlanes, a timeline, a page of panels, a walkthrough over another
+with swimlanes, a lifecycle, a timeline, a page of panels, a walkthrough over another
 view, or a doc: a page of prose that names the model's boxes and embeds its
 pictures instead of copying them. Vantage lays the views
 out, scores them, and renders SVG, PNG, or a self-contained interactive HTML
@@ -116,7 +116,7 @@ Any other MCP client points at the server directly:
 }
 ```
 
-The agent is the first consumer (`docs/decisions/0002`), so the server
+The agent is the first consumer (VAN-0002), so the server
 shows it a small core and keeps the rest one call away. Always listed:
 `vantage_outline` and `vantage_read` (the guide and the schema, by topic),
 `vantage_validate`, and `vantage_render` (the PNG and the quality notes;
@@ -204,7 +204,9 @@ guide's gesture table maps sentences to primitives, and `vantage_explore`
 shows alternatives when a view looks mechanical.
 
 The authoring guide is `docs/agent-guide.md`. The design and the research
-that shaped it are in `docs/design.md` and `docs/research/`.
+that shaped it are in `docs/design.md` and `docs/research/`. Decision
+records live in a Vantage hub, in the registry `vantage.yaml` names, and are
+cited as `VAN-NNNN`.
 
 ## Layout of the repository
 
@@ -215,15 +217,15 @@ that shaped it are in `docs/design.md` and `docs/research/`.
 | `packages/render` | SVG renderer, themes, icon packs (generic, Azure, AWS, Kubernetes, brand), PNG export, interactive HTML bundle |
 | `packages/viewer` | The browser viewer: picker, pan and zoom, hover and focus, walkthroughs, morphing transitions, and in the hub who is here and follow the presenter |
 | `packages/export` | PDF (vector), draw.io, VSDX, clipboard SVG and PNG, title blocks |
-| `packages/import` | draw.io and VSDX (Visio, Lucidchart export) drawings in: nodes, relations, pinned views, inferred hints, a report |
-| `packages/connectors` | Sources of truth: the push shape with open items, Backstage conversion, Orrery (with firing alerts), kubectl, Cloudflare, Azure Resource Graph, Jira, GitHub, generic HTTP, mappings, merge, bind, freshness, drift |
+| `packages/import` | draw.io and VSDX (Visio, Lucidchart export) drawings in, pinned, plus Ilograph, Mermaid, PlantUML, and Markdown diagram blocks laid out fresh: nodes, relations, views, inferred hints, a report |
+| `packages/connectors` | Sources of truth: the push shape with open items, Backstage conversion, Orrery (with firing alerts), kubectl, Cloudflare, Azure Resource Graph, Jira, GitHub, git history, generic HTTP, mappings, merge, bind, freshness, drift |
 | `packages/publish` | Publications and targets: fs, Azure Blob, git, webhook, SharePoint, Confluence, Teams |
 | `packages/server` | Shared operations plus the Hono HTTP API and live reload |
 | `packages/mcp` | The MCP server |
 | `packages/cli` | The `vantage` command |
-| `examples/` | Complete example sets, including real estates |
+| `examples/` | Three made-up example sets that cover every view kind and story primitive |
 | `packages/hub` | The self-hosted hub: Postgres, OIDC or proxy auth, workspaces, versions, worker, web viewer, REST, remote MCP, guest links, comments on boxes with @mentions, reactions for review sessions, YAML editing in the browser with a live picture, revisions from comments and diagrams from a description on the organization's model API, live presence and follow, voice walkthroughs, audit |
-| `deploy/`, `Dockerfile` | The image and Kustomize base and overlays; see `docs/deploy.md` |
+| `deploy/`, `Dockerfile` | The image and the Helm chart; see `docs/deploy.md` |
 | `skills/`, `.claude-plugin/`, `.mcp.json` | The Claude Code plugin: skills and MCP wiring. `.mcp.json` runs the local bridge from a checkout; `.claude-plugin/mcp.remote.json` and `scripts/mcp-headers.sh` are the remote wiring the released zip carries |
 
 ## Fonts and icons

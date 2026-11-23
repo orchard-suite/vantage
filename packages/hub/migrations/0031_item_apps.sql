@@ -1,4 +1,4 @@
--- A module's app (docs/decisions/2005): an OAuth client the issuer vouches
+-- A module's app (VAN-2005): an OAuth client the issuer vouches
 -- for, registered by an admin with the kinds it works and the workspace its
 -- kinds live in. Its own work (putting items, publishing labels, loading
 -- kinds files, reading the feed) runs under it; a person's act never does.

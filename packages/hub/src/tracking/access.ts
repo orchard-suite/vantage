@@ -1,5 +1,5 @@
 /**
- * Who sees an item (docs/decisions/2004): the people its workspace lets
+ * Who sees an item (VAN-2004): the people its workspace lets
  * in, and the people it names. Every read path goes through here: one item
  * by its key, and the condition a list puts in its own query, so a page of
  * twenty rows is twenty the caller may see.

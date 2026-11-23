@@ -92,7 +92,7 @@ async function me(h: Awaited<ReturnType<typeof hub>>, token: string): Promise<st
   return ((await res.json()) as { userId: string }).userId;
 }
 
-describe('a person through any app is one user (docs/decisions/2006)', () => {
+describe('a person through any app is one user (VAN-2006)', () => {
   // Entra gives each app its own sub for the same person; oid is the same in all of them.
   const viaForms = { oid: 'pat-oid', azp: 'forms-client', sub: 'pat-sub-for-forms' };
   const viaCopilot = { oid: 'pat-oid', azp: 'copilot-client', sub: 'pat-sub-for-copilot' };

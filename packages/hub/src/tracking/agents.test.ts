@@ -1,4 +1,4 @@
-/** Agents on items (docs/decisions/3010): the queue, claims that expire, run records, handoff notes, and questions. */
+/** Agents on items (VAN-3010): the queue, claims that expire, run records, handoff notes, and questions. */
 import { describe, expect, test } from 'bun:test';
 import { mkdtempSync, readFileSync, readdirSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';

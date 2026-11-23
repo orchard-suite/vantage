@@ -175,7 +175,7 @@ export async function createDecision(ctx: AppContext, p: Principal, prefix: stri
   return (await present(ctx, p, [(await placedById(ctx.db, p.orgId, id))!]))[0]!;
 }
 
-/** A refinement: the record changes in place and Last updated moves, unless `minor` says it is a date or wording fix. */
+/** A refinement: the record changes in place and Last updated moves, unless `minor` says it is a date or wording fix; a date sent wins either way. */
 export async function updateDecision(ctx: AppContext, p: Principal, ref: string, patch: DecisionPatch): Promise<Decision> {
   const { row, registry, workspace } = await requireDecision(ctx, p, ref, 'author');
   const v = parse(DecisionPatchSchema, patch);
@@ -185,7 +185,7 @@ export async function updateDecision(ctx: AppContext, p: Principal, ref: string,
     title: v.title ?? row.title,
     status: v.status ?? row.status,
     decided_on: v.decidedOn ?? row.decided_on,
-    updated_on: v.minor ? row.updated_on : (v.updatedOn ?? today()),
+    updated_on: v.updatedOn ?? (v.minor ? row.updated_on : today()),
     deciders: v.deciders ?? row.deciders,
     context: v.context ?? row.context,
     decision: v.decision ?? row.decision,

@@ -1,6 +1,6 @@
 /**
  * The proofs the tracking records name in their Verification sections:
- * docs/decisions 2004, 3005, 3006, 3007, 3008, and 5001.
+ * VAN-2004, VAN-3005, VAN-3006, VAN-3007, VAN-3008, and VAN-5001.
  */
 import { describe, expect, test } from 'bun:test';
 import { readFileSync, writeFileSync } from 'node:fs';
