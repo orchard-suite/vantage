@@ -1183,7 +1183,10 @@ A program keeps its diagrams, decisions, roadmap, and work in a workspace
 of its own; what several programs share goes in their platform's
 workspace. `vantage_workspaces` lists the workspaces you may open and
 makes a team workspace you author. `vantage_move` takes a document or a
-registry prefix and the workspace it goes to. A document keeps its id,
+registry prefix and the workspace it goes to (`to`). A document can also
+take a new slug (`slug`), with or without a new workspace; a slug alone
+renames it in place. The slug follows the rule a new document's does, and
+a slug another document holds there is refused. A document keeps its id,
 history, and every link to its boxes; when it defines a kind, the kind and
 its items go with it; its old address sends people and tools to the new
 one. A registry keeps its prefix, so its citations never change. Moving

@@ -967,9 +967,10 @@ VAN-0001 sets. The code is `packages/hub/src/tracking/`.
   VAN-5006.
 - A program keeps its documents, registry, and kinds in a workspace of its
   own. `vantage_workspaces` makes one; `vantage_move` moves a document (with
-  the kind it defines and its items) or a registry there. A moved
-  document's old address is kept in `document_aliases`: its page redirects,
-  and a tool that names it is told the new address.
+  the kind it defines and its items) or a registry there. The same move
+  gives a document a new slug, in its own workspace or the new one. A moved
+  or renamed document's old address is kept in `document_aliases`: its
+  page redirects, and a tool that names it is told the new address.
 
 ### Freshness, drift, review
 

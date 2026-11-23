@@ -62,25 +62,32 @@ export function registerHubTools(server: McpServer, ctx: AppContext, p: Principa
     'vantage_move',
     {
       description:
-        "Move a document, or a whole decision registry, to another workspace. A program keeps its diagrams, decisions, roadmap, and work in a workspace of its own; this is how they get there. A document keeps its id, versions, comments, guest links, and every link to its boxes; when it defines a kind of item, the kind and its items go with it; its old address stays an alias that sends people and tools to the new one. A registry keeps its prefix, so every citation still resolves. The caller must be able to delete the document where it is (the workspace's delete rule) and author where it goes.",
+        "Move a document to another workspace, give it a new slug, or both; or move a whole decision registry to another workspace. A program keeps its diagrams, decisions, roadmap, and work in a workspace of its own; this is how they get there. A document keeps its id, versions, comments, guest links, and every link to its boxes; when it defines a kind of item, the kind and its items go with it; its old address stays an alias that sends people and tools to the new one. A new slug follows the rule a new document's does, and is refused when the workspace already has a document there. A registry keeps its prefix, so every citation still resolves. The caller must be able to delete the document where it is (the workspace's delete rule) and author where it goes.",
       inputSchema: {
         address: z.string().min(1).describe('workspace/document, or a registry prefix (KD)'),
-        to: z.string().min(1).describe('Slug of the workspace it goes to'),
+        to: z.string().min(1).optional().describe('Slug of the workspace it goes to; default the one it is in. Required for a registry'),
+        slug: z.string().min(1).optional().describe('For a document: the slug it takes; default the one it has'),
       },
     },
-    guarded<{ address: string; to: string }>('vantage_move', async ({ address, to }) => {
+    guarded<{ address: string; to?: string | undefined; slug?: string | undefined }>('vantage_move', async ({ address, to, slug }) => {
       const slash = address.indexOf('/');
       if (slash < 0) {
+        if (!to) return text('to is required to move a registry', true);
+        if (slug) return text('a registry has no slug; it keeps its prefix', true);
         const r = await moveRegistry(ctx, p, who, address.trim().toUpperCase(), to);
         return text(r.from === r.to ? `registry ${r.prefix} is already in ${r.to}` : `moved registry ${r.prefix} (${r.records} records) from ${r.from} to ${r.to}; its citations are unchanged`);
       }
+      if (!to && !slug) return text('name the workspace it goes to (to), a new slug (slug), or both', true);
       const { ws, d } = await doc(address.slice(0, slash), address.slice(slash + 1), 'author');
       requireDelete(p, ws, d.created_by);
-      const target = await requireWorkspace(ctx.db, p, to, 'author');
+      const target = to ? await requireWorkspace(ctx.db, p, to, 'author') : ws;
       const kind = await kindOfDocument(ctx.db, d.id);
-      const moved = await moveDocument(ctx, { orgId: p.orgId, userId: p.userId, who, surface: 'mcp' }, d, target);
-      const items = kind ? Number((await ctx.db.query<{ n: number }>('select count(*)::int as n from items where kind_id = $1', [kind.id]))[0]!.n) : 0;
-      return text([`moved ${ws.slug}/${d.slug} to ${target.slug}/${moved.slug}; ${ws.slug}/${d.slug} now sends people and tools there`, ...(kind ? [`kind ${kind.prefix} and its ${items} items went with it`] : [])].join('\n'));
+      const moved = await moveDocument(ctx, { orgId: p.orgId, userId: p.userId, who, surface: 'mcp' }, d, { workspace: target, slug });
+      const from = `${ws.slug}/${d.slug}`;
+      if (moved.workspace_id === d.workspace_id && moved.slug === d.slug) return text(`${from} is already there`);
+      const across = target.id !== d.workspace_id;
+      const items = kind && across ? Number((await ctx.db.query<{ n: number }>('select count(*)::int as n from items where kind_id = $1', [kind.id]))[0]!.n) : 0;
+      return text([`${across ? 'moved' : 'renamed'} ${from} to ${target.slug}/${moved.slug}; ${from} now sends people and tools there`, ...(kind && across ? [`kind ${kind.prefix} and its ${items} items went with it`] : [])].join('\n'));
     }),
   );
 

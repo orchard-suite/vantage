@@ -42,4 +42,38 @@ describe('a program moves into a workspace of its own', () => {
     await client.close();
     await t.ctx.db.close();
   });
+
+  test('a document takes a new slug in its own workspace or with a move; the old address names the new one, a rename back reclaims it, and a taken slug is refused', async () => {
+    const t = await testApp();
+    const me = await t.bearer('author');
+    const home = ((await t.json('/api/v1/workspaces', { headers: me.headers })).body['workspaces'] as { slug: string }[])[0]!.slug;
+    const client = new Client({ name: 'test', version: '0' });
+    const fetchViaApp = (input: string | URL, init?: RequestInit): Promise<Response> => Promise.resolve(t.app.request(String(input), init));
+    await client.connect(new StreamableHTTPClientTransport(new URL('http://hub.test/mcp'), { fetch: fetchViaApp, requestInit: { headers: me.headers } }));
+    const result = async (name: string, args: Record<string, unknown>) => (await client.callTool({ name, arguments: args })) as { content: { text: string }[]; isError?: boolean };
+    const call = async (name: string, args: Record<string, unknown>): Promise<string> => (await result(name, args)).content[0]!.text;
+    await call('vantage_workspaces', { action: 'create', name: 'Shop' });
+    await call('vantage_write', { writes: [{ address: `${home}/shop-roadmap`, text: PLAN }, { address: 'shop/billing', text: 'title: Billing\nviews: []\n' }] });
+
+    expect(await call('vantage_move', { address: `${home}/shop-roadmap` })).toContain('name the workspace it goes to (to), a new slug (slug), or both');
+    expect(await call('vantage_move', { address: `${home}/shop-roadmap`, slug: 'Shop Plan' })).toContain('Shop Plan is not a slug');
+
+    expect(await call('vantage_move', { address: `${home}/shop-roadmap`, slug: 'shop-plan' })).toBe(`renamed ${home}/shop-roadmap to ${home}/shop-plan; ${home}/shop-roadmap now sends people and tools there`);
+    expect(await call('vantage_read', { addresses: [`${home}/shop-roadmap`] })).toContain(`moved to ${home}/shop-plan`);
+    expect(await call('vantage_move', { address: `${home}/shop-plan`, slug: 'shop-roadmap' })).toBe(`renamed ${home}/shop-plan to ${home}/shop-roadmap; ${home}/shop-plan now sends people and tools there`);
+    expect(await call('vantage_read', { addresses: [`${home}/shop-roadmap`] })).toContain('Shop roadmap');
+
+    expect(await call('vantage_move', { address: `${home}/shop-roadmap`, to: 'shop', slug: 'roadmap' })).toBe(`moved ${home}/shop-roadmap to shop/roadmap; ${home}/shop-roadmap now sends people and tools there\nkind PLAN and its 0 items went with it`);
+    expect(await call('vantage_read', { addresses: [`${home}/shop-plan`] })).toContain('moved to shop/roadmap');
+    const page = await t.app.request(`/w/${home}/shop-roadmap`, { headers: me.headers });
+    expect(page.headers.get('location')).toBe('/w/shop/roadmap');
+
+    const taken = await result('vantage_move', { address: 'shop/roadmap', slug: 'billing' });
+    expect(taken.isError).toBe(true);
+    expect(taken.content[0]!.text).toContain('Shop already has a diagram at billing');
+    expect(await call('vantage_move', { address: 'SHOP', slug: 'x' })).toContain('to is required to move a registry');
+
+    await client.close();
+    await t.ctx.db.close();
+  });
 });

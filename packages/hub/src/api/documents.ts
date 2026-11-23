@@ -36,6 +36,10 @@ const EditBody = z.object({
   expectedVersion: z.string().optional(),
 });
 
+const MoveBody = z
+  .object({ workspace: z.string().min(1).optional(), slug: z.string().min(1).optional() })
+  .refine((b) => b.workspace !== undefined || b.slug !== undefined, 'name the workspace it goes to, a new slug, or both');
+
 export function documentRoutes(ctx: AppContext, reg: OpenApiRegistry): Hono<HubEnv> {
   const app = new Hono<HubEnv>();
   const base = '/workspaces/:workspace/documents';
@@ -111,13 +115,13 @@ export function documentRoutes(ctx: AppContext, reg: OpenApiRegistry): Hono<HubE
     return c.body(null, 204);
   });
 
-  reg.add({ method: 'post', path: '/documents/:id/move', summary: "Move a document to another workspace of the organization, with its versions, comments, stars, guest links, publications, and walkthroughs; it leaves its folder, and the workspace icons it names come along. The caller must be able to delete it where it is (the same rule as a delete) and author where it goes; org admins always may", tag: 'documents', params: ['id'], body: { workspace: 'the slug of the workspace it goes to' }, auth: 'author', responses: { '200': 'moved; the answer names its new workspace and link', '403': 'the delete rule or the new workspace does not let the caller', '409': 'the new workspace already has a document at that slug' } });
+  reg.add({ method: 'post', path: '/documents/:id/move', summary: "Move a document to another workspace of the organization, give it a new slug, or both, with its versions, comments, stars, guest links, publications, and walkthroughs; the old address stays an alias that sends people and tools to the new one. A document that changes workspace leaves its folder, and the workspace icons it names come along. The caller must be able to delete it where it is (the same rule as a delete) and author where it goes; org admins always may", tag: 'documents', params: ['id'], body: { workspace: 'optional: the slug of the workspace it goes to; default the one it is in', slug: 'optional: the slug it takes; default the one it has. Name at least one' }, auth: 'author', responses: { '200': 'moved; the answer names its new workspace, slug, and link', '400': 'neither workspace nor slug, or a slug a new document could not take', '403': 'the delete rule or the new workspace does not let the caller', '409': 'the workspace already has a document at that slug' } });
   app.post('/documents/:id/move', async (c) => {
     const scope = await scopedDocumentById(ctx, c, 'author');
     requireDelete(scope.p, scope.workspace, scope.document.created_by);
-    const { workspace } = await body(c, z.object({ workspace: z.string().min(1) }));
-    const to = await requireWorkspace(ctx.db, scope.p, workspace, 'author');
-    const moved = await moveDocument(ctx, { orgId: scope.p.orgId, userId: scope.p.userId, who: who(scope.p), surface: scope.p.surface }, scope.document, to);
+    const input = await body(c, MoveBody);
+    const to = input.workspace ? await requireWorkspace(ctx.db, scope.p, input.workspace, 'author') : scope.workspace;
+    const moved = await moveDocument(ctx, { orgId: scope.p.orgId, userId: scope.p.userId, who: who(scope.p), surface: scope.p.surface }, scope.document, { workspace: to, slug: input.slug });
     return c.json({ id: moved.id, slug: moved.slug, workspace: to.slug, url: `/w/${encodeURIComponent(to.slug)}/${encodeURIComponent(moved.slug)}` });
   });
 
