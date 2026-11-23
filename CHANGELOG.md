@@ -2,6 +2,29 @@
 
 All notable changes to this project will be documented in this file.
 
+## [4.2.0](https://github.com/orchard-suite/vantage/compare/v4.1.0...v4.2.0) (2026-11-23)
+
+### Features
+
+* **vantage:** carry agent work on the nine verbs ([a56ce46](https://github.com/orchard-suite/vantage/commit/a56ce46c5166bea983aaddef7b83034038b5e33c))
+
+### Bug Fixes
+
+* **vantage:** close each test's database when it ends ([1b23636](https://github.com/orchard-suite/vantage/commit/1b2363629335351fc5e12bc6d3c49234d678f559))
+* **vantage:** bound every answer an agent reads ([d606e37](https://github.com/orchard-suite/vantage/commit/d606e37e6245fe86b9e285823b5a1d673299f148))
+* **vantage:** name a guide topic in every refusal ([f22100a](https://github.com/orchard-suite/vantage/commit/f22100a08b17e840cb5afdf88353f1dd695db13f))
+* **vantage:** let a role's person claim and finish ([ee7c8cd](https://github.com/orchard-suite/vantage/commit/ee7c8cd568348b6d123a8f73a3ef5e9784ebf330))
+* **vantage:** frame embeds only in allowed origins ([d8f774b](https://github.com/orchard-suite/vantage/commit/d8f774b50e94239c594f2e1e56ce030c188bd850))
+* **vantage:** match watch paths as globs ([f0632d5](https://github.com/orchard-suite/vantage/commit/f0632d5e1bc3efe192481f553878487ae2408392))
+* **vantage:** record every failed pooled run ([e543c90](https://github.com/orchard-suite/vantage/commit/e543c9037adb9b17a054d74846e624f8b1fa8d1a))
+* **vantage:** draw saved documents in every format ([213a381](https://github.com/orchard-suite/vantage/commit/213a3811643797ef37f4ab2d650657bdbd30f377))
+* **vantage:** put workspace icons by their path ([a364125](https://github.com/orchard-suite/vantage/commit/a364125cba17dd14fb7a22fc9aa7b75e0dbc5086))
+* **vantage:** explore a saved document as it draws ([0694d6a](https://github.com/orchard-suite/vantage/commit/0694d6addcf65a9be776ade5fc4c55ed9b21ca50))
+* **vantage:** answer a drawn file as a resource ([526e7a2](https://github.com/orchard-suite/vantage/commit/526e7a2fdf023aa7515c768cd4dafe03ab6cdf68))
+* **vantage:** stop animations that run forever ([f1bca42](https://github.com/orchard-suite/vantage/commit/f1bca425be7ebfcffbc6cb56b0cf2b51d0971dad))
+* **vantage:** give every size and color one home ([0ec4770](https://github.com/orchard-suite/vantage/commit/0ec47703612a76216191bcdb007b33c8b6c82e0b))
+* **vantage:** move inline layout sizes to style ([1bb28cc](https://github.com/orchard-suite/vantage/commit/1bb28ccc181e755e3735eccfb59a4728f1861634))
+
 ## [4.1.0](https://github.com/orchard-suite/vantage/compare/v4.0.2...v4.1.0) (2026-11-23)
 
 ### Features
