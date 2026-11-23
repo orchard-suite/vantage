@@ -15,7 +15,10 @@ import { HttpError, badRequest } from '../http.ts';
 import { findItem } from '../tracking/access.ts';
 import { membersOf, openMoves } from '../tracking/gate.ts';
 import { bodyOf, cardOf, changes, describeKind, find, get, history, kindsFor, notes, planOf } from '../tracking/read.ts';
-import { attach, hold, link, move, note, put, release, type WriteAnswer } from '../tracking/write.ts';
+import { ask, attach, claim, finish, hold, link, move, note, put, release, renew, type WriteAnswer } from '../tracking/write.ts';
+import { queue } from '../tracking/queue.ts';
+import { importRoadmap } from '../tracking/import.ts';
+import { pick, CARD_FIELDS, ROW_FIELDS } from '../tracking/fields.ts';
 import { STATE_CLASSES } from '@vantage/model';
 import { listApps, registerApp } from '../tracking/apps.ts';
 import { erase, loadKind } from '../tracking/admin.ts';
@@ -23,9 +26,15 @@ import { maybe } from '../db/db.ts';
 import type { KindDef } from '../tracking/kinds.ts';
 
 const Labels = z.record(z.string(), z.union([z.string(), z.number(), z.null()]));
-const PutBody = z.object({ kind: z.string().optional(), item: z.string().optional(), ref: z.string().min(1).max(200).optional(), title: z.string().optional(), labels: Labels.optional(), revision: z.string().min(1).max(200).optional(), body: z.string().max(200_000).optional(), parent: z.string().optional() }).strict();
-const MoveBody = z.object({ to: z.string(), note: z.string().optional(), revision: z.string().optional() }).strict();
-const PersonBody = z.object({ person: z.string().optional() }).strict();
+const BodyEdit = z.object({ old: z.string().min(1), new: z.string() }).strict();
+const PutBody = z.object({ kind: z.string().optional(), item: z.string().optional(), ref: z.string().min(1).max(200).optional(), title: z.string().optional(), labels: Labels.optional(), revision: z.string().min(1).max(200).optional(), body: z.string().max(200_000).optional(), edits: z.array(BodyEdit).min(1).max(50).optional(), parent: z.string().optional() }).strict();
+// ask is a move whose lifecycle picks the state that waits for a person.
+const MoveBody = z.object({ to: z.string().optional(), note: z.string().optional(), revision: z.string().optional(), ask: z.string().optional() }).strict();
+// A claim is a hold that runs out; renew keeps one.
+const HoldBody = z.object({ person: z.string().optional(), claim: z.union([z.literal(true), z.number().int().min(1).max(240)]).optional(), renew: z.literal(true).optional() }).strict();
+const Run = z.object({ summary: z.string(), proof: z.array(z.string()).optional(), handoff: z.string().optional(), seconds: z.number().nonnegative().optional(), cost: z.object({ amount: z.number(), currency: z.string().min(1).max(10), tokens: z.number().int().nonnegative().optional() }).strict().optional() }).strict();
+// Finishing a run is a release that carries the run record, and the move it ends with.
+const ReleaseBody = z.object({ person: z.string().optional(), run: Run.optional(), move: z.string().optional() }).strict();
 const NoteBody = z.object({ text: z.string() }).strict();
 const LinkBody = z.object({ rel: z.string(), target: z.string(), remove: z.boolean().optional() }).strict();
 const AppBody = z.object({ clientId: z.string().min(1).max(200), name: z.string().min(1).max(200), workspace: z.string(), kinds: z.array(z.string()).max(50) }).strict();
@@ -37,7 +46,8 @@ const BatchBody = z.object({
       z.discriminatedUnion('verb', [
         PutBody.extend({ verb: z.literal('put'), key: z.string().min(1).max(200) }),
         MoveBody.extend({ verb: z.literal('move'), item: z.string(), key: z.string().min(1).max(200) }),
-        PersonBody.extend({ verb: z.enum(['hold', 'release']), item: z.string(), key: z.string().min(1).max(200) }),
+        HoldBody.extend({ verb: z.literal('hold'), item: z.string(), key: z.string().min(1).max(200) }),
+        ReleaseBody.extend({ verb: z.literal('release'), item: z.string(), key: z.string().min(1).max(200) }),
         NoteBody.extend({ verb: z.literal('note'), item: z.string(), key: z.string().min(1).max(200) }),
         LinkBody.extend({ verb: z.literal('link'), item: z.string(), key: z.string().min(1).max(200) }),
       ]),
@@ -52,6 +62,54 @@ function idempotencyKey(c: Context<HubEnv>): string {
   if (!k) throw badRequest('every write to an item carries an Idempotency-Key header, so a write sent twice lands once');
   if (k.length > 200) throw badRequest('an Idempotency-Key is at most 200 characters');
   return k;
+}
+
+type Ctx = AppContext;
+type P = ReturnType<typeof principal>;
+
+/** move, or its ask form. */
+function moveVerb(ctx: Ctx, p: P, ref: string, b: z.infer<typeof MoveBody>, key: string): Promise<WriteAnswer> {
+  if (b.ask !== undefined) {
+    if (b.to !== undefined || b.revision !== undefined) throw badRequest('ask moves to the state its lifecycle waits in; leave out to and revision');
+    return ask(ctx, p, ref, b.ask, key);
+  }
+  if (!b.to) throw badRequest('a move names the state to go to (to), or asks a person a question (ask)');
+  return move(ctx, p, ref, { to: b.to, note: b.note, revision: b.revision }, key);
+}
+
+/** hold, or its claim and renew forms. */
+function holdVerb(ctx: Ctx, p: P, ref: string, b: z.infer<typeof HoldBody>, key: string): Promise<WriteAnswer> {
+  if (b.claim !== undefined && b.renew) throw badRequest('claim takes the item; renew keeps a claim you hold; send one');
+  if ((b.claim !== undefined || b.renew) && b.person !== undefined && b.person !== 'me') throw badRequest('a claim is always your own; leave out person');
+  if (b.renew) return renew(ctx, p, ref, key);
+  if (b.claim !== undefined) return claim(ctx, p, ref, typeof b.claim === 'number' ? b.claim : undefined, key);
+  return hold(ctx, p, ref, b.person, key);
+}
+
+/** release, or its finish form: the run record, its move, and letting go. */
+function releaseVerb(ctx: Ctx, p: P, ref: string, b: z.infer<typeof ReleaseBody>, key: string): Promise<WriteAnswer> {
+  if (!b.run) {
+    if (b.move !== undefined) throw badRequest('a release moves the item only as it finishes a run; send run with move, or move the item first');
+    return release(ctx, p, ref, b.person, key);
+  }
+  if (b.person !== undefined && b.person !== 'me') throw badRequest('a run is finished by the one who ran it; leave out person');
+  const r = b.run;
+  return finish(ctx, p, ref, { move: b.move, run: { summary: r.summary, proof: r.proof ?? [], ...(r.handoff !== undefined ? { handoff: r.handoff } : {}), ...(r.seconds !== undefined ? { seconds: r.seconds } : {}), ...(r.cost ? { cost: { amount: r.cost.amount, currency: r.cost.currency, ...(r.cost.tokens !== undefined ? { tokens: r.cost.tokens } : {}) } } : {}) } }, key);
+}
+
+/** `fields=title,state` as a list, or undefined for every field. */
+const fieldsOf = (raw: string | undefined): string[] | undefined => (raw ? raw.split(',').map((f) => f.trim()).filter(Boolean) : undefined);
+
+/** `held=VAN-1@5,VAN-2@7`: the version of each item the caller already holds. */
+function heldOf(raw: string | undefined): Record<string, number> {
+  const out: Record<string, number> = {};
+  for (const pair of (raw ?? '').split(',').map((x) => x.trim()).filter(Boolean)) {
+    const at = pair.lastIndexOf('@');
+    const n = Number(pair.slice(at + 1));
+    if (at < 1 || !Number.isInteger(n) || n < 0) throw badRequest('held is key@version pairs: held=VAN-1@5,VAN-2@7');
+    out[pair.slice(0, at)] = n;
+  }
+  return out;
 }
 
 const answer = (c: Context<HubEnv>, a: WriteAnswer, created = false) => c.json({ status: a.status, key: a.key, line: a.line }, created && a.status === 'done' ? 201 : 200);
@@ -82,17 +140,24 @@ export function itemRoutes(ctx: AppContext, reg: OpenApiRegistry): Hono<HubEnv> 
     return c.json({ item: f.item.key, state: f.item.state, moves: openMoves(f.kind.definition, f.item, f.caller, await membersOf(ctx.db, p.orgId, f.kind.definition)) });
   });
 
-  reg.add({ method: 'put', path: '/items', summary: "put: make an item, or change the fields named; by the caller's own key (kind + ref) it is safe to send twice", tag: 'items', body: { kind: 'prefix, for a new item or one named by ref', item: 'optional: an item to change', ref: "optional: the owner's own key", title: 'optional', labels: 'optional: {name: value}; null removes one', revision: 'optional: the content revision', body: 'optional: Markdown, for a kind the hub keeps', parent: 'optional: an item key' }, auth: 'author', responses: { '201': 'created', '200': 'changed, unchanged, or a repeat' } });
+  reg.add({ method: 'put', path: '/items', summary: "put: make an item, or change the fields named; by the caller's own key (kind + ref) it is safe to send twice", tag: 'items', body: { kind: 'prefix, for a new item or one named by ref', item: 'optional: an item to change', ref: "optional: the owner's own key", title: 'optional', labels: 'optional: {name: value}; null removes one', revision: 'optional: the content revision', body: 'optional: Markdown, for a new item of a kind the hub keeps', edits: "optional: [{old, new}], each old matching the body exactly once; how a body changes", parent: 'optional: an item key' }, auth: 'author', responses: { '201': 'created', '200': 'changed, unchanged, or a repeat' } });
   app.put('/items', async (c) => answer(c, await put(ctx, principal(c), await body(c, PutBody), idempotencyKey(c)), true));
 
-  reg.add({ method: 'post', path: '/items/:item/move', summary: 'move: change state through the lifecycle; a refusal (409) names the moves open', tag: 'items', params: ['item'], body: { to: 'a state id', note: 'optional; some moves need one', revision: 'optional; some moves pin one' }, auth: 'viewer', responses: { '409': 'the lifecycle refuses it; details.open lists the moves open' } });
-  app.post('/items/:item/move', async (c) => answer(c, await move(ctx, principal(c), item(c), await body(c, MoveBody), idempotencyKey(c))));
+  reg.add({ method: 'put', path: '/items/roadmap', summary: 'put many: a Markdown roadmap (a table with an outcome column, or bullets under Now, Next, and Later) as items of a kind, sent as the request body; sent twice it makes nothing twice', tag: 'items', query: ['kind', 'dryRun'], auth: 'author' });
+  app.put('/items/roadmap', async (c) => {
+    const kind = c.req.query('kind');
+    if (!kind) throw badRequest('name the kind: ?kind=PLAN');
+    return c.json({ lines: await importRoadmap(ctx, principal(c), kind, await c.req.text(), c.req.query('dryRun') === 'true') });
+  });
 
-  reg.add({ method: 'post', path: '/items/:item/hold', summary: 'hold: who has it now; person is me or an email', tag: 'items', params: ['item'], body: { person: 'optional: me or an email' }, auth: 'author' });
-  app.post('/items/:item/hold', async (c) => answer(c, await hold(ctx, principal(c), item(c), (await body(c, PersonBody)).person, idempotencyKey(c))));
+  reg.add({ method: 'post', path: '/items/:item/move', summary: 'move: change state through the lifecycle; a refusal (409) names the moves open. ask: a question for a person moves the item to the state its lifecycle waits in', tag: 'items', params: ['item'], body: { to: 'a state id', note: 'optional; some moves need one', revision: 'optional; some moves pin one', ask: 'optional, in place of to: a question for a person' }, auth: 'viewer', responses: { '409': 'the lifecycle refuses it; details.open lists the moves open' } });
+  app.post('/items/:item/move', async (c) => answer(c, await moveVerb(ctx, principal(c), item(c), await body(c, MoveBody), idempotencyKey(c))));
 
-  reg.add({ method: 'post', path: '/items/:item/release', summary: 'release: let go of an item', tag: 'items', params: ['item'], body: { person: 'optional: me or an email' }, auth: 'viewer' });
-  app.post('/items/:item/release', async (c) => answer(c, await release(ctx, principal(c), item(c), (await body(c, PersonBody)).person, idempotencyKey(c))));
+  reg.add({ method: 'post', path: '/items/:item/hold', summary: 'hold: who has it now; person is me or an email. claim: hold it for a while (true: 20 minutes, or minutes), offered again when it runs out; renew: keep your claim', tag: 'items', params: ['item'], body: { person: 'optional: me or an email', claim: 'optional: true or minutes', renew: 'optional: true' }, auth: 'viewer' });
+  app.post('/items/:item/hold', async (c) => answer(c, await holdVerb(ctx, principal(c), item(c), await body(c, HoldBody), idempotencyKey(c))));
+
+  reg.add({ method: 'post', path: '/items/:item/release', summary: 'release: let go of an item. run: finish a run as you let go, with its record and the move it ends with', tag: 'items', params: ['item'], body: { person: 'optional: me or an email', run: 'optional: {summary, proof, handoff, seconds, cost}', move: 'optional, with run: the state to end in' }, auth: 'viewer' });
+  app.post('/items/:item/release', async (c) => answer(c, await releaseVerb(ctx, principal(c), item(c), await body(c, ReleaseBody), idempotencyKey(c))));
 
   reg.add({ method: 'post', path: '/items/:item/notes', summary: 'note: a note on the item; a longer text is a file', tag: 'items', params: ['item'], body: { text: 'the note' }, auth: 'author' });
   app.post('/items/:item/notes', async (c) => answer(c, await note(ctx, principal(c), item(c), (await body(c, NoteBody)).text, idempotencyKey(c))));
@@ -130,11 +195,18 @@ export function itemRoutes(ctx: AppContext, reg: OpenApiRegistry): Hono<HubEnv> 
           switch (a.verb) {
             case 'put':
               return put(ctx, p, rest as z.infer<typeof PutBody>, key);
-            case 'move':
-              return move(ctx, p, a.item, { to: a.to, note: a.note, revision: a.revision }, key);
-            case 'hold':
-            case 'release':
-              return (a.verb === 'hold' ? hold : release)(ctx, p, a.item, a.person, key);
+            case 'move': {
+              const { item: ref, ...b } = rest as z.infer<typeof MoveBody> & { item: string };
+              return moveVerb(ctx, p, ref, b, key);
+            }
+            case 'hold': {
+              const { item: ref, ...b } = rest as z.infer<typeof HoldBody> & { item: string };
+              return holdVerb(ctx, p, ref, b, key);
+            }
+            case 'release': {
+              const { item: ref, ...b } = rest as z.infer<typeof ReleaseBody> & { item: string };
+              return releaseVerb(ctx, p, ref, b, key);
+            }
             case 'note':
               return note(ctx, p, a.item, a.text, key);
             case 'link':
@@ -150,13 +222,15 @@ export function itemRoutes(ctx: AppContext, reg: OpenApiRegistry): Hono<HubEnv> 
     return c.json({ results });
   });
 
-  reg.add({ method: 'get', path: '/items/:item', summary: "get: one item's card, and its body when the hub keeps it; held=<version> answers an unchanged item with nothing", tag: 'items', params: ['item'], query: ['held'], auth: 'viewer' });
+  reg.add({ method: 'get', path: '/items/:item', summary: "get: one item's card, and its body when the hub keeps it; fields=title,state,body answers only those; held=<version> answers an unchanged item with nothing", tag: 'items', params: ['item'], query: ['held', 'fields'], auth: 'viewer' });
   app.get('/items/:item', async (c) => {
     const p = principal(c);
     const f = await findItem(ctx, p, item(c));
     if (intParam(c.req.query('held'), 'held') === f.item.position) return c.json({ item: f.item.key, unchanged: f.item.position });
+    const fields = fieldsOf(c.req.query('fields'));
     const card = await cardOf(ctx, f);
-    return c.json({ card, ...(card.hasBody ? { body: await bodyOf(ctx, f.item) } : {}) });
+    const withBody = card.hasBody && (!fields || fields.includes('body'));
+    return c.json({ card: pick(card, fields?.filter((x) => x !== 'body'), CARD_FIELDS), ...(withBody ? { body: await bodyOf(ctx, f.item) } : {}) });
   });
 
   reg.add({ method: 'get', path: '/items/:item/history', summary: "An item's events, newest first, a page at a time", tag: 'items', params: ['item'], query: ['before', 'limit'], auth: 'viewer' });
@@ -165,11 +239,19 @@ export function itemRoutes(ctx: AppContext, reg: OpenApiRegistry): Hono<HubEnv> 
   reg.add({ method: 'get', path: '/items/:item/notes', summary: "An item's notes, newest first, a page at a time", tag: 'items', params: ['item'], query: ['before', 'limit'], auth: 'viewer' });
   app.get('/items/:item/notes', async (c) => c.json(await notes(ctx, await findItem(ctx, principal(c), item(c)), { ...(intParam(c.req.query('before'), 'before') ? { before: intParam(c.req.query('before'), 'before')! } : {}), ...(intParam(c.req.query('limit'), 'limit') ? { limit: intParam(c.req.query('limit'), 'limit')! } : {}) })));
 
-  reg.add({ method: 'get', path: '/items', summary: 'get many by key (keys=VAN-1,VAN-2), or find: a page of items the caller may see, filtered, with the total; count=state|class|kind|holder answers counts', tag: 'items', query: ['keys', 'kind', 'state', 'class', 'holder', 'asker', 'parent', 'q', 'label.<name>', 'limit', 'offset', 'count'], auth: 'user' });
+  reg.add({ method: 'get', path: '/items', summary: 'get many by key (keys=VAN-1,VAN-2, held=VAN-1@5), or find: a page of items the caller may see, filtered, with the total; count=state|class|kind|holder answers counts; list=queue answers what the caller may pick up; fields=title,state answers only those', tag: 'items', query: ['keys', 'held', 'kind', 'state', 'class', 'holder', 'asker', 'parent', 'q', 'label.<name>', 'limit', 'offset', 'count', 'list', 'fields'], auth: 'user' });
   app.get('/items', async (c) => {
     const p = principal(c);
+    const fields = fieldsOf(c.req.query('fields'));
     const keys = c.req.query('keys');
-    if (keys) return c.json({ items: await get(ctx, p, keys.split(',').map((k) => k.trim()).filter(Boolean)) });
+    if (keys) return c.json({ items: (await get(ctx, p, keys.split(',').map((k) => k.trim()).filter(Boolean), heldOf(c.req.query('held')))).map((x) => ('card' in x ? { card: pick(x.card, fields, CARD_FIELDS) } : x)) });
+    const list = c.req.query('list');
+    if (list !== undefined && list !== 'queue') throw badRequest('list is queue: what you may pick up');
+    if (list === 'queue') {
+      const kind = c.req.query('kind');
+      const limit = intParam(c.req.query('limit'), 'limit');
+      return c.json(await queue(ctx, p, { ...(kind ? { kinds: kind.split(',') } : {}), ...(limit ? { limit } : {}) }));
+    }
     const cls = c.req.query('class');
     if (cls && !(STATE_CLASSES as readonly string[]).includes(cls)) throw badRequest(`class is one of ${STATE_CLASSES.join(', ')}`);
     const count = c.req.query('count');
@@ -190,7 +272,7 @@ export function itemRoutes(ctx: AppContext, reg: OpenApiRegistry): Hono<HubEnv> 
       ...opt(intParam(c.req.query('offset'), 'offset'), 'offset'),
       ...(count ? { countBy: count as 'state' } : {}),
     });
-    return c.json(r);
+    return c.json(fields ? { ...r, rows: r.rows.map((row) => pick(row, fields, ROW_FIELDS)) } : r);
   });
 
   reg.add({ method: 'get', path: '/documents/:id/plan', summary: "The plan on a document: the items the caller may see that add, change, or retire its boxes and views, with where each stands and its horizon", tag: 'items', params: ['id'], auth: 'viewer' });

@@ -86,6 +86,45 @@ describe('items through the doors', () => {
     expect(counts.body['counts']).toEqual({ doing: 1 });
   });
 
+  test('over HTTP the nine verbs carry the agent work: claim and renew are holds, ask is a move, finish is a release, the queue is a find, a roadmap is a put', async () => {
+    const { t, me } = await seeded();
+    const send = (path: string, method: string, key: string, body: unknown) => t.json(path, { method, headers: { ...me.headers, 'idempotency-key': key }, body: JSON.stringify(body) });
+    await send('/api/v1/items', 'PUT', 'p1', { kind: 'SW', title: 'Cache the price list' });
+    expect((await t.json('/api/v1/items?list=queue', { headers: me.headers })).body['cards']).toEqual([expect.objectContaining({ key: 'SW-1' })]);
+    expect((await send('/api/v1/items/SW-1/hold', 'POST', 'c1', { claim: 30 })).body['line']).toBe('SW-1 is claimed by you for 30 minutes; any call you make on it renews the claim');
+    expect((await send('/api/v1/items/SW-1/hold', 'POST', 'c2', { renew: true })).body['line']).toBe('SW-1 is claimed by you for 20 more minutes');
+    await send('/api/v1/items/SW-1/move', 'POST', 'm1', { to: 'doing' });
+    expect((await send('/api/v1/items/SW-1/move', 'POST', 'a1', { ask: 'Which region holds the cache?' })).body['line']).toBe('SW-1 waits in waiting for an answer');
+    await send('/api/v1/items/SW-1/move', 'POST', 'm2', { to: 'doing', note: 'Central US.' });
+    const done = await send('/api/v1/items/SW-1/release', 'POST', 'f1', { move: 'done', run: { summary: 'Cached it.', proof: ['commit abc1234'], handoff: 'Watch the miss rate.' } });
+    expect(done.body['line']).toBe('SW-1 run recorded, moved doing → done, and released');
+    const roadmap = await t.app.request('/api/v1/items/roadmap?kind=SW&dryRun=true', { method: 'PUT', headers: { ...me.headers, 'content-type': 'text/markdown' }, body: '## Now\n\n- Warm the cache on deploy\n' });
+    expect(((await roadmap.json()) as { lines: string[] }).lines.join('\n')).toContain('Warm the cache on deploy');
+  });
+
+  test('get and find answer only the fields asked for, and get answers an item the caller holds as unchanged', async () => {
+    const { t, me } = await seeded();
+    await t.json('/api/v1/items', { method: 'PUT', headers: { ...me.headers, 'idempotency-key': 'p1' }, body: JSON.stringify({ kind: 'SW', title: 'Cache the price list', labels: { area: 'api' } }) });
+    expect((await t.json('/api/v1/items/SW-1?fields=title,state', { headers: me.headers })).body).toEqual({ card: { key: 'SW-1', title: 'Cache the price list', state: 'open' } });
+    expect((await t.json('/api/v1/items?kind=SW&fields=state', { headers: me.headers })).body['rows']).toEqual([{ key: 'SW-1', state: 'open' }]);
+    const many = await t.json('/api/v1/items?keys=SW-1&fields=labels', { headers: me.headers });
+    expect(many.body['items']).toEqual([{ card: { key: 'SW-1', labels: { area: 'api' } } }]);
+    const version = ((await t.json('/api/v1/items/SW-1', { headers: me.headers })).body['card'] as { version: number }).version;
+    expect((await t.json(`/api/v1/items?keys=SW-1&held=SW-1@${version}`, { headers: me.headers })).body['items']).toEqual([{ key: 'SW-1', unchanged: version }]);
+    const bad = await t.json('/api/v1/items?kind=SW&fields=colour', { headers: me.headers });
+    expect(bad.status).toBe(400);
+  });
+
+  test('put changes a body by edits, never the whole body, and an edit that does not match once saves nothing', async () => {
+    const { t, me, hub } = await seeded();
+    await hub.call('vantage_write', { writes: [{ address: 'SW', text: ITEM }] });
+    const put = (key: string, body: unknown) => t.json('/api/v1/items', { method: 'PUT', headers: { ...me.headers, 'idempotency-key': key }, body: JSON.stringify(body) });
+    expect((await put('e1', { item: 'SW-1', edits: [{ old: 'from the cache', new: 'from the cache in under 50 ms' }] })).body['line']).toBe('saved SW-1 (body)');
+    expect((await t.json('/api/v1/items/SW-1?fields=body', { headers: me.headers })).body['body']).toContain('The price list answers from the cache in under 50 ms.');
+    expect((await put('e2', { item: 'SW-1', edits: [{ old: 'not in the body', new: 'x' }] })).status).toBe(400);
+    expect((await put('e3', { item: 'SW-1', body: 'whole', edits: [{ old: 'The', new: 'A' }] })).status).toBe(400);
+  });
+
   test('the Work tab lists a kind by state, and an item page offers only the moves open to the reader', async () => {
     const { t, me, hub } = await seeded();
     await hub.call('vantage_write', { writes: [{ address: 'SW', text: ITEM }] });

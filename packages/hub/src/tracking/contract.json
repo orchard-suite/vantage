@@ -37,8 +37,19 @@
       "labels",
       "revision",
       "body",
+      "edits",
       "parent"
     ]
+  },
+  {
+    "method": "put",
+    "path": "/items/roadmap",
+    "params": [],
+    "query": [
+      "kind",
+      "dryRun"
+    ],
+    "body": []
   },
   {
     "method": "post",
@@ -50,7 +61,8 @@
     "body": [
       "to",
       "note",
-      "revision"
+      "revision",
+      "ask"
     ]
   },
   {
@@ -61,7 +73,9 @@
     ],
     "query": [],
     "body": [
-      "person"
+      "person",
+      "claim",
+      "renew"
     ]
   },
   {
@@ -72,7 +86,9 @@
     ],
     "query": [],
     "body": [
-      "person"
+      "person",
+      "run",
+      "move"
     ]
   },
   {
@@ -136,7 +152,8 @@
       "item"
     ],
     "query": [
-      "held"
+      "held",
+      "fields"
     ],
     "body": []
   },
@@ -170,6 +187,7 @@
     "params": [],
     "query": [
       "keys",
+      "held",
       "kind",
       "state",
       "class",
@@ -180,7 +198,9 @@
       "label.<name>",
       "limit",
       "offset",
-      "count"
+      "count",
+      "list",
+      "fields"
     ],
     "body": []
   },

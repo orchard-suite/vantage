@@ -121,6 +121,8 @@ export interface PutInput {
   readonly labels?: Readonly<Record<string, unknown>> | undefined;
   readonly revision?: string | undefined;
   readonly body?: string | undefined;
+  /** How a body changes: each old string matches the body exactly once and becomes the new one. */
+  readonly edits?: readonly { readonly old: string; readonly new: string }[] | undefined;
   /** The item this one is part of, by key. */
   readonly parent?: string | undefined;
 }
@@ -147,6 +149,7 @@ export async function put(ctx: AppContext, p: Principal, input: PutInput, key: s
   if (!input.title?.trim()) throw badRequest('a new item needs a title');
   const def = kind.definition;
   if (input.body !== undefined && def.owner) throw badRequest(`${kind.prefix} items are kept by ${def.owner}; the hub holds no body for them, only their state`);
+  if (input.edits) throw badRequest('a new item has no body to edit; send its body');
   const labels = Object.fromEntries(Object.entries(checkLabels(def, input.labels ?? {})).filter((e): e is [string, LabelValue] => e[1] !== null));
   const parent = input.parent ? await parentLink(ctx, p, kind, input.parent) : undefined;
   const members = await membersOf(ctx.db, p.orgId, def);
@@ -168,7 +171,8 @@ export async function put(ctx: AppContext, p: Principal, input: PutInput, key: s
 async function change(ctx: AppContext, p: Principal, f: Found, input: PutInput, key: string | undefined): Promise<WriteAnswer> {
   requireAuthor(f);
   const def = f.kind.definition;
-  if (input.body !== undefined && def.owner) throw badRequest(`${f.item.key} is kept by ${def.owner}; the hub holds no body for it`);
+  if ((input.body !== undefined || input.edits) && def.owner) throw badRequest(`${f.item.key} is kept by ${def.owner}; the hub holds no body for it`);
+  if (input.body !== undefined && input.edits) throw badRequest('send the body or edits to it, not both');
   const labels = checkLabels(def, input.labels ?? {});
   const parent = input.parent !== undefined ? await parentLink(ctx, p, f.kind, input.parent) : undefined;
   const members = await membersOf(ctx.db, p.orgId, def);
@@ -179,9 +183,10 @@ async function change(ctx: AppContext, p: Principal, f: Found, input: PutInput, 
     const changedLabels = Object.fromEntries(Object.entries(labels).filter(([k, v]) => (v === null ? s.labels[k] !== undefined : s.labels[k] !== v)));
     if (Object.keys(changedLabels).length) set.labels = changedLabels;
     if (input.revision !== undefined && input.revision !== s.revision) set.revision = input.revision;
-    if (input.body !== undefined) {
-      const current = s.bodyId ? (await maybe<{ text: string }>(tx, 'select text from item_bodies where id = $1', [s.bodyId]))?.text : undefined;
-      if ((current ?? '') !== input.body) set.bodyId = await saveBody(tx, s.id, input.body);
+    if (input.body !== undefined || input.edits) {
+      const current = (s.bodyId ? (await maybe<{ text: string }>(tx, 'select text from item_bodies where id = $1', [s.bodyId]))?.text : undefined) ?? '';
+      const next = input.edits ? editBody(s.key, current, input.edits) : input.body!;
+      if (current !== next) set.bodyId = await saveBody(tx, s.id, next);
     }
     const events: { id: string; data: EventData }[] = [];
     if (Object.keys(set).length) events.push({ id: s.id, data: { type: 'changed', ...set } });
@@ -193,6 +198,18 @@ async function change(ctx: AppContext, p: Principal, f: Found, input: PutInput, 
     const what = [...Object.keys(set).map((k) => (k === 'bodyId' ? 'body' : k)), ...(parent !== undefined && parent !== oldParent ? ['parent'] : [])];
     return { events, line: what.length ? `saved ${s.key} (${what.join(', ')})` : `unchanged: ${s.key}`, key: s.key, named: (x) => namedBy(def, x, members) };
   });
+}
+
+/** Applies body edits in order; each old string must stand in the body exactly once, which is the guard that needs no version. */
+export function editBody(key: string, text: string, edits: readonly { readonly old: string; readonly new: string }[]): string {
+  let out = text;
+  for (const [i, e] of edits.entries()) {
+    const at = out.indexOf(e.old);
+    if (at < 0) throw badRequest(`edit ${i + 1} to ${key}'s body: the old text is not in it; read ${key} and send text as it stands`);
+    if (out.indexOf(e.old, at + 1) >= 0) throw badRequest(`edit ${i + 1} to ${key}'s body: the old text stands more than once; send more of the text around it`);
+    out = out.slice(0, at) + e.new + out.slice(at + e.old.length);
+  }
+  return out;
 }
 
 async function saveBody(tx: Db, itemId: string, text: string): Promise<string> {

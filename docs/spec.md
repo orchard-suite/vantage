@@ -922,8 +922,12 @@ VAN-0001 sets. The code is `packages/hub/src/tracking/`.
   module's token reach one user (VAN-2006).
 - **API.** Nine verbs over HTTP: describe, put, move, hold and release,
   note and attach, get, find, changes, link. Each names an item by the
-  caller's own key. Versioned and never broken; the web pages and agent
-  tools call the same verbs (VAN-5001).
+  caller's own key. An agent's work is forms of them: a claim and its
+  renewal are holds, a question is a move, finishing a run is a release
+  that carries the run record, the queue is a find, and a Markdown
+  roadmap is a put of many. get and find take the fields wanted; a put
+  changes a body by edits. Versioned and never broken; the web pages and
+  agent tools call the same verbs (VAN-5001).
 - **Agent cost.** An item reads as a card of a fixed size, with its
   notes, history, and links as parts. An event never carries a body. A
   roadmap is read as rows and changed by naming what changes; several

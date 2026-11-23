@@ -1471,6 +1471,14 @@ views:
   The skill `vantage-work` walks through it.
 - `vantage_checkout` of a kind's prefix writes its items as files under
   `work/<KIND>/`; a new file there is a new item on sync.
+- A module calls the same work over HTTP, as forms of the nine verbs
+  under `/api/v1`: `GET /items?list=queue` is the queue; `POST
+  /items/SW-12/hold` with `{"claim": true}` or `{"claim": 30}` claims and
+  `{"renew": true}` renews; `POST /items/SW-12/move` with `{"ask": "..."}`
+  asks; `POST /items/SW-12/release` with `{"run": {...}, "move": "review"}`
+  finishes; `PUT /items/roadmap?kind=PLAN` brings a Markdown roadmap in.
+  `get` and `find` take `fields=title,state` and answer only those; a
+  `put` changes a body by `edits: [{"old", "new"}]`, never the whole body.
 
 ### Roadmaps
 
