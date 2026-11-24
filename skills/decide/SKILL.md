@@ -44,6 +44,11 @@ categories, before you write to it.
   program with no workspace gets one first (`vantage_workspaces`), and a
   registry that sits elsewhere moves there with `vantage_move`.
 
+A decision is written once, in the registry of the narrowest scope it is
+true for, and it stays there: this skill sends a record nowhere else. When
+a program's decision must bind every program, write it in the organization
+registry and relate the two records.
+
 Infer it from the decision and the `when` lines. A repository you are
 working in names its registry in `vantage.yaml` (`decisions`), and its
 hub and workspace come from the pointer (`sh
@@ -103,34 +108,7 @@ a record each.
 Fill every section. Plain words, short sentences. No em dashes or en
 dashes. Never name a person anywhere but the decision makers.
 
-## 5. Standard alignment
-
-Check whether a `platform-standard` plugin is installed: its `consult`
-skill is listed among your skills.
-
-- **Installed**: run `platform-standard:consult` on the decision. Stamp
-  `alignment` with the stance (`follows`, `extends`, `departs`, or
-  `new-ground`), the rule id it is about (none for new ground), and a
-  short note.
-- **Not installed**: leave `alignment` out. Do not mention a standard.
-
-## 6. Hand off
-
-After a decision event (a new record, a supersede, or a change in
-substance; not a date or wording fix), check whether a
-`platform-standard:capture` skill exists. If it does, call it with:
-
-- the record's machine id (`adr:<ULID>`, the `id:` line of its header)
-  and its citation (`SHOP-2001`);
-- the scope kind, `organization` or `program`;
-- the full Context, Decision, Consequences, and Alternatives;
-- the alignment line, as a hint.
-
-Make no judgment about whether the record is a standard; capture decides.
-If capture is absent, do nothing. This skill never writes to a book, a
-standard, or any standards inbox itself.
-
-## 7. Refactor
+## 5. Refactor
 
 Renumber a record, move it to another category, or move it to another
 registry, when a registry is cleaned up or reorganized. The record keeps
@@ -150,10 +128,8 @@ never handed out again.
 4. **Read the report.** For each place it could not rewrite, tell its
    owner the new citation. The old one keeps working until they change it.
    Repoint links outside the hub (repositories, docs) the same way.
-5. **Hand off** as in step 6 only if the move changed what the decision
-   means; a renumber does not.
 
-## 8. Migrate a repository
+## 6. Migrate a repository
 
 Move a repository's in-repo records into its program's registry, in one
 commit.
