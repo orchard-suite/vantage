@@ -3,9 +3,13 @@ name: Release
 on:
   push:
     branches: [main]
-    paths-ignore:
-      - '**/*.md'
-      - 'docs/**'
+    # Prose that ships is product: the skills, and the guide the hub hands to agents.
+    paths:
+      - '**'
+      - '!**/*.md'
+      - '!docs/**'
+      - 'skills/**'
+      - 'docs/agent-guide.md'
   workflow_dispatch:
 
 permissions:
