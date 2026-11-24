@@ -13,6 +13,7 @@ import { maybe } from '../db/db.ts';
 import { randomId } from '../crypto.ts';
 import { renameKinds } from './roster.ts';
 import { badRequest } from '../http.ts';
+import type { Logger } from '../log.ts';
 
 /** A kind as the hub enforces it: the kind block with its base laid under it and its lifecycle read out of the view. */
 export interface KindDef {
@@ -191,4 +192,36 @@ export async function registerKind(tx: Db, input: { orgId: string; workspaceId: 
   const id = randomId();
   await tx.query('insert into item_kinds (id, org_id, workspace_id, document_id, prefix, name, definition, version_id) values ($1, $2, $3, $4, $5, $6, $7, $8)', [id, input.orgId, input.workspaceId, input.documentId, def.prefix, def.name, JSON.stringify(def), input.versionId]);
   return { id, org_id: input.orgId, workspace_id: input.workspaceId, document_id: input.documentId, prefix: def.prefix, name: def.name, definition: def, version_id: input.versionId, next_number: 1 };
+}
+
+/** JSON with every object's keys in order, so a definition read back from jsonb compares equal to the same one built here. */
+function canonical(v: unknown): string {
+  if (Array.isArray(v)) return `[${v.map(canonical).join(',')}]`;
+  if (v && typeof v === 'object') return `{${Object.entries(v).filter(([, x]) => x !== undefined).sort(([a], [b]) => (a < b ? -1 : 1)).map(([k, x]) => `${JSON.stringify(k)}:${canonical(x)}`).join(',')}}`;
+  return JSON.stringify(v);
+}
+
+/**
+ * Lays every kind built on a shipped base over that base again, after the
+ * migrations, so a label or a state a base gains reaches the kinds already
+ * registered on it. A kind whose file no longer reads as a kind is left as
+ * it was and logged.
+ */
+export async function relayKinds(db: Db, log: Logger): Promise<number> {
+  const rows = await db.query<{ id: string; prefix: string; definition: KindDef; yaml: string }>('select k.id, k.prefix, k.definition, v.yaml from item_kinds k join documents d on d.id = k.document_id join versions v on v.id = d.head_version_id');
+  let changed = 0;
+  for (const r of rows.filter((x) => x.definition.base)) {
+    try {
+      const doc = parseDocumentText(r.yaml, 'kind.vantage.yaml').document;
+      const def = doc ? kindOf(doc) : undefined;
+      if (!def || canonical(def) === canonical(r.definition)) continue;
+      await db.query('update item_kinds set definition = $2, updated_at = now() where id = $1', [r.id, JSON.stringify(def)]);
+      changed++;
+      log.info('kinds.relaid', { kind: r.prefix, base: def.base });
+    } catch (err) {
+      log.warn('kinds.relay.failed', { kind: r.prefix, error: (err as Error).message });
+    }
+  }
+  log.info('kinds.relay.end', { kinds: rows.length, changed });
+  return changed;
 }

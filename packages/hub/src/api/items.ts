@@ -27,7 +27,9 @@ import type { KindDef } from '../tracking/kinds.ts';
 
 const Labels = z.record(z.string(), z.union([z.string(), z.number(), z.null()]));
 const BodyEdit = z.object({ old: z.string().min(1), new: z.string() }).strict();
-const PutBody = z.object({ kind: z.string().optional(), item: z.string().optional(), ref: z.string().min(1).max(200).optional(), title: z.string().optional(), labels: Labels.optional(), revision: z.string().min(1).max(200).optional(), body: z.string().max(200_000).optional(), edits: z.array(BodyEdit).min(1).max(50).optional(), parent: z.string().optional() }).strict();
+// A place puts an item in order among its kind in its horizon; with labels.horizon in the same put it moves to another.
+const Place = z.union([z.enum(['first', 'last']), z.object({ before: z.string().min(1) }).strict(), z.object({ after: z.string().min(1) }).strict()]);
+const PutBody = z.object({ kind: z.string().optional(), item: z.string().optional(), ref: z.string().min(1).max(200).optional(), title: z.string().optional(), labels: Labels.optional(), revision: z.string().min(1).max(200).optional(), body: z.string().max(200_000).optional(), edits: z.array(BodyEdit).min(1).max(50).optional(), parent: z.string().optional(), place: Place.optional() }).strict();
 // ask is a move whose lifecycle picks the state that waits for a person.
 const MoveBody = z.object({ to: z.string().optional(), note: z.string().optional(), revision: z.string().optional(), ask: z.string().optional() }).strict();
 // A claim is a hold that runs out; renew keeps one.
@@ -140,7 +142,7 @@ export function itemRoutes(ctx: AppContext, reg: OpenApiRegistry): Hono<HubEnv> 
     return c.json({ item: f.item.key, state: f.item.state, moves: openMoves(f.kind.definition, f.item, f.caller, await membersOf(ctx.db, p.orgId, f.kind.definition)) });
   });
 
-  reg.add({ method: 'put', path: '/items', summary: "put: make an item, or change the fields named; by the caller's own key (kind + ref) it is safe to send twice", tag: 'items', body: { kind: 'prefix, for a new item or one named by ref', item: 'optional: an item to change', ref: "optional: the owner's own key", title: 'optional', labels: 'optional: {name: value}; null removes one', revision: 'optional: the content revision', body: 'optional: Markdown, for a new item of a kind the hub keeps', edits: "optional: [{old, new}], each old matching the body exactly once; how a body changes", parent: 'optional: an item key' }, auth: 'author', responses: { '201': 'created', '200': 'changed, unchanged, or a repeat' } });
+  reg.add({ method: 'put', path: '/items', summary: "put: make an item, or change the fields named; by the caller's own key (kind + ref) it is safe to send twice", tag: 'items', body: { kind: 'prefix, for a new item or one named by ref', item: 'optional: an item to change', ref: "optional: the owner's own key", title: 'optional', labels: 'optional: {name: value}; null removes one', revision: 'optional: the content revision', body: 'optional: Markdown, for a new item of a kind the hub keeps', edits: "optional: [{old, new}], each old matching the body exactly once; how a body changes", parent: 'optional: an item key', place: "optional: first, last, {before: KEY}, or {after: KEY}; its order among its kind in its horizon" }, auth: 'author', responses: { '201': 'created', '200': 'changed, unchanged, or a repeat' } });
   app.put('/items', async (c) => answer(c, await put(ctx, principal(c), await body(c, PutBody), idempotencyKey(c)), true));
 
   reg.add({ method: 'put', path: '/items/roadmap', summary: 'put many: a Markdown roadmap (a table with an outcome column, or bullets under Now, Next, and Later) as items of a kind, sent as the request body; sent twice it makes nothing twice', tag: 'items', query: ['kind', 'dryRun'], auth: 'author' });
@@ -180,7 +182,7 @@ export function itemRoutes(ctx: AppContext, reg: OpenApiRegistry): Hono<HubEnv> 
     return new Response(Buffer.from(bytes), { headers: { 'content-type': row.content_type, 'content-disposition': `attachment; filename="${row.name.replace(/"/g, '')}"` } });
   });
 
-  reg.add({ method: 'post', path: '/items/:item/links', summary: 'link: came-from, part-of, or waits-on an item, a box or a view (workspace/document#id), or a decision record; remove: true takes one away', tag: 'items', params: ['item'], body: { rel: 'came-from, part-of, box, view, or decision', target: 'what it links to', remove: 'optional' }, auth: 'author' });
+  reg.add({ method: 'post', path: '/items/:item/links', summary: 'link: came-from, part-of, or waits-on an item, toward a milestone, a box or a view (workspace/document#id), or a decision record; remove: true takes one away', tag: 'items', params: ['item'], body: { rel: 'came-from, part-of, waits-on, toward, box, view, or decision', target: 'what it links to', remove: 'optional' }, auth: 'author' });
   app.post('/items/:item/links', async (c) => answer(c, await link(ctx, principal(c), item(c), await body(c, LinkBody), idempotencyKey(c))));
 
   reg.add({ method: 'post', path: '/items/batch', summary: 'Several writes in one request; each commits alone with its own key, and the answer says in a line each which landed', tag: 'items', body: { actions: '[{verb: put | move | hold | release | note | link, key, ...that verb\'s body, item}]' }, auth: 'user' });

@@ -48,6 +48,7 @@ interface ItemRow {
   readonly claim_user: string | null;
   readonly claim_until: Date | null;
   readonly runs: number;
+  readonly rank: string | null;
   readonly position: string | number;
   readonly events: number;
   readonly notes: number;
@@ -99,6 +100,7 @@ export async function stateById(db: Db, id: string, lock = false): Promise<ItemS
     bodyId: row.body_id,
     claim: row.claim_user && row.claim_until ? { userId: row.claim_user, until: iso(row.claim_until) } : null,
     runs: Number(row.runs),
+    rank: row.rank,
     links,
     position: Number(row.position),
     events: Number(row.events),
@@ -140,13 +142,13 @@ export async function append(tx: Db, input: AppendInput): Promise<ItemState> {
 }
 
 async function writeState(tx: Db, s: ItemState, fresh: boolean): Promise<void> {
-  const values = [s.id, s.orgId, s.kindId, s.workspaceId, s.number, s.key, s.ref, s.title, s.state, s.class, s.askerId, JSON.stringify(s.holders), JSON.stringify(s.labels), s.revision, s.bodyId, parentOf(s), s.position, s.events, s.notes, s.files, s.stateSince, s.createdAt, s.updatedAt, s.claim?.userId ?? null, s.claim?.until ?? null, s.runs];
+  const values = [s.id, s.orgId, s.kindId, s.workspaceId, s.number, s.key, s.ref, s.title, s.state, s.class, s.askerId, JSON.stringify(s.holders), JSON.stringify(s.labels), s.revision, s.bodyId, parentOf(s), s.position, s.events, s.notes, s.files, s.stateSince, s.createdAt, s.updatedAt, s.claim?.userId ?? null, s.claim?.until ?? null, s.runs, s.rank];
   const search = "to_tsvector('english', $8 || ' ' || $6 || ' ' || coalesce((select string_agg(value::text, ' ') from jsonb_each_text($13::jsonb)), '') || ' ' || coalesce((select text from item_bodies where id = $15), ''))";
   if (fresh) {
-    await tx.query(`insert into items (id, org_id, kind_id, workspace_id, number, key, ref, title, state, class, asker_id, holders, labels, revision, body_id, parent_id, position, events, notes, files, state_since, created_at, updated_at, claim_user, claim_until, runs, search) values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25, $26, ${search})`, values);
+    await tx.query(`insert into items (id, org_id, kind_id, workspace_id, number, key, ref, title, state, class, asker_id, holders, labels, revision, body_id, parent_id, position, events, notes, files, state_since, created_at, updated_at, claim_user, claim_until, runs, rank, search) values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25, $26, $27, ${search})`, values);
   } else {
     await tx.query(
-      `update items set kind_id = $3, workspace_id = $4, number = $5, key = $6, ref = $7, title = $8, state = $9, class = $10, asker_id = $11, holders = $12, labels = $13, revision = $14, body_id = $15, parent_id = $16, position = $17, events = $18, notes = $19, files = $20, state_since = $21, created_at = $22, updated_at = $23, claim_user = $24, claim_until = $25, runs = $26, search = ${search} where id = $1 and org_id = $2`,
+      `update items set kind_id = $3, workspace_id = $4, number = $5, key = $6, ref = $7, title = $8, state = $9, class = $10, asker_id = $11, holders = $12, labels = $13, revision = $14, body_id = $15, parent_id = $16, position = $17, events = $18, notes = $19, files = $20, state_since = $21, created_at = $22, updated_at = $23, claim_user = $24, claim_until = $25, runs = $26, rank = $27, search = ${search} where id = $1 and org_id = $2`,
       values,
     );
   }

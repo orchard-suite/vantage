@@ -1,0 +1,31 @@
+vantage: 1
+title: Milestone
+description: The kind of dated point the hub ships. Items of any kind link toward a milestone, and it ships when every one of them has shipped. Its date is when it is due; its body says what must be true by then. A workspace builds on it with a kind block of its own (prefix, name, base milestone).
+kind:
+  prefix: MILE
+  name: Milestone
+  labels:
+    - { name: date, type: date, title: Due }
+  lifecycle: lifecycle
+views:
+  - id: lifecycle
+    kind: lifecycle
+    title: How a milestone moves
+    question: What moves a milestone, and what can a person move by hand?
+    direction: down
+    states:
+      - { id: planned, text: Planned, class: not-started }
+      - { id: building, text: Building, class: in-progress, description: An item toward it is under way }
+      - { id: reported, text: Reported done, class: in-progress, description: Someone says it is met and no machine has read proof of it }
+      - { id: shipped, text: Shipped, class: done, description: Every item toward it has shipped }
+      - { id: dropped, text: Dropped, class: parked }
+    moves:
+      - { from: planned, to: building, label: work starts, who: [proof] }
+      - { from: building, to: shipped, label: proof lands, who: [proof] }
+      - { from: shipped, to: building, label: proof reopens, who: [proof] }
+      - { from: planned, to: reported, label: report done, who: [author], needs: [note] }
+      - { from: building, to: reported, label: report done, who: [author], needs: [note] }
+      - { from: reported, to: shipped, label: proof lands, who: [proof] }
+      - { from: planned, to: dropped, label: drop, who: [author], needs: [note] }
+      - { from: building, to: dropped, label: drop, who: [author], needs: [note] }
+      - { from: dropped, to: planned, label: restore, who: [author], needs: [note] }

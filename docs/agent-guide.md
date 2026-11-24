@@ -1378,6 +1378,8 @@ views: []
   flat values the hub shows, sorts, and filters; a nested value or a
   document is never a label. A kind's labels and roles add to its base's;
   a label it names again takes the base label's place.
+- `base` is one of the kinds the hub ships: `work-item`, `roadmap-item`,
+  or `milestone`.
 - `owner: forms` says another system keeps the content: its items have
   no body, and the system puts them by its own key.
 - A kind with items keeps its prefix and every state an item is in. It
@@ -1424,8 +1426,12 @@ views:
 ### Working with items
 
 - `vantage_outline SW` lists the kind: its states with a live count, its
-  moves, its labels, and its items newest first (`SW#doing` for one
-  state, `SW#done` for one class).
+  moves, its labels, and its items in the kind's order (`SW#doing` for one
+  state, `SW#done` for one class). Every list, board, and outline of a
+  kind shows the same order: by horizon in its choice order when the kind
+  has one, then by each item's place, then newest first. An item nobody
+  placed comes after the placed ones, so a kind nobody orders reads newest
+  first.
 - `vantage_read SW-12` is the item's card, then its body. The card names
   the moves open to you now. Its parts are read a page at a time:
   `SW-12#notes`, `SW-12#history`, `SW-12#links`, `SW-12#files`.
@@ -1455,9 +1461,17 @@ views:
   ```
 
   A refused move names the moves open to you and what each needs.
-  `link` takes `came-from`, `part-of`, `waits-on`, `box` or `view`
-  (`workspace/document#id`), or `decision` (`SHOP-2001`). On a machine
-  with a disk, `attach` takes the file's path.
+  `link` takes `came-from`, `part-of`, `waits-on`, `toward` (a
+  milestone), `box` or `view` (`workspace/document#id`), or `decision`
+  (`SHOP-2001`). On a machine with a disk, `attach` takes the file's path.
+- `place` puts an item in order among the items of its kind in its
+  horizon: `{"item": "SW-12", "place": "first"}`, `"last"`, `{"before":
+  "SW-9"}`, or `{"after": "SW-9"}`. It is an event on the item, and it
+  needs the author role in the item's workspace. A place beside an item
+  in another horizon is refused; over HTTP, a `put` with `labels.horizon`
+  and `place` moves it there in one write. A horizon changed alone puts
+  the item after the placed ones there. On the board a person drags a
+  card, or uses its Up and Down buttons, which call the same put.
 - People see an item when they can open its workspace, or when it names
   them: who asked, who holds it, or a role a move out of its state waits
   for. Being named lets a person make the moves the lifecycle gives them.
@@ -1500,7 +1514,15 @@ views: []
 ```
 
 - An item's outcome is its body. `horizon` is `now`, `next`, or `later`.
-  `promised` is a date, set only for a real promise. Who owes it holds it.
+  `promised` is a date, set only for a real promise. `start` and `end` are
+  the plan: when the work starts and ends, set from a person or from
+  capacity the estate's rules state, never invented. An end before its
+  start is refused. Who owes it holds it.
+- A parent with parts has a span worked out from them, the earliest
+  start to the latest end of every item under it. Its card and outline
+  show it (`span: 2026-01-05 to 2026-03-20, from 3 parts`), and the
+  timeline draws it as a bar over the parts. It is never the parent's own
+  labels; set the dates on the parts.
 - Nobody types its status. The hub moves it from its proof: its parts
   (items that are `part-of` it) and the items or boxes it names with a
   `proof` link. Building when any proof is under way, shipped when every
@@ -1521,12 +1543,32 @@ views: []
   document draws no items; opened, it points at the board.
 - Read a roadmap as rows: `vantage_outline PLAN#now` (a state, a class, or
   a label choice narrows it). Move one item's horizon with a patch of
-  `horizon: now`.
+  `horizon: now`, and its order inside the horizon with `place`.
+- The timeline draws an item with a start and an end as a bar, a parent
+  as a bar over its parts' span, an item with one date as a point, and
+  each milestone its items link toward as a marker at its date.
 - A roadmap kept in Markdown comes in with `vantage_roadmap_import`: a
   table with an outcome column, or bullets under Now, Next, and Later. On a
   machine with a disk give `file`. Running it again makes nothing twice.
 - An item that cannot start before another says so with a `waits-on`
   link to it. The build order is these links, never prose.
+- A milestone is a dated point items gather to, a kind built on the
+  shipped milestone:
+
+  ```yaml
+  kind: { prefix: PLANM, name: Platform milestones, base: milestone }
+  views: []
+  ```
+
+  Its `date` label is when it is due; its body says what must be true by
+  then. An item of any kind, in any workspace, links `toward` it; `toward`
+  at an item that is not a milestone is refused. It follows the roadmap
+  lifecycle and ships when every item toward it has shipped. Its card and
+  outline roll up what links toward it: counts by class, the items at
+  risk, and `on track`, `at risk`, or `done`. An item is at risk when it
+  is not done and it ends after the milestone's date, has no end, or
+  waits on an item that ends after it. A milestone with no date is at
+  risk.
 - A kind's outline says which kinds take it as a part (`part of: PLAN`),
   so a planner in one program climbs to the roadmap above it.
 - A page names an item with `[[item:PLAN-3]]`; readers who may see the item

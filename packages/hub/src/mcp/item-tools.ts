@@ -10,7 +10,8 @@ import type { AppContext } from '../context.ts';
 import type { Principal } from '../auth/principal.ts';
 import { randomId } from '../crypto.ts';
 import { badRequest } from '../http.ts';
-import { ask, attach, claim, finish, hold, link, move, note, release, renew, type WriteAnswer } from '../tracking/write.ts';
+import { ask, attach, claim, finish, hold, link, move, note, put, release, renew, type WriteAnswer } from '../tracking/write.ts';
+import type { Place } from '../tracking/rank.ts';
 import { queue, queueText } from '../tracking/queue.ts';
 import { guardFor, refusalText, text } from './run.ts';
 
@@ -23,6 +24,7 @@ interface Action {
   readonly release?: string | undefined;
   readonly link?: { rel: string; target: string } | undefined;
   readonly unlink?: { rel: string; target: string } | undefined;
+  readonly place?: Place | undefined;
   readonly attach?: { name: string; data: string; contentType?: string | undefined } | undefined;
   readonly claim?: boolean | number | undefined;
   readonly renew?: boolean | undefined;
@@ -31,10 +33,10 @@ interface Action {
   readonly key?: string | undefined;
 }
 
-/** Runs one action: exactly one of move, hold, release, link, unlink, attach, or a note alone. */
+/** Runs one action: exactly one of move, hold, release, place, link, unlink, attach, or a note alone. */
 export async function runAction(ctx: AppContext, p: Principal, a: Action): Promise<WriteAnswer> {
   const key = a.key ?? randomId();
-  const verbs = (['move', 'hold', 'release', 'link', 'unlink', 'attach', 'claim', 'renew', 'finish', 'ask'] as const).filter((v) => a[v] !== undefined && a[v] !== false);
+  const verbs = (['move', 'hold', 'release', 'place', 'link', 'unlink', 'attach', 'claim', 'renew', 'finish', 'ask'] as const).filter((v) => a[v] !== undefined && a[v] !== false);
   if (verbs.length > 1) throw badRequest(`one action does one thing; ${verbs.join(' and ')} go in separate actions`);
   if (a.revision !== undefined && !a.move) throw badRequest('revision goes with a move; to set it alone, the owner puts the item');
   switch (verbs[0]) {
@@ -44,6 +46,8 @@ export async function runAction(ctx: AppContext, p: Principal, a: Action): Promi
       return hold(ctx, p, a.item, a.hold, key);
     case 'release':
       return release(ctx, p, a.item, a.release, key);
+    case 'place':
+      return put(ctx, p, { item: a.item, place: a.place! }, key);
     case 'link':
       return link(ctx, p, a.item, a.link!, key);
     case 'unlink':
@@ -64,7 +68,7 @@ export async function runAction(ctx: AppContext, p: Principal, a: Action): Promi
       return attach(ctx, p, a.item, { name: a.attach!.name, contentType: a.attach!.contentType ?? 'application/octet-stream', bytes }, key);
     }
   }
-  if (a.note === undefined) throw badRequest('an action names what to do: move, hold, release, note, attach, link, or unlink');
+  if (a.note === undefined) throw badRequest('an action names what to do: move, hold, release, place, note, attach, link, or unlink');
   return note(ctx, p, a.item, a.note, key);
 }
 

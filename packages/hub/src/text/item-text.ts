@@ -10,6 +10,8 @@ import { parse as parseYaml, stringify } from 'yaml';
 import { badRequest } from '../http.ts';
 import type { Card } from '../tracking/read.ts';
 import type { LabelValue } from '../tracking/state.ts';
+import { spanText } from '../tracking/dates.ts';
+import { rollupText } from '../tracking/milestone.ts';
 
 export interface ItemFields {
   readonly title: string | undefined;
@@ -31,6 +33,8 @@ const FIXED: Readonly<Record<string, string>> = {
   revision: 'a revision comes with the owner\'s put or with a move that pins one',
   counts: 'notes, files, links, and events are counted by the hub',
   moves: 'the moves open to you come from the lifecycle',
+  span: "a parent's span is worked out from its parts' start and end; set them on the parts",
+  milestone: 'a milestone rolls up what links toward it; link one with vantage_item {"actions":[{"item":"VAN-12","link":{"rel":"toward","target":"<key>"}}]}',
   proof: 'proof is read from the parts and the proof links; link one with vantage_item {"actions":[{"item":"<key>","link":{"rel":"proof","target":"VAN-12"}}]}',
 };
 
@@ -48,6 +52,8 @@ export function itemText(c: Card, body: string): string {
     ...(c.revision ? { revision: c.revision } : {}),
     counts: `notes ${c.counts.notes}, files ${c.counts.files}, links ${c.counts.links}, events ${c.counts.events}`,
     ...(c.proof ? { proof: c.proof } : {}),
+    ...(c.span ? { span: spanText(c.span) } : {}),
+    ...(c.milestone ? { milestone: rollupText(c.milestone) } : {}),
     moves: c.moves.length ? [...c.moves] : 'none open to you',
   };
   const text = `---\n${stringify(header, { lineWidth: 0 })}---\n`;

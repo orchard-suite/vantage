@@ -901,12 +901,20 @@ VAN-0001 sets. The code is `packages/hub/src/tracking/`.
   progress, done, parked), and moves that name who may make them and what
   they need. One gate refuses every move the view does not draw. A parent
   state can be worked out from its parts. A state can have a page, and
-  the view shows a live count per state. The hub ships work item and
-  roadmap item (VAN-3015).
+  the view shows a live count per state. The hub ships work item,
+  roadmap item, and milestone (VAN-3015).
 - **Roadmaps.** A roadmap item names its outcome, who owes it, a horizon
-  (now, next, later), what it waits on, the decision it came from, the
-  boxes and arrows it adds, changes, or retires, and its proof. Board,
-  timeline, and table views read the same items. The hub works out each
+  (now, next, later), its place in that horizon, a start and an end, what
+  it waits on, the milestone it works toward, the decision it came from,
+  the boxes and arrows it adds, changes, or retires, and its proof. Every
+  list, board, and outline of a kind shows its items by horizon, then by
+  place (a fractional rank, so a move rewrites one row), then newest
+  first; a person drags a card to its place. An end before a start is
+  refused. A parent's span is worked out from its parts and never stored.
+  A milestone is a dated item that items of any kind link toward; it ships
+  when they all have, and its card rolls them up with the items at risk
+  of its date. Board, timeline, and table views read the same items; the
+  timeline draws bars, points, and milestone markers. The hub works out each
   item's state from its proof and shows the proof's age; no surface takes
   a typed status. Planned boxes draw on the real views, and a view can
   show today or after a horizon. Outside trackers are read through
@@ -1242,7 +1250,9 @@ Known gaps are listed under each phase.
     list views, rows by horizon for agents, import from Markdown by path,
     the plan on the picture (`adds`, `changes`, `retires`) with the horizon
     switch, the live count on each state of a lifecycle view, and an
-    item's live state in a page (`[[item:KEY]]`). Landed.
+    item's live state in a page (`[[item:KEY]]`). Then an order inside a
+    horizon (`place`), a start and an end with a parent's span from its
+    parts, and milestones that items link `toward`. Landed.
 12. **Agents on items.** The queue, claims that expire and renew on any
     call and from the laptop's bridge, finishing a run in one call (run
     record, move, release), handoff notes, questions that make an item

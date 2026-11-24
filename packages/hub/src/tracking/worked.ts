@@ -36,7 +36,8 @@ const iso = (d: Date | string): string => new Date(d).toISOString();
 export async function readProof(db: Db, item: Pick<ItemState, 'id' | 'links'>): Promise<Proof> {
   const named = item.links.filter((l) => l.rel === 'proof');
   const itemIds = named.filter((l) => !l.target.includes('#') && !l.target.startsWith('ticket:')).map((l) => l.target);
-  const rows = await db.query<{ key: string; class: ItemState['class']; state_since: Date }>('select key, class, state_since from items where parent_id = $1 or id = any($2::text[]) order by key', [item.id, itemIds]);
+  // Its parts, the items it names as proof, and the items that link toward it, as a milestone's are.
+  const rows = await db.query<{ key: string; class: ItemState['class']; state_since: Date }>("select key, class, state_since from items where parent_id = $1 or id = any($2::text[]) or id in (select item_id from item_links where rel = 'toward' and target = $1) order by key", [item.id, itemIds]);
   const items: { key: string; class: ItemState['class']; since: string }[] = rows.map((r) => ({ key: r.key, class: r.class, since: iso(r.state_since) }));
   // A ticket a connector reads: open while the connector still reports it, done once it has dropped out of what is open.
   for (const l of named.filter((x) => x.target.startsWith('ticket:'))) {
@@ -128,11 +129,11 @@ export async function rework(tx: Db, orgId: string, itemIds: Iterable<string>): 
   return moved;
 }
 
-/** The worked items a change to these items may move: their parents, and the items that name them as proof. */
+/** The worked items a change to these items may move: their parents, the items that name them as proof, and the milestones they link toward. */
 export async function dependents(tx: Db, itemIds: readonly string[]): Promise<string[]> {
   if (!itemIds.length) return [];
   const rows = await tx.query<{ id: string }>(
-    "select parent_id as id from items where id = any($1::text[]) and parent_id is not null union select item_id as id from item_links where rel = 'proof' and target = any($1::text[])",
+    "select parent_id as id from items where id = any($1::text[]) and parent_id is not null union select item_id as id from item_links where rel = 'proof' and target = any($1::text[]) union select target as id from item_links where rel = 'toward' and item_id = any($1::text[])",
     [[...itemIds]],
   );
   return rows.map((r) => r.id);

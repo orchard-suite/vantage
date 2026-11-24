@@ -21,11 +21,12 @@ import { findItem } from '../tracking/access.ts';
 import { membersOf, openMoves } from '../tracking/gate.ts';
 import { bodyOf, cardOf, filesOf, find, history, linksOf, notes } from '../tracking/read.ts';
 import type { KindRow } from '../tracking/kinds.ts';
+import { markersFor } from '../tracking/milestone.ts';
 import { itemBody, itemUrl, looksOf, WORK_SCRIPT, type WorkLook, type WorkTabModel } from './work-page.ts';
 
 export async function workTabModel(ctx: AppContext, p: Principal, kinds: readonly KindRow[], q: Record<string, string>): Promise<WorkTabModel> {
   const current = kinds.find((k) => k.prefix === q['kind']) ?? kinds[0];
-  if (!current) return { kinds, counts: {}, rows: [], total: 0, look: 'list' };
+  if (!current) return { kinds, counts: {}, rows: [], total: 0, look: 'list', author: false, milestones: [] };
   const state = current.definition.states.some((s) => s.id === q['state']) ? q['state'] : undefined;
   const counts = (await find(ctx, p, { kinds: [current.prefix], countBy: 'state' })).counts ?? {};
   const page = await find(ctx, p, { kinds: [current.prefix], ...(state ? { state } : {}), limit: 100 });
@@ -33,7 +34,9 @@ export async function workTabModel(ctx: AppContext, p: Principal, kinds: readonl
   const asked = q['look'] as WorkLook | undefined;
   // A roadmap opens on its board; a kind of work opens as a list.
   const look: WorkLook = asked && looks.includes(asked) ? asked : looks.includes('board') ? 'board' : 'list';
-  return { kinds, current, counts, rows: page.rows, total: page.total, state, look };
+  const author = (await accessibleWorkspaces(ctx.db, p)).find((w) => w.id === current.workspace_id)?.role === 'author';
+  const milestones = look === 'timeline' ? await markersFor(ctx, p, current.id) : [];
+  return { kinds, current, counts, rows: page.rows, total: page.total, state, look, author, milestones };
 }
 
 export function workRoutes(ctx: AppContext, frameUser: (p: Principal) => Promise<HomeUser>, agents: AgentSetup): Hono<HubEnv> {
@@ -67,6 +70,7 @@ export function workRoutes(ctx: AppContext, frameUser: (p: Principal) => Promise
       author: f.caller.role === 'author',
       held: f.item.holders.includes(p.userId),
       lifecycleUrl,
+      shipped: f.kind.definition.drawnIn.shipped,
     });
     return c.html(appPage({ title: `${card.key} ${card.title}`, nonce: c.get('nonce'), ...(csrf ? { csrf } : {}), user: await frameUser(p), workspaces: spaces, sharedCount: shared, starredCount: starred, place: workspace ? { kind: 'workspace', slug: workspace.slug } : { kind: 'home' }, agents, body: html }, WORK_SCRIPT));
   });

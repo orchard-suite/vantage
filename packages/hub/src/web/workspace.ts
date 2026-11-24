@@ -16,6 +16,7 @@ import { blockedReason } from '../publishing/repo.ts';
 import { connectorBlocked as connectorBlockedText } from '../sources/repo.ts';
 import { decisionsTab, type DecisionsTabModel } from './decisions-page.ts';
 import { workTab, type WorkTabModel } from './work-page.ts';
+import { BOARD_SCRIPT } from './work-views.ts';
 import { LIBRARY_SCRIPT, libraryItems, libraryTools, plural, spaceName, when, type Layout, type LibraryOptions, type Sort } from './library.ts';
 
 export type WorkspaceTab = 'diagrams' | 'decisions' | 'work' | 'connectors' | 'publications' | 'members' | 'activity';
@@ -248,6 +249,6 @@ export function workspaceHtml(m: WorkspaceModel): string {
   const { spaces, shared, starred } = frameWorkspaces(m.workspaces, m.documents, m.user.id);
   return appPage(
     { title: name, nonce: m.nonce, ...(m.csrf ? { csrf: m.csrf } : {}), user: m.user, workspaces: spaces, sharedCount: shared, starredCount: starred, place: m.visiting ? { kind: 'admin' } : { kind: 'workspace', slug: ws.slug }, agents: m.agents, body: `${head}${body}${toast}` },
-    RUN_SCRIPT + LIBRARY_SCRIPT,
+    RUN_SCRIPT + LIBRARY_SCRIPT + (m.tab === 'work' ? BOARD_SCRIPT : ''),
   );
 }

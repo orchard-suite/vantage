@@ -192,6 +192,19 @@ The `decide` skill writes them. It reads the estate's registries from
 `~/.config/vantage/decisions.yaml` (or the file `VANTAGE_DECISIONS_CONFIG`
 names); `skills/decide/decisions.example.yaml` shows every key.
 
+### Tracked work and roadmaps
+
+A hub tracks work as items of a kind: a document with a `kind` block,
+built on a kind the hub ships (`work-item`, `roadmap-item`, or
+`milestone`). A roadmap item moves by its proof, never by a typed status.
+Items keep an order inside each horizon (`place`), carry a `start` and an
+`end`, and a parent's span is worked out from its parts. A milestone is a
+dated point that items of any kind link `toward`; it ships when they all
+have, and says whether it is on track. The workspace's Work tab shows a
+kind as a list, a board a person reorders by dragging, and a timeline of
+bars, points, and milestone markers. `docs/agent-guide.md`, "Kinds and
+items", has the details.
+
 ### Telling a story
 
 A view is a question with a one-sentence answer, and the sentence has a

@@ -373,7 +373,7 @@ export const KindLabelSchema = z
   .strict();
 
 /** The kinds the hub ships, which a kind may build on. */
-export const BASE_KINDS = ['work-item', 'roadmap-item'] as const;
+export const BASE_KINDS = ['work-item', 'roadmap-item', 'milestone'] as const;
 export type BaseKind = (typeof BASE_KINDS)[number];
 
 export const KindSchema = z

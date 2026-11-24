@@ -10,7 +10,10 @@ import type { Principal } from '../auth/principal.ts';
 import { randomId } from '../crypto.ts';
 import { HttpError, badRequest } from '../http.ts';
 import { headingOutline } from '@vantage/mcp';
-import { kindByPrefix } from '../tracking/kinds.ts';
+import { kindByPrefix, type KindDef } from '../tracking/kinds.ts';
+import { horizonOf } from '../tracking/rank.ts';
+import { spanText } from '../tracking/dates.ts';
+import { rollupText } from '../tracking/milestone.ts';
 import { findItem } from '../tracking/access.ts';
 import { bodyOf, cardOf, describeKind, filesOf, kindsFor, find as findItems, history, linksOf, notes, type Row } from '../tracking/read.ts';
 import { put } from '../tracking/write.ts';
@@ -65,9 +68,14 @@ export async function itemPart(ctx: AppContext, p: Principal, key: string, part:
   }
 }
 
-const rowLine = (r: Row): string => `  ${r.key}  ${r.state}  ${r.title}${r.holders.length ? `  held by ${r.holders.join(', ')}` : ''}${r.proofAt ? `  proof ${r.proofAt}` : ''}${Object.keys(r.labels).length ? `  ${Object.entries(r.labels).map(([k, v]) => `${k}=${v}`).join(' ')}` : ''}`;
+const rowLine = (r: Row): string => `  ${r.key}  ${r.state}  ${r.title}${r.holders.length ? `  held by ${r.holders.join(', ')}` : ''}${r.proofAt ? `  proof ${r.proofAt}` : ''}${Object.keys(r.labels).length ? `  ${Object.entries(r.labels).map(([k, v]) => `${k}=${v}`).join(' ')}` : ''}${r.span ? `  span ${r.span.start ?? '?'}..${r.span.end ?? '?'}` : ''}`;
 
-/** A kind's outline: its states with live counts, its labels, and its items as rows, newest first. A part names a state or a class. */
+/** The order a kind's rows come in, in words, as `find` sorts one kind. */
+function orderWords(def: KindDef): string {
+  return horizonOf(def) ? 'by horizon, then in their place, then newest first' : 'in their place, then newest first';
+}
+
+/** A kind's outline: its states with live counts, its labels, and its items as rows in the kind's order. A part names a state or a class. */
 export async function kindOutline(ctx: AppContext, p: Principal, prefix: string, part: string | undefined): Promise<string> {
   const { kind, counts } = await describeKind(ctx, p, prefix);
   const def = kind.definition;
@@ -92,7 +100,7 @@ export async function kindOutline(ctx: AppContext, p: Principal, prefix: string,
     ...(within.length ? [`part of: ${within.join(', ')}`] : []),
   ];
   const page = await findItems(ctx, p, { kinds: [kind.prefix], ...filter, limit: 40 });
-  lines.push('', `items${part ? ` in ${part}` : ''}, newest first (${n(page.total)}):`, ...page.rows.map(rowLine));
+  lines.push('', `items${part ? ` in ${part}` : ''}, ${orderWords(def)} (${n(page.total)}):`, ...page.rows.map(rowLine));
   if (page.total > page.rows.length) lines.push(`  ${n(page.total - page.rows.length)} more. more: vantage_outline ${kind.prefix}#<state>, or vantage_find with in: ${kind.prefix}`);
   if (!part) lines.push('', `A new item: vantage_write to ${kind.prefix} with this text, filled in:`, itemTemplate(def.labels, !def.owner));
   return lines.join('\n');
@@ -108,6 +116,8 @@ export async function itemOutline(ctx: AppContext, p: Principal, key: string): P
     `${c.key}: ${c.title}  version ${c.version}  ${c.kind} ${c.kindName}`,
     `${c.state} (${c.stateText}) since ${c.since}; asked by ${c.asker ?? 'nobody'}; held by ${c.holders.join(', ') || 'nobody'}`,
     `moves open to you: ${c.moves.join('; ') || 'none'}`,
+    ...(c.span ? [`span: ${spanText(c.span)}`] : []),
+    ...(c.milestone ? [`milestone: ${rollupText(c.milestone)}`] : []),
     `link: ${ctx.config.PUBLIC_URL}/w/${encodeURIComponent((await ctx.db.query<{ slug: string }>('select slug from workspaces where id = $1', [f.item.workspaceId]))[0]?.slug ?? '')}/work/${c.key}`,
     ...(c.hasBody ? [`body: ${n(body.length)} chars${hs.length ? '' : ', no headings'}`, ...hs] : []),
     `parts: ${c.key}#notes ${c.counts.notes}, #history ${c.counts.events}, #links ${c.counts.links}, #files ${c.counts.files}`,

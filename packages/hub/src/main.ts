@@ -8,6 +8,7 @@ import { connectPostgres } from './db/postgres.ts';
 import { databasePassword } from './db/auth.ts';
 import { migrate } from './db/migrate.ts';
 import { refreshBindSources } from './documents/save.ts';
+import { relayKinds } from './tracking/kinds.ts';
 import { backfillCitations } from './decisions/citations.ts';
 import { createRenderPool } from './render/pool.ts';
 import { openBlobStore } from './blob/index.ts';
@@ -101,7 +102,8 @@ export async function main(argv: string[]): Promise<number> {
       const out = await migrate(ctx.db, log);
       const refreshed = await refreshBindSources(ctx.db, log);
       const cited = await backfillCitations(ctx);
-      process.stdout.write(`applied ${out.applied.length}, skipped ${out.skipped}, refreshed sources of ${refreshed} documents, indexed citations of ${cited.documents} documents and ${cited.records} records\n`);
+      const relaid = await relayKinds(ctx.db, log);
+      process.stdout.write(`applied ${out.applied.length}, skipped ${out.skipped}, refreshed sources of ${refreshed} documents, indexed citations of ${cited.documents} documents and ${cited.records} records, laid ${relaid} kinds over their bases again\n`);
       await ctx.render.close();
       await ctx.db.close();
       await ctx.shutdownTelemetry();

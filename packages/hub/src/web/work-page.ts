@@ -6,12 +6,17 @@
  * makes so a double click lands once.
  */
 import type { AccessibleWorkspace } from '../authz.ts';
+import type { BaseKind } from '@vantage/model';
 import { escapeHtml } from './html.ts';
 import { ico } from './icons.ts';
 import { bodyHtml } from './decisions-page.ts';
 import type { KindRow } from '../tracking/kinds.ts';
 import type { Card, Row } from '../tracking/read.ts';
 import type { MoveOption } from '../tracking/gate.ts';
+import type { Marker } from '../tracking/milestone.ts';
+import { spanText } from '../tracking/dates.ts';
+import { rollupText } from '../tracking/milestone.ts';
+import { board, itemUrl, timeline, WORK_VIEWS_CSS } from './work-views.ts';
 
 /** How the tab shows the same items: a list, a board by horizon, or a timeline by promised date. */
 export type WorkLook = 'list' | 'board' | 'timeline';
@@ -24,6 +29,10 @@ export interface WorkTabModel {
   readonly total: number;
   readonly state?: string | undefined;
   readonly look: WorkLook;
+  /** Whether the reader writes the workspace, and so may put items in order. */
+  readonly author: boolean;
+  /** The milestones the kind's items work toward, for the timeline. */
+  readonly milestones: readonly Marker[];
 }
 
 /** A kind with a horizon label reads as a roadmap: a board by horizon, and a timeline when it has a date label. */
@@ -37,7 +46,7 @@ export function looksOf(k: KindRow): WorkLook[] {
 
 const PILL: Record<Row['class'], string> = { 'not-started': '', 'in-progress': 'warn', done: 'ok', parked: '' };
 
-export const itemUrl = (ws: string, key: string): string => `/w/${encodeURIComponent(ws)}/work/${encodeURIComponent(key)}`;
+export { itemUrl };
 
 function tabHref(ws: AccessibleWorkspace, kind: string | undefined, state?: string, look?: WorkLook): string {
   const p = new URLSearchParams({ tab: 'work' });
@@ -50,31 +59,6 @@ function tabHref(ws: AccessibleWorkspace, kind: string | undefined, state?: stri
 function rowLink(ws: AccessibleWorkspace, r: Row, stateText: ReadonlyMap<string, string>): string {
   const sub = [r.holders.length ? `held by ${r.holders.join(', ')}` : 'nobody holds it', ...Object.entries(r.labels).filter(([k]) => k !== 'horizon').map(([k, v]) => `${k} ${v}`), ...(r.proofAt ? [`proof ${r.proofAt}`] : [])].join(' · ');
   return `<a class="dec-row" href="${escapeHtml(itemUrl(ws.slug, r.key))}"><span class="ref">${escapeHtml(r.key)}</span><span class="t"><b>${escapeHtml(r.title)}</b><span>${escapeHtml(sub)}</span></span><span class="pill ${PILL[r.class]}">${escapeHtml(stateText.get(r.state) ?? r.state)}</span><time datetime="${escapeHtml(r.updated)}" title="Last changed">${escapeHtml(r.updated)}</time></a>`;
-}
-
-/** The board: one column per horizon, and one for items with none. */
-function board(ws: AccessibleWorkspace, k: KindRow, rows: readonly Row[], stateText: ReadonlyMap<string, string>): string {
-  const horizons = [...(k.definition.labels.find((l) => l.name === 'horizon')?.choices ?? []), ''];
-  const cols = horizons.map((h) => {
-    const mine = rows.filter((r) => (r.labels['horizon'] ?? '') === h);
-    if (!h && !mine.length) return '';
-    const cards = mine.map((r) => `<a class="work-card" href="${escapeHtml(itemUrl(ws.slug, r.key))}"><span class="ref">${escapeHtml(r.key)}</span><b>${escapeHtml(r.title)}</b><span class="pill ${PILL[r.class]}">${escapeHtml(stateText.get(r.state) ?? r.state)}</span><span class="sub">${escapeHtml([r.holders.join(', ') || 'nobody owes it', r.proofAt ? `proof ${r.proofAt}` : 'no proof yet'].join(' · '))}</span></a>`);
-    return `<section class="work-col" aria-label="${escapeHtml(h || 'No horizon')}"><h3>${escapeHtml(h ? h[0]!.toUpperCase() + h.slice(1) : 'No horizon')}<span class="n">${mine.length}</span></h3>${cards.join('') || '<p class="none">Nothing here.</p>'}</section>`;
-  });
-  return `<div class="work-board">${cols.join('')}</div>`;
-}
-
-/** The timeline: items with a date, in date order, each placed along the span from the first date to the last. */
-function timeline(ws: AccessibleWorkspace, k: KindRow, rows: readonly Row[], stateText: ReadonlyMap<string, string>): string {
-  const dateLabel = k.definition.labels.find((l) => l.type === 'date')!.name;
-  const dated = rows.filter((r) => typeof r.labels[dateLabel] === 'string').sort((a, b) => String(a.labels[dateLabel]).localeCompare(String(b.labels[dateLabel])));
-  const undated = rows.length - dated.length;
-  if (!dated.length) return `<p class="none-here">No item has a ${escapeHtml(dateLabel)} date yet. A date is set only for a real promise.</p>`;
-  const t = (r: Row): number => Date.parse(String(r.labels[dateLabel]));
-  const first = t(dated[0]!), last = t(dated[dated.length - 1]!);
-  const span = Math.max(1, last - first);
-  const lines = dated.map((r) => `<a class="work-tl" href="${escapeHtml(itemUrl(ws.slug, r.key))}" style="--at:${(((t(r) - first) / span) * 100).toFixed(1)}%"><time>${escapeHtml(String(r.labels[dateLabel]))}</time><span class="ref">${escapeHtml(r.key)}</span><b>${escapeHtml(r.title)}</b><span class="pill ${PILL[r.class]}">${escapeHtml(stateText.get(r.state) ?? r.state)}</span></a>`);
-  return `<div class="work-timeline">${lines.join('')}</div>${undated ? `<p class="none-here">${undated} item${undated === 1 ? ' has' : 's have'} no ${escapeHtml(dateLabel)} date.</p>` : ''}`;
 }
 
 export function workTab(ws: AccessibleWorkspace, m: WorkTabModel): string {
@@ -92,7 +76,7 @@ export function workTab(ws: AccessibleWorkspace, m: WorkTabModel): string {
   const stateText = new Map(cur.definition.states.map((s) => [s.id, s.text]));
   const more = m.total > m.rows.length ? `<p class="none-here">${m.total - m.rows.length} more; pick a state to narrow the list.</p>` : '';
   if (!m.rows.length) return `<section aria-labelledby="t-head">${intro}${bar}<p class="none-here">${all ? 'No item is in this state.' : `<b>${escapeHtml(cur.prefix)} has no items yet.</b> Agents make one with <code>vantage_write</code> to <code>${escapeHtml(cur.prefix)}</code>.`}</p></section>`;
-  const body = m.look === 'board' && looks.includes('board') ? board(ws, cur, m.rows, stateText) : m.look === 'timeline' && looks.includes('timeline') ? timeline(ws, cur, m.rows, stateText) : `<div class="rows">${m.rows.map((r) => rowLink(ws, r, stateText)).join('')}</div>`;
+  const body = m.look === 'board' && looks.includes('board') ? board(ws, cur, m.rows, stateText, m.author) : m.look === 'timeline' && looks.includes('timeline') ? timeline(ws, cur, m.rows, stateText, m.milestones) : `<div class="rows">${m.rows.map((r) => rowLink(ws, r, stateText)).join('')}</div>`;
   return `<section aria-labelledby="t-head">${intro}${bar}${body}${more}</section>`;
 }
 
@@ -109,6 +93,8 @@ export interface ItemPageModel {
   readonly held: boolean;
   /** Where the kind's lifecycle is drawn; absent for one that follows the hub's shipped lifecycle. */
   readonly lifecycleUrl?: string | undefined;
+  /** The shipped kind whose lifecycle it follows, when it draws none of its own. */
+  readonly shipped?: BaseKind | undefined;
 }
 
 /** The page body of one item; the route wraps it in the app frame. */
@@ -118,13 +104,15 @@ export function itemBody(ws: AccessibleWorkspace | undefined, wsName: string, m:
   const crumbs = ws
     ? `<nav class="crumbs" aria-label="Breadcrumb"><a href="/">Home</a>${ico('right', 12)}<a href="/w/${encodeURIComponent(ws.slug)}">${escapeHtml(wsName)}</a>${ico('right', 12)}<a href="${escapeHtml(tabHref(ws, c.kind))}">${escapeHtml(c.kind)} work</a>${ico('right', 12)}<span aria-current="page">${escapeHtml(c.key)}</span></nav>`
     : '';
-  const head = `<header class="dec-head">${crumbs}<span class="ref">${escapeHtml(c.key)}</span><h1>${escapeHtml(c.title)}</h1><div class="ws-meta"><span class="pill ${PILL[c.class]}">${escapeHtml(c.stateText)}</span><span>since ${escapeHtml(c.since)}</span>${m.lifecycleUrl ? `<a href="${escapeHtml(m.lifecycleUrl)}">How ${escapeHtml(c.kindName)} moves</a>` : `<span>follows the hub's work item lifecycle</span>`}</div></header>`;
+  const head = `<header class="dec-head">${crumbs}<span class="ref">${escapeHtml(c.key)}</span><h1>${escapeHtml(c.title)}</h1><div class="ws-meta"><span class="pill ${PILL[c.class]}">${escapeHtml(c.stateText)}</span><span>since ${escapeHtml(c.since)}</span>${m.lifecycleUrl ? `<a href="${escapeHtml(m.lifecycleUrl)}">How ${escapeHtml(c.kindName)} moves</a>` : `<span>follows the hub's ${escapeHtml((m.shipped ?? 'work-item').replace('-', ' '))} lifecycle</span>`}</div></header>`;
   const cell = (label: string, value: string): string => `<div><span class="caps">${label}</span><b>${value}</b></div>`;
   const meta = [
     cell('Asked by', escapeHtml(c.asker ?? 'Nobody')),
     cell('Held by', escapeHtml(c.holders.join(', ') || 'Nobody')),
     ...Object.entries(c.labels).map(([k, v]) => cell(escapeHtml(k), escapeHtml(String(v)))),
     ...(c.parent ? [cell('Part of', escapeHtml(c.parent))] : []),
+    ...(c.span ? [cell('Span', escapeHtml(spanText(c.span)))] : []),
+    ...(c.milestone ? [cell('Milestone', escapeHtml(rollupText(c.milestone)))] : []),
     ...(c.ref ? [cell("Owner's key", `<code>${escapeHtml(c.ref)}</code>`)] : []),
     ...(c.revision ? [cell('Revision', `<code>${escapeHtml(c.revision)}</code>`)] : []),
   ];
@@ -162,21 +150,7 @@ export const WORK_SCRIPT = `
 })();
 `;
 
-export const WORK_CSS = `
-.work-board{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:12px;align-items:start}
-.work-col{display:flex;flex-direction:column;gap:8px;padding:10px;border:1px solid var(--line);border-radius:var(--r-l);background:var(--sunken)}
-.work-col h3{display:flex;justify-content:space-between;margin:0 2px 2px;font-size:13px;font-weight:600}
-.work-col h3 .n{font:500 var(--fs-xs) var(--mono);color:var(--faint)}
-.work-card{display:flex;flex-direction:column;gap:6px;padding:10px 12px;border:1px solid var(--line);border-radius:var(--r-m);background:var(--panel);color:inherit;text-decoration:none}
-.work-card:hover{border-color:var(--line2)}
-.work-card .ref{font:600 var(--fs-xs) var(--mono);color:var(--muted)}
-.work-card b{font-weight:600;font-size:13.5px}
-.work-card .pill{align-self:flex-start}
-.work-card .sub{font-size:12px;color:var(--muted)}
-.work-timeline{position:relative;display:flex;flex-direction:column;gap:6px;padding:4px 0 4px 18px;border-left:2px solid var(--line)}
-.work-tl{display:grid;grid-template-columns:96px 70px 1fr auto;gap:12px;align-items:center;padding:8px 12px;border:1px solid var(--line);border-radius:var(--r-m);background:var(--panel);color:inherit;text-decoration:none;margin-left:calc(var(--at) * 0.3)}
-.work-tl time,.work-tl .ref{font:500 var(--fs-xs) var(--mono);color:var(--muted)}
-@media (max-width:640px){.work-tl{grid-template-columns:1fr;margin-left:0}}
+export const WORK_CSS = `${WORK_VIEWS_CSS}
 .work-actions{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
 .work-move{display:flex;gap:6px;align-items:center}
 .work-move .field{height:30px;min-width:220px}

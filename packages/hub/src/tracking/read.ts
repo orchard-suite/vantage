@@ -14,6 +14,9 @@ import { findItem, reachOf, visibleWhere, type Found, type Reach } from './acces
 import { linkText } from './links.ts';
 import { isWorked, readProof, type Proof } from './worked.ts';
 import type { EventData, ItemState, LabelValue, LinkRel } from './state.ts';
+import { spanFrom, spanOf, spanSql, type Span } from './dates.ts';
+import { horizonOf, orderSql } from './rank.ts';
+import { isMilestone, rollupOf, type Rollup } from './milestone.ts';
 
 export interface Card {
   readonly key: string;
@@ -41,6 +44,10 @@ export interface Card {
   /** Who claims it and until when, while the claim holds. */
   readonly claim?: string;
   readonly runs: number;
+  /** For a parent: the span its parts give it, from the earliest start to the latest end. */
+  readonly span?: Span;
+  /** For a milestone: what links toward it, rolled up. */
+  readonly milestone?: Rollup;
 }
 
 /** A worked item's proof in one line: its pieces by state, and the age of the newest. */
@@ -67,6 +74,7 @@ export async function cardOf(ctx: AppContext, f: Found): Promise<Card> {
   const who = await people(ctx, [item.askerId, ...item.holders]);
   const parentId = item.links.find((l) => l.rel === 'part-of')?.target;
   const members = await membersOf(ctx.db, item.orgId, def);
+  const span = await spanOf(ctx.db, item.id);
   return {
     key: item.key,
     kind: kind.prefix,
@@ -89,6 +97,8 @@ export async function cardOf(ctx: AppContext, f: Found): Promise<Card> {
     ...(isWorked(def) ? { proof: proofText(await readProof(ctx.db, item)) } : {}),
     ...(item.claim && Date.parse(item.claim.until) > Date.now() ? { claim: `${(await people(ctx, [item.claim.userId])).get(item.claim.userId) ?? 'a person'} until ${item.claim.until.slice(0, 16).replace('T', ' ')} UTC` } : {}),
     runs: item.runs,
+    ...(span ? { span } : {}),
+    ...(isMilestone(def) ? { milestone: await rollupOf(ctx.db, item) } : {}),
   };
 }
 
@@ -141,6 +151,8 @@ export interface Row {
   readonly updated: string;
   /** When the newest of its parts and the items it names as proof last moved; absent when it has none. */
   readonly proofAt?: string;
+  /** For a parent: the span its parts give it. */
+  readonly span?: Span;
 }
 
 export const FIND_LIMIT = 100;
@@ -188,14 +200,37 @@ export async function find(ctx: AppContext, p: Principal, q: FindQuery, r?: Reac
     return { rows: [], total, counts, ...(grouped.length > FIND_LIMIT ? { others: total - counted } : {}) };
   }
   const limit = Math.min(Math.max(1, q.limit ?? 20), FIND_LIMIT);
-  const rows = await ctx.dbRead.query<{ key: string; title: string; state: string; class: ItemState['class']; holders: string[]; labels: Record<string, LabelValue>; updated_at: Date; proof_at: Date | null }>(
+  const order = await orderOf(ctx, p, q, params);
+  const rows = await ctx.dbRead.query<{ key: string; title: string; state: string; class: ItemState['class']; holders: string[]; labels: Record<string, LabelValue>; updated_at: Date; proof_at: Date | null; span: Span | null }>(
     `select i.key, i.title, i.state, i.class, i.holders, i.labels, i.updated_at,
-            (select max(c.state_since) from items c where c.parent_id = i.id or c.id in (select l.target from item_links l where l.item_id = i.id and l.rel = 'proof')) as proof_at
-       ${from} order by i.updated_at desc, i.key limit ${limit} offset ${Math.max(0, q.offset ?? 0)}`,
+            (select max(c.state_since) from items c where c.parent_id = i.id or c.id in (select l.target from item_links l where l.item_id = i.id and l.rel = 'proof') or c.id in (select l.item_id from item_links l where l.target = i.id and l.rel = 'toward')) as proof_at,
+            ${spanSql('i.id')} as span
+       ${from} order by ${order} limit ${limit} offset ${Math.max(0, q.offset ?? 0)}`,
     params,
   );
   const who = await people(ctx, rows.flatMap((x) => x.holders));
-  return { rows: rows.map((x) => ({ key: x.key, title: x.title, state: x.state, class: x.class, holders: x.holders.map((h) => who.get(h) ?? 'a person'), labels: x.labels, updated: new Date(x.updated_at).toISOString().slice(0, 10), ...(x.proof_at ? { proofAt: new Date(x.proof_at).toISOString().slice(0, 10) } : {}) })), total };
+  return {
+    rows: rows.map((x) => {
+      const span = spanFrom(x.span);
+      return { key: x.key, title: x.title, state: x.state, class: x.class, holders: x.holders.map((h) => who.get(h) ?? 'a person'), labels: x.labels, updated: new Date(x.updated_at).toISOString().slice(0, 10), ...(x.proof_at ? { proofAt: new Date(x.proof_at).toISOString().slice(0, 10) } : {}), ...(span ? { span } : {}) };
+    }),
+    total,
+  };
+}
+
+/**
+ * How a list orders its rows. A list of one kind shows the kind's order: by
+ * horizon in its choice order when it has one, then by rank, then newest
+ * first, so an unranked kind of work reads newest first as it always has.
+ * A list across kinds reads newest first.
+ */
+async function orderOf(ctx: AppContext, p: Principal, q: FindQuery, params: unknown[]): Promise<string> {
+  if (q.kinds?.length !== 1) return 'i.updated_at desc, i.key';
+  const kind = await kindByPrefix(ctx.db, p.orgId, q.kinds[0]!);
+  const choices = kind ? horizonOf(kind.definition) : undefined;
+  if (!choices) return orderSql(undefined);
+  params.push([...choices]);
+  return orderSql(params.length);
 }
 
 export interface Change {
@@ -253,6 +288,8 @@ export function eventLine(c: Pick<Change, 'type' | 'data' | 'actor' | 'at'>): st
         return `noted: ${d.text.split('\n')[0]!.slice(0, 160)}`;
       case 'attached':
         return `attached ${d.name}`;
+      case 'placed':
+        return d.rank === null ? 'left its place' : 'placed';
       case 'linked':
         return `linked ${d.rel}`;
       case 'unlinked':

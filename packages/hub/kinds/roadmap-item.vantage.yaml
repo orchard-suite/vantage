@@ -7,6 +7,8 @@ kind:
   labels:
     - { name: horizon, type: choice, title: Horizon, choices: [now, next, later] }
     - { name: promised, type: date, title: Promised by }
+    - { name: start, type: date, title: Starts }
+    - { name: end, type: date, title: Ends }
   lifecycle: lifecycle
 views:
   - id: lifecycle

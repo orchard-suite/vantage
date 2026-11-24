@@ -13,13 +13,15 @@ import { loadStored } from '../documents/model.ts';
 import { documentAt, workspaceAt } from '../text/things.ts';
 import { ITEM_KEY, OWNER_KEY, findItem, type Found } from './access.ts';
 import type { LinkRel } from './state.ts';
+import { isMilestone } from './milestone.ts';
 
 /** The form a link target is kept in, from the words a caller gave. */
 export async function linkTarget(ctx: AppContext, p: Principal, f: Found, rel: LinkRel, target: string): Promise<string> {
   const t = target.trim();
-  if (rel === 'came-from' || rel === 'part-of' || rel === 'waits-on') {
+  if (rel === 'came-from' || rel === 'part-of' || rel === 'waits-on' || rel === 'toward') {
     const other = await findItem(ctx, p, t);
     if (other.item.id === f.item.id) throw badRequest(`${f.item.key} cannot link to itself`);
+    if (rel === 'toward' && !isMilestone(other.kind.definition)) throw badRequest(`${other.item.key} is not a milestone; toward names an item of a kind built on base: milestone`);
     if (rel === 'part-of' && !other.kind.definition.parts.includes(f.kind.prefix)) throw badRequest(`a ${f.kind.prefix} item cannot be part of ${other.item.key}: kind ${other.kind.prefix} lists ${other.kind.definition.parts.join(', ') || 'no kinds'} as its parts`);
     return other.item.id;
   }
@@ -61,7 +63,7 @@ export async function linkText(ctx: AppContext, rel: LinkRel, target: string): P
     const s = await maybe<{ ws: string; slug: string }>(ctx.db, 'select w.slug as ws, s.slug from sources s join workspaces w on w.id = s.workspace_id where s.id = $1', [sourceId]);
     return s ? `ticket:${s.ws}/${s.slug}#${id}` : `ticket ${id}`;
   }
-  if (rel === 'came-from' || rel === 'part-of' || rel === 'waits-on' || (rel === 'proof' && !target.includes('#'))) return (await maybe<{ key: string }>(ctx.db, 'select key from items where id = $1', [target]))?.key ?? 'an item';
+  if (rel === 'came-from' || rel === 'part-of' || rel === 'waits-on' || rel === 'toward' || (rel === 'proof' && !target.includes('#'))) return (await maybe<{ key: string }>(ctx.db, 'select key from items where id = $1', [target]))?.key ?? 'an item';
   if (rel === 'decision') {
     const r = await maybe<{ prefix: string; number: number }>(ctx.db, 'select g.prefix, d.number from decisions d join decision_registries g on g.id = d.registry_id where d.id = $1', [target]);
     return r ? `${r.prefix}-${String(r.number).padStart(4, '0')}` : 'a record';

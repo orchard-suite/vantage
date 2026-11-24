@@ -6,7 +6,7 @@
  */
 import type { StateClass } from '@vantage/model';
 
-export const LINK_RELS = ['came-from', 'part-of', 'waits-on', 'box', 'view', 'decision', 'proof', 'adds', 'changes', 'retires'] as const;
+export const LINK_RELS = ['came-from', 'part-of', 'waits-on', 'toward', 'box', 'view', 'decision', 'proof', 'adds', 'changes', 'retires'] as const;
 export type LinkRel = (typeof LINK_RELS)[number];
 
 export type LabelValue = string | number;
@@ -27,10 +27,12 @@ export interface ItemState {
   readonly labels: Readonly<Record<string, LabelValue>>;
   readonly revision: string | null;
   readonly bodyId: string | null;
-  /** Targets by relation: `part-of`, `came-from`, and `waits-on` name item ids; `box`, `view`, `adds`, `changes`, and `retires` name document-id#id; `decision` names a record's ULID; `proof` names an item id or a document-id#box. */
+  /** Targets by relation: `part-of`, `came-from`, `waits-on`, and `toward` name item ids; `box`, `view`, `adds`, `changes`, and `retires` name document-id#id; `decision` names a record's ULID; `proof` names an item id or a document-id#box. */
   readonly links: readonly { readonly rel: LinkRel; readonly target: string }[];
   /** Who claims the item and until when; a claim past its end holds nothing. */
   readonly claim: { readonly userId: string; readonly until: string } | null;
+  /** Its place among the items of its kind: a fractional rank, compared byte by byte; null sorts after every ranked item. */
+  readonly rank: string | null;
   readonly position: number;
   readonly events: number;
   readonly notes: number;
@@ -54,6 +56,7 @@ export type EventData =
   | { readonly type: 'released'; readonly userId: string }
   | { readonly type: 'noted'; readonly text: string }
   | { readonly type: 'attached'; readonly fileId: string; readonly name: string; readonly size: number; readonly contentType: string }
+  | { readonly type: 'placed'; readonly rank: string | null }
   | { readonly type: 'linked'; readonly rel: LinkRel; readonly target: string }
   | { readonly type: 'unlinked'; readonly rel: LinkRel; readonly target: string };
 
@@ -109,6 +112,7 @@ export function fold(before: ItemState | undefined, e: ItemEvent, orgId: string)
       askerId: d.askerId,
       holders: [],
       claim: null,
+      rank: null,
       labels: d.labels,
       revision: d.revision,
       bodyId: d.bodyId,
@@ -152,6 +156,8 @@ export function fold(before: ItemState | undefined, e: ItemEvent, orgId: string)
       return { ...s, notes: before.notes + 1 };
     case 'attached':
       return { ...s, files: before.files + 1 };
+    case 'placed':
+      return { ...s, rank: d.rank };
     case 'linked':
       return before.links.some((l) => l.rel === d.rel && l.target === d.target) ? s : { ...s, links: [...before.links, { rel: d.rel, target: d.target }] };
     case 'unlinked':

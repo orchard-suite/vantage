@@ -19,6 +19,8 @@ import { findItem, requireAuthor, requireWorker, type Found } from './access.ts'
 import { linkTarget } from './links.ts';
 import { requireApp, requirePerson } from './apps.ts';
 import { dependents, rework } from './worked.ts';
+import { placement, type Place, type Placement } from './rank.ts';
+import { checkDates } from './dates.ts';
 
 /** What a write answers: one line, and the item as it stands after. */
 export interface WriteAnswer {
@@ -96,13 +98,15 @@ async function commit(c: Commit, itemId: string | undefined, act: (tx: Db, befor
       out.events.push({ id: before!.id, data: { type: 'renewed', until: new Date(Date.now() + CLAIM_MINUTES * 60_000).toISOString() } });
     }
     if (!out.events.length) return { status: 'unchanged' as const, line: out.line, key: out.key };
-    let s = before;
+    // A write changes its own item, and sometimes others beside it (a placement ranks the items shown before it): each folds from its own state.
+    const states = new Map<string, ItemState | undefined>(before ? [[before.id, before]] : []);
     const touched = new Set<string>();
     for (const [i, e] of out.events.entries()) {
+      const prior = states.has(e.id) ? states.get(e.id) : await stateById(tx, e.id, true);
       // The key rides on the first event: a repeat finds it and answers the line, and the rest of the write is already in.
-      s = await append(tx, { orgId: c.p.orgId, itemId: e.id, before: s, data: e.data, actor: actorOf(c.p), key: i === 0 ? c.key : undefined, answer: out.line, named: out.named });
+      states.set(e.id, await append(tx, { orgId: c.p.orgId, itemId: e.id, before: prior, data: e.data, actor: actorOf(c.p), key: i === 0 ? c.key : undefined, answer: out.line, named: out.named }));
       touched.add(e.id);
-      if ((e.data.type === 'linked' || e.data.type === 'unlinked') && e.data.rel === 'part-of') touched.add(e.data.target);
+      if ((e.data.type === 'linked' || e.data.type === 'unlinked') && (e.data.rel === 'part-of' || e.data.rel === 'toward')) touched.add(e.data.target);
     }
     // A worked item moves with its proof, in this same transaction: the item itself, its parent, and whatever names it as proof.
     const moved = await rework(tx, c.p.orgId, [...touched, ...(await dependents(tx, [...touched]))]);
@@ -125,6 +129,8 @@ export interface PutInput {
   readonly edits?: readonly { readonly old: string; readonly new: string }[] | undefined;
   /** The item this one is part of, by key. */
   readonly parent?: string | undefined;
+  /** Where it goes among the items of its kind in its horizon. */
+  readonly place?: Place | undefined;
 }
 
 /** Makes an item or changes the fields it names. Fields it does not name stay as they are. */
@@ -151,6 +157,7 @@ export async function put(ctx: AppContext, p: Principal, input: PutInput, key: s
   if (input.body !== undefined && def.owner) throw badRequest(`${kind.prefix} items are kept by ${def.owner}; the hub holds no body for them, only their state`);
   if (input.edits) throw badRequest('a new item has no body to edit; send its body');
   const labels = Object.fromEntries(Object.entries(checkLabels(def, input.labels ?? {})).filter((e): e is [string, LabelValue] => e[1] !== null));
+  checkDates(def, labels);
   const parent = input.parent ? await parentLink(ctx, p, kind, input.parent) : undefined;
   const members = await membersOf(ctx.db, p.orgId, def);
   const id = randomId();
@@ -160,11 +167,13 @@ export async function put(ctx: AppContext, p: Principal, input: PutInput, key: s
     const itemKey = `${kind.prefix}-${number}`;
     const bodyId = input.body !== undefined ? await saveBody(tx, id, input.body) : null;
     const start = startState(def);
+    const placed = input.place ? await placement(tx, kind, { id, key: itemKey }, labels, input.place) : undefined;
     const events: { id: string; data: EventData }[] = [
       { id, data: { type: 'created', key: itemKey, number, kindId: kind.id, workspaceId: kind.workspace_id, ref: input.ref ?? null, title: input.title!.trim(), state: start.id, class: start.class, askerId: p.module ? null : p.userId, labels, revision: input.revision ?? null, bodyId } },
       ...(parent ? [{ id, data: { type: 'linked' as const, rel: 'part-of' as const, target: parent } }] : []),
+      ...(placed ? placedEvents(id, placed) : []),
     ];
-    return { events, line: `created ${itemKey}: ${input.title!.trim()} (${start.text})`, key: itemKey, named: (s) => namedBy(def, s, members) };
+    return { events, line: `created ${itemKey}: ${input.title!.trim()} (${start.text})${placed ? `, placed ${placed.words}` : ''}`, key: itemKey, named: (s) => namedBy(def, s, members) };
   });
 }
 
@@ -195,9 +204,31 @@ async function change(ctx: AppContext, p: Principal, f: Found, input: PutInput, 
       if (oldParent) events.push({ id: s.id, data: { type: 'unlinked', rel: 'part-of', target: oldParent } });
       events.push({ id: s.id, data: { type: 'linked', rel: 'part-of', target: parent } });
     }
-    const what = [...Object.keys(set).map((k) => (k === 'bodyId' ? 'body' : k)), ...(parent !== undefined && parent !== oldParent ? ['parent'] : [])];
+    const after = mergeLabels(s.labels, set.labels ?? {});
+    if (set.labels) checkDates(def, after);
+    // A new horizon without a place puts the item after the ranked ones there, until it is placed.
+    const placed = input.place ? await placement(tx, f.kind, s, after, input.place) : undefined;
+    const moved = set.labels && 'horizon' in set.labels && s.rank !== null;
+    if (placed) events.push(...placedEvents(s.id, placed));
+    else if (moved) events.push({ id: s.id, data: { type: 'placed', rank: null } });
+    const what = [...Object.keys(set).map((k) => (k === 'bodyId' ? 'body' : k)), ...(parent !== undefined && parent !== oldParent ? ['parent'] : []), ...(placed ? [`placed ${placed.words}`] : [])];
     return { events, line: what.length ? `saved ${s.key} (${what.join(', ')})` : `unchanged: ${s.key}`, key: s.key, named: (x) => namedBy(def, x, members) };
   });
+}
+
+/** Labels as they stand once a change lands: a null takes one away. */
+function mergeLabels(before: Readonly<Record<string, LabelValue>>, change: Readonly<Record<string, LabelValue | null>>): Record<string, LabelValue> {
+  const out: Record<string, LabelValue> = { ...before };
+  for (const [k, v] of Object.entries(change)) {
+    if (v === null) delete out[k];
+    else out[k] = v;
+  }
+  return out;
+}
+
+/** The events a placement makes: a rank for each unranked item shown before it, then the item's own. */
+function placedEvents(id: string, p: Placement): { id: string; data: EventData }[] {
+  return [...p.peers.map((x) => ({ id: x.id, data: { type: 'placed' as const, rank: x.rank } })), { id, data: { type: 'placed', rank: p.rank } }];
 }
 
 /** Applies body edits in order; each old string must stand in the body exactly once, which is the guard that needs no version. */
