@@ -2,6 +2,12 @@
 
 All notable changes to this project will be documented in this file.
 
+## [4.4.0](https://github.com/orchard-suite/vantage/compare/v4.3.0...v4.4.0) (2026-11-24)
+
+### Features
+
+* **vantage:** add item order, dates, milestones ([df73b69](https://github.com/orchard-suite/vantage/commit/df73b6989772e6e402a2076840b51da82f33e930))
+
 ## [4.3.0](https://github.com/orchard-suite/vantage/compare/v4.2.0...v4.3.0) (2026-11-23)
 
 ### Features
