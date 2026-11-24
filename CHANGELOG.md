@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file.
 
+## [4.4.1](https://github.com/orchard-suite/vantage/compare/v4.4.0...v4.4.1) (2026-11-24)
+
+### Bug Fixes
+
+* **vantage:** keep a decision in its registry ([39246e0](https://github.com/orchard-suite/vantage/commit/39246e0a5ba659c02f1005e0fb3a36472ec2d8ce))
+* **vantage:** release a skill-only change ([326b31c](https://github.com/orchard-suite/vantage/commit/326b31ce7d1d111e793fdaaf07c91496f2157c42))
+
 ## [4.4.0](https://github.com/orchard-suite/vantage/compare/v4.3.0...v4.4.0) (2026-11-24)
 
 ### Features
