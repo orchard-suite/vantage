@@ -2,6 +2,12 @@
 
 All notable changes to this project will be documented in this file.
 
+## [4.4.6](https://github.com/orchard-suite/vantage/compare/v4.4.5...v4.4.6) (2026-11-25)
+
+### Bug Fixes
+
+* **vantage:** parse a saved document once, off the event loop ([6643dd5](https://github.com/orchard-suite/vantage/commit/6643dd5d7c0da46b8c42f8624d95c05126e4c2d4))
+
 ## [4.4.5](https://github.com/orchard-suite/vantage/compare/v4.4.4...v4.4.5) (2026-11-25)
 
 ### Bug Fixes
