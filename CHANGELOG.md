@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file.
 
+## [4.4.2](https://github.com/orchard-suite/vantage/compare/v4.4.1...v4.4.2) (2026-11-25)
+
+### Bug Fixes
+
+* **vantage:** redraw only views a refresh changes ([e60d8c0](https://github.com/orchard-suite/vantage/commit/e60d8c0bf10202243d0e97a1f4a2755fb6a3f123))
+* **vantage:** draw a save before a source refresh ([b76b35a](https://github.com/orchard-suite/vantage/commit/b76b35ad4b9ec4b6b53a8219289b785df39c2c42))
+
 ## [4.4.1](https://github.com/orchard-suite/vantage/compare/v4.4.0...v4.4.1) (2026-11-24)
 
 ### Bug Fixes
