@@ -175,6 +175,11 @@ one table per level:
 - a milestone at risk, with the items that put it there;
 - items no proof has moved in a long time while `now`;
 - items with no decision where the level's rule needs one;
+- accepted decision records in the program's registry that owe work and
+  that no item links (`decision`), newest first: the work a decision
+  promised and nobody filed;
+- items in `doing` that no one holds, and work in the repository's recent
+  commits that names no item;
 - program items that serve nothing above, and suite items with no parts in
   the program that owes them.
 
