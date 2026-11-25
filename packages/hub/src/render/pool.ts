@@ -2,8 +2,10 @@
  * The render pool: a few threads that run render tasks, so drawing never
  * holds the event loop that answers requests, renews job leases, and runs
  * connectors. Tasks wait in one queue; a thread that crashes or runs past
- * the deadline is replaced and its task fails with a reason. With no
- * threads the tasks run in this process, for tests and small tools.
+ * the deadline is replaced and its task fails with a reason. A background
+ * task (a source refresh's draw) waits behind every task a person waits
+ * for, so a save never queues behind a refresh. With no threads the tasks
+ * run in this process, for tests and small tools.
  */
 import type { Logger } from '../log.ts';
 import { runTask, type TaskInput, type TaskKind, type TaskOutput } from './tasks.ts';
@@ -11,6 +13,8 @@ import { runTask, type TaskInput, type TaskKind, type TaskOutput } from './tasks
 export interface RunOptions {
   /** This task's deadline, when it should be shorter or longer than the pool's. */
   readonly timeoutMs?: number;
+  /** Nobody waits on it: it runs only when no other task waits. */
+  readonly background?: boolean;
 }
 
 export interface RenderPool {
@@ -45,6 +49,7 @@ interface Pending {
   readonly reject: (e: Error) => void;
   readonly queuedAt: number;
   readonly timeoutMs: number;
+  readonly background: boolean;
 }
 
 interface Slot {
@@ -131,7 +136,11 @@ export function createRenderPool(opts: PoolOptions): RenderPool {
         return Promise.reject(new PoolBusyError(queue.length));
       }
       return new Promise<TaskOutput<K>>((resolve, reject) => {
-        queue.push({ id: nextId++, kind, input, resolve: resolve as (v: unknown) => void, reject, queuedAt: Date.now(), timeoutMs: runOpts.timeoutMs ?? opts.timeoutMs });
+        const task: Pending = { id: nextId++, kind, input, resolve: resolve as (v: unknown) => void, reject, queuedAt: Date.now(), timeoutMs: runOpts.timeoutMs ?? opts.timeoutMs, background: runOpts.background === true };
+        // A task a person waits for goes ahead of every background task; each kind keeps its own order.
+        const at = task.background ? -1 : queue.findIndex((t) => t.background);
+        if (at < 0) queue.push(task);
+        else queue.splice(at, 0, task);
         dispatch();
       });
     },

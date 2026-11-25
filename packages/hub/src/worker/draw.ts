@@ -30,8 +30,10 @@ export interface DrawRunner {
   range(input: RangeInput): Promise<RangeView[]>;
 }
 
-export function poolRunner(ctx: AppContext): DrawRunner {
-  return { threads: Math.max(1, ctx.render.stats().threads), plan: (i) => ctx.render.run('plan', i), range: (i) => ctx.render.run('range', i) };
+/** A background draw (a source refresh) lets every draw a person waits for go first. */
+export function poolRunner(ctx: AppContext, opts: { readonly background?: boolean } = {}): DrawRunner {
+  const run = { background: opts.background === true };
+  return { threads: Math.max(1, ctx.render.stats().threads), plan: (i) => ctx.render.run('plan', i, run), range: (i) => ctx.render.run('range', i, run) };
 }
 
 export async function drawDocument(run: DrawRunner, input: DocumentInput, opts: { readonly previousDigest?: string | undefined } = {}): Promise<DrawResult> {

@@ -144,13 +144,17 @@ export async function releaseJobs(db: Db, workerId: string, ids: readonly string
   return rows.length;
 }
 
-/** Claims the oldest runnable job of its lane for this worker, or nothing. A job whose dedupe key is running waits for it. */
+/**
+ * Claims the oldest runnable job of its lane for this worker, or nothing:
+ * a save's draw first, since a person waits for it, then the rest. A job
+ * whose dedupe key is running waits for it.
+ */
 export async function claim(db: Db, workerId: string, lane: JobLane = 'hub'): Promise<JobRow | undefined> {
   const rows = await db.query<JobRow>(
     `update jobs set state = 'running', locked_by = $1, locked_at = now(), attempts = attempts + 1, updated_at = now()
       where id = (select q.id from jobs q where q.state = 'queued' and q.run_at <= now() and (q.kind = 'connector-run') = $2
                     and (q.dedupe_key is null or not exists (select 1 from jobs r where r.state = 'running' and r.dedupe_key = q.dedupe_key))
-                    order by q.run_at, q.created_at limit 1 for update skip locked)
+                    order by (q.kind = 'render') desc, q.run_at, q.created_at limit 1 for update skip locked)
       returning *`,
     [workerId, lane === 'pool'],
   );

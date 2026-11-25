@@ -56,6 +56,14 @@ describe('job queue', () => {
     expect(next).not.toBe(first);
   });
 
+  test("a save's draw is claimed before a source refresh queued ahead of it", async () => {
+    const ctx = await testContext();
+    const refresh = await enqueueDraw(ctx.db, { orgId: ORG, kind: 'overlay', documentId: 'bound' });
+    const save = await enqueueDraw(ctx.db, { orgId: ORG, kind: 'render', documentId: 'saved' });
+    expect((await claim(ctx.db, 'w1'))?.id).toBe(save);
+    expect((await claim(ctx.db, 'w1'))?.id).toBe(refresh);
+  });
+
   test('a document has one queued draw; a save takes the place of a source refresh', async () => {
     const ctx = await testContext();
     const refresh = await enqueueDraw(ctx.db, { orgId: ORG, kind: 'overlay', documentId: 'd1', payload: { source: 's' } });

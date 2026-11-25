@@ -637,6 +637,9 @@ diagrams, points an embed at a storage account static site or at the hub.
   it changed. A relation view's digest reads the boxes it draws in full and
   the boxes it only holds by their place in the tree, so a source refresh
   lays out only the views whose pictures it changed.
+- A save's draw goes ahead of a source refresh's: the worker claims it
+  first, and its tasks pass every waiting refresh task on the render
+  threads.
 - A render is drawn in ranges of views side by side, one per render thread.
   A relation view breaks layout ties with the box centres the relation
   view before it left, so a range that starts mid-document starts from the

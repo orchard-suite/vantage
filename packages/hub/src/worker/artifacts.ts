@@ -192,7 +192,7 @@ export async function renderVersion(ctx: AppContext, version: VersionRow, opts: 
   const source = await cacheSource(ctx, doc.id);
   log.info('render.start', { hash: version.hash, replace: opts.replace, binds: doc.bind_sources, visibleSources: observed.sources, observedEntities: Object.keys(observed.model.entities).length, openItems: Object.keys(observed.model.items ?? {}).length, thresholdDays: input.thresholdDays, previous: previous?.render_id ?? null, cached: source ? Object.keys(source.cached).length : 0 });
   const inputMs = Date.now() - started;
-  const out = await drawDocument(poolRunner(ctx), { ...input, cached: source?.cached }, { previousDigest: opts.replace ? previous?.digest : undefined });
+  const out = await drawDocument(poolRunner(ctx, { background: opts.trigger === 'overlay' }), { ...input, cached: source?.cached }, { previousDigest: opts.replace ? previous?.digest : undefined });
   const drawMs = Date.now() - started - inputMs;
 
   if (out.kind === 'skipped') {
