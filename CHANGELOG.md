@@ -2,6 +2,12 @@
 
 All notable changes to this project will be documented in this file.
 
+## [4.4.5](https://github.com/orchard-suite/vantage/compare/v4.4.4...v4.4.5) (2026-11-25)
+
+### Bug Fixes
+
+* **vantage:** look a save's citations up in one pass ([628caff](https://github.com/orchard-suite/vantage/commit/628caff78b2bbca39842b5c2caca7a767bfef927))
+
 ## [4.4.4](https://github.com/orchard-suite/vantage/compare/v4.4.3...v4.4.4) (2026-11-25)
 
 ### Bug Fixes
