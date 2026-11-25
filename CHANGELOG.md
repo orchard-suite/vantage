@@ -2,6 +2,16 @@
 
 All notable changes to this project will be documented in this file.
 
+## [4.6.0](https://github.com/orchard-suite/vantage/compare/v4.5.0...v4.6.0) (2026-11-25)
+
+### Features
+
+* **vantage:** file the work a decision owes ([d480e86](https://github.com/orchard-suite/vantage/commit/d480e8651af7602270ebf6ab213142e7d5c8f20b))
+
+### Bug Fixes
+
+* **vantage:** ask the decide eval for its calls ([95a8db2](https://github.com/orchard-suite/vantage/commit/95a8db22addf119b9c0afd91519496cc9fa2e5d7))
+
 ## [4.5.0](https://github.com/orchard-suite/vantage/compare/v4.4.6...v4.5.0) (2026-11-25)
 
 ### Features
