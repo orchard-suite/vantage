@@ -7,6 +7,7 @@
  * draws (document-task.ts).
  */
 import type { AppContext } from '../context.ts';
+import type { Lane } from '../render/pool.ts';
 import { sameAnchors, splitRanges, type AnchorList, type DocumentInput, type PlanInput, type PlanOutput, type RangeInput, type RangeView } from '../render/document-task.ts';
 
 export type DrawResult =
@@ -30,9 +31,9 @@ export interface DrawRunner {
   range(input: RangeInput): Promise<RangeView[]>;
 }
 
-/** A background draw (a source refresh) lets every draw a person waits for go first. */
-export function poolRunner(ctx: AppContext, opts: { readonly background?: boolean } = {}): DrawRunner {
-  const run = { background: opts.background === true };
+/** A draw runs in its lane: a refresh's or a release's lets every draw a person waits for go first. */
+export function poolRunner(ctx: AppContext, opts: { readonly lane?: Lane } = {}): DrawRunner {
+  const run = { lane: opts.lane ?? 'person' };
   return { threads: Math.max(1, ctx.render.stats().threads), plan: (i) => ctx.render.run('plan', i, run), range: (i) => ctx.render.run('range', i, run) };
 }
 

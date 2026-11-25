@@ -2,10 +2,11 @@
  * The render pool: a few threads that run render tasks, so drawing never
  * holds the event loop that answers requests, renews job leases, and runs
  * connectors. Tasks wait in one queue; a thread that crashes or runs past
- * the deadline is replaced and its task fails with a reason. A background
- * task (a source refresh's draw) waits behind every task a person waits
- * for, so a save never queues behind a refresh. With no threads the tasks
- * run in this process, for tests and small tools.
+ * the deadline is replaced and its task fails with a reason. Each task
+ * runs in a lane: what a person waits for first, then a source refresh's
+ * draws, then a new release's redraws, so a save never queues behind
+ * either. With no threads the tasks run in this process, for tests and
+ * small tools.
  */
 import type { Logger } from '../log.ts';
 import { runTask, type TaskInput, type TaskKind, type TaskOutput } from './tasks.ts';
@@ -13,9 +14,13 @@ import { runTask, type TaskInput, type TaskKind, type TaskOutput } from './tasks
 export interface RunOptions {
   /** This task's deadline, when it should be shorter or longer than the pool's. */
   readonly timeoutMs?: number;
-  /** Nobody waits on it: it runs only when no other task waits. */
-  readonly background?: boolean;
+  /** Who waits for it; a person when absent. */
+  readonly lane?: Lane;
 }
+
+/** Who waits for a task, first to last: a person, a source refresh, a new release redrawing what an older one drew. */
+export type Lane = 'person' | 'refresh' | 'release';
+const LANE_ORDER: Readonly<Record<Lane, number>> = { person: 0, refresh: 1, release: 2 };
 
 export interface RenderPool {
   run<K extends TaskKind>(kind: K, input: TaskInput<K>, opts?: RunOptions): Promise<TaskOutput<K>>;
@@ -49,7 +54,7 @@ interface Pending {
   readonly reject: (e: Error) => void;
   readonly queuedAt: number;
   readonly timeoutMs: number;
-  readonly background: boolean;
+  readonly lane: number;
 }
 
 interface Slot {
@@ -136,9 +141,9 @@ export function createRenderPool(opts: PoolOptions): RenderPool {
         return Promise.reject(new PoolBusyError(queue.length));
       }
       return new Promise<TaskOutput<K>>((resolve, reject) => {
-        const task: Pending = { id: nextId++, kind, input, resolve: resolve as (v: unknown) => void, reject, queuedAt: Date.now(), timeoutMs: runOpts.timeoutMs ?? opts.timeoutMs, background: runOpts.background === true };
-        // A task a person waits for goes ahead of every background task; each kind keeps its own order.
-        const at = task.background ? -1 : queue.findIndex((t) => t.background);
+        const task: Pending = { id: nextId++, kind, input, resolve: resolve as (v: unknown) => void, reject, queuedAt: Date.now(), timeoutMs: runOpts.timeoutMs ?? opts.timeoutMs, lane: LANE_ORDER[runOpts.lane ?? 'person'] };
+        // A task goes ahead of every waiting task of a later lane; each lane keeps its own order.
+        const at = queue.findIndex((t) => t.lane > task.lane);
         if (at < 0) queue.push(task);
         else queue.splice(at, 0, task);
         dispatch();

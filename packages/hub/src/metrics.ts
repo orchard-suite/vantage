@@ -22,6 +22,8 @@ export interface HubMetrics {
   readonly renderPass: Histogram;
   /** One per saved version, in seconds from the save until its first picture is stored. */
   readonly firstPicture: Histogram;
+  /** One per organization a new release has redrawn, in seconds from its first document to its last, by `release`. */
+  readonly releaseRedraw: Histogram;
   /** One per revision that ends, by `outcome` (ready, failed, accepted, rejected). */
   readonly revisions: Counter;
   /** One per diagram drawn from a description that ends, by `outcome` (ready, failed). */
@@ -63,6 +65,7 @@ export function createHubMetrics(meter: Meter = hubMeter()): HubMetrics {
     browserBatches: meter.createCounter('vantage.browser.batches', { description: "Telemetry batches from readers' browsers, by outcome." }),
     renderPass: meter.createHistogram('vantage.render.pass.duration', { unit: 's', description: 'How long one render pass took until its picture was stored.', advice: { explicitBucketBoundaries: RENDER_SECONDS } }),
     firstPicture: meter.createHistogram('vantage.render.first_picture.duration', { unit: 's', description: 'From a save until the first picture of the new version was stored.', advice: { explicitBucketBoundaries: RENDER_SECONDS } }),
+    releaseRedraw: meter.createHistogram('vantage.release.redraw.duration', { unit: 's', description: 'How long a new release took to redraw every document an older one drew.', advice: { explicitBucketBoundaries: [10, 30, 60, 120, 300, 600, 1800, 3600] } }),
     revisions: meter.createCounter('vantage.revisions', { description: 'Revisions from comments that ended, by outcome.' }),
     generations: meter.createCounter('vantage.generations', { description: 'Diagrams drawn from a description that ended, by outcome.' }),
     aiTokens: meter.createCounter('vantage.ai.tokens', { unit: '{token}', description: "Tokens revisions and generations spent on the organization's model API, by model and direction." }),

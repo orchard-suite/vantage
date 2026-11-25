@@ -4,7 +4,8 @@
  * missed notification costs one interval, never a stuck queue. Renews the
  * lease on what it runs, takes back jobs whose worker died, and on stop
  * waits a grace period, then hands back what is still running. Schedules
- * the daily gc and purge jobs for every organization.
+ * the daily gc and purge jobs for every organization, and starts a new
+ * release's redraw (release-redraw.ts).
  */
 import type { AppContext } from '../context.ts';
 import { SpanStatusCode } from '@opentelemetry/api';
@@ -13,12 +14,14 @@ import { runRender } from './render.ts';
 import { dropFiles, runGc, runPurge } from './gc.ts';
 import { runIngestJob } from './ingest-run.ts';
 import { runOverlay } from './overlay.ts';
+import { runRedraw, runReleaseRedraw, startReleaseRedraw } from './release-redraw.ts';
 import { runPublicationJob } from './publication-run.ts';
 import { runReview } from './review.ts';
 import { runRevise } from '../revise/run.ts';
 import { runGenerate } from '../revise/generate.ts';
 import { createScheduler } from './schedule.ts';
 import { randomId } from '../crypto.ts';
+import { RENDERER } from '../render/renderer.ts';
 
 export interface Worker {
   readonly id: string;
@@ -52,6 +55,8 @@ export function createWorker(ctx: AppContext): Worker {
     if (job.kind === 'purge') return runPurge(ctx, job.org_id, jlog);
     if (job.kind === 'ingest') return runIngestJob(ctx, job, jlog);
     if (job.kind === 'overlay') return runOverlay(ctx, job, jlog);
+    if (job.kind === 'redraw') return runRedraw(ctx, job, jlog);
+    if (job.kind === 'release-redraw') return runReleaseRedraw(ctx, job, jlog);
     if (job.kind === 'publication-run') return runPublicationJob(ctx, job, jlog);
     if (job.kind === 'review') return runReview(ctx, job, jlog);
     if (job.kind === 'drop-files') return dropFiles(ctx, job, jlog);
@@ -197,6 +202,8 @@ export function createWorker(ctx: AppContext): Worker {
       log.info('worker.start', { poll: ctx.config.WORKER_POLL_SECONDS, concurrency: ctx.config.WORKER_CONCURRENCY, leaseSeconds: ctx.config.JOB_LEASE_SECONDS });
       unlisten = await ctx.db.listen(JOBS_CHANNEL, wakeUp);
       await scheduleMaintenance();
+      // A new release redraws in the background what an older one drew, so no save pays for its new cache keys.
+      log.info('worker.release.redraw', { release: RENDERER, started: await startReleaseRedraw(ctx) });
       busy = loop();
     },
     async stop() {

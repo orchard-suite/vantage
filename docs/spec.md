@@ -630,16 +630,21 @@ diagrams, points an embed at a storage account static site or at the hub.
   transaction. A view's SVG and PNG and the standalone HTML are made on
   first request. Serving reads artifacts, never lays out again.
 - A render records the release that drew it; a reader opening a document
-  drawn by an older release queues its redraw.
+  drawn by an older release queues its redraw. Every view's digest names
+  the release, so a new release would make the next save of each document
+  lay out every view again. Instead the first worker of a new release
+  redraws every document an older one drew, one at a time, in the
+  background, before people save; it runs once per release and goes on
+  where it stopped after a restart.
 - A render takes the last render of the document as a cache: each view has
   a digest of what its picture reads, and a view whose digest matches is
   taken as it was, its stored entry and all. A save lays out only the views
   it changed. A relation view's digest reads the boxes it draws in full and
   the boxes it only holds by their place in the tree, so a source refresh
   lays out only the views whose pictures it changed.
-- A save's draw goes ahead of a source refresh's: the worker claims it
-  first, and its tasks pass every waiting refresh task on the render
-  threads.
+- A save's draw goes ahead of a source refresh's, and both go ahead of a
+  new release's redraw: the worker claims them in that order, and the
+  render threads run their tasks in that order.
 - A render is drawn in ranges of views side by side, one per render thread.
   A relation view breaks layout ties with the box centres the relation
   view before it left, so a range that starts mid-document starts from the

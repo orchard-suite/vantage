@@ -55,15 +55,16 @@ describe('render pool', () => {
     expect(p.stats()).toEqual({ threads: 1, running: 0, queued: 0 });
   });
 
-  test('a task a person waits for goes ahead of a waiting background task', async () => {
+  test('waiting tasks run by lane: a person, then a refresh, then a release, each in order', async () => {
     const p = pool(1);
     const order: string[] = [];
     const running = p.run('localValidate', { text: bigDocument(150) });
-    const refresh = p.run('png', { svg: SVG }, { background: true }).then(() => order.push('refresh'));
-    const refreshToo = p.run('png', { svg: SVG }, { background: true }).then(() => order.push('refresh too'));
+    const release = p.run('png', { svg: SVG }, { lane: 'release' }).then(() => order.push('release'));
+    const refresh = p.run('png', { svg: SVG }, { lane: 'refresh' }).then(() => order.push('refresh'));
+    const refreshToo = p.run('png', { svg: SVG }, { lane: 'refresh' }).then(() => order.push('refresh too'));
     const save = p.run('png', { svg: SVG }).then(() => order.push('save'));
-    await Promise.all([running, refresh, refreshToo, save]);
-    expect(order).toEqual(['save', 'refresh', 'refresh too']);
+    await Promise.all([running, release, refresh, refreshToo, save]);
+    expect(order).toEqual(['save', 'refresh', 'refresh too', 'release']);
   });
 
   test('a full queue refuses with PoolBusyError instead of growing without bound', async () => {

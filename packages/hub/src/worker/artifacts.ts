@@ -25,6 +25,7 @@ import { observedModel, workspaceConnectors } from '../sources/repo.ts';
 import { resourceInputs } from '../documents/assets.ts';
 import { shellBundle, type CachedView, type RangeView } from '../render/document-task.ts';
 import { drawDocument, poolRunner, type DrawResult } from './draw.ts';
+import type { Lane } from '../render/pool.ts';
 import { RENDERER } from '../render/renderer.ts';
 import { enqueue, type JobLog } from './jobs.ts';
 
@@ -182,7 +183,11 @@ async function cacheSource(ctx: AppContext, documentId: string): Promise<CacheSo
   return { cached, files };
 }
 
-export async function renderVersion(ctx: AppContext, version: VersionRow, opts: { replace: boolean; jlog: JobLog; trigger: 'save' | 'overlay' }): Promise<RenderOutcome> {
+/** Why a version is drawn: a save, a source refresh, or a new release redrawing what an older one drew. */
+export type RenderTrigger = 'save' | 'overlay' | 'release';
+const LANE_OF: Readonly<Record<RenderTrigger, Lane>> = { save: 'person', overlay: 'refresh', release: 'release' };
+
+export async function renderVersion(ctx: AppContext, version: VersionRow, opts: { replace: boolean; jlog: JobLog; trigger: RenderTrigger }): Promise<RenderOutcome> {
   const log = ctx.log.child({ versionId: version.id, documentId: version.document_id });
   const doc = await documentById(ctx.db, version.document_id);
   if (!doc) throw new Error(`document ${version.document_id} not found`);
@@ -192,7 +197,7 @@ export async function renderVersion(ctx: AppContext, version: VersionRow, opts: 
   const source = await cacheSource(ctx, doc.id);
   log.info('render.start', { hash: version.hash, replace: opts.replace, binds: doc.bind_sources, visibleSources: observed.sources, observedEntities: Object.keys(observed.model.entities).length, openItems: Object.keys(observed.model.items ?? {}).length, thresholdDays: input.thresholdDays, previous: previous?.render_id ?? null, cached: source ? Object.keys(source.cached).length : 0 });
   const inputMs = Date.now() - started;
-  const out = await drawDocument(poolRunner(ctx, { background: opts.trigger === 'overlay' }), { ...input, cached: source?.cached }, { previousDigest: opts.replace ? previous?.digest : undefined });
+  const out = await drawDocument(poolRunner(ctx, { lane: LANE_OF[opts.trigger] }), { ...input, cached: source?.cached }, { previousDigest: opts.replace ? previous?.digest : undefined });
   const drawMs = Date.now() - started - inputMs;
 
   if (out.kind === 'skipped') {

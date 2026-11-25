@@ -7,7 +7,7 @@
 import type { Db } from '../db/db.ts';
 import { randomId } from '../crypto.ts';
 
-export type JobKind = 'render' | 'gc' | 'purge' | 'ingest' | 'overlay' | 'publication-run' | 'review' | 'drop-files' | 'revise' | 'generate' | 'connector-run';
+export type JobKind = 'render' | 'gc' | 'purge' | 'ingest' | 'overlay' | 'redraw' | 'release-redraw' | 'publication-run' | 'review' | 'drop-files' | 'revise' | 'generate' | 'connector-run';
 
 /** Who claims a job: the hub's own worker, or the shared connector pool, which holds the connectors' sign-in and runs connector runs only. */
 export type JobLane = 'hub' | 'pool';
@@ -44,9 +44,9 @@ export const JOBS_CHANNEL = 'vantage_jobs';
  * its row and is not retried either: every attempt spends the
  * organization's tokens. A connector run records its own failure as a
  * failed run, and its schedule runs it again. Rendering, a pushed batch's
- * ingest, and maintenance retry.
+ * ingest, a release's redraws, and maintenance retry.
  */
-export const DEFAULT_ATTEMPTS: Record<JobKind, number> = { render: 3, gc: 3, purge: 3, ingest: 3, overlay: 3, 'publication-run': 1, review: 2, 'drop-files': 3, revise: 1, generate: 1, 'connector-run': 1 };
+export const DEFAULT_ATTEMPTS: Record<JobKind, number> = { render: 3, gc: 3, purge: 3, ingest: 3, overlay: 3, redraw: 2, 'release-redraw': 3, 'publication-run': 1, review: 2, 'drop-files': 3, revise: 1, generate: 1, 'connector-run': 1 };
 
 export interface NewJob {
   readonly orgId: string;
@@ -74,18 +74,23 @@ export function drawKey(documentId: string): string {
   return `doc:${documentId}`;
 }
 
+/** The draws of a document, first to last: a save's, a source refresh's, a new release's. */
+export type DrawKind = 'render' | 'overlay' | 'redraw';
+
 /**
- * Queues a draw of a document's head. When one already waits, a save's draw
- * takes its place as a `render` (a save runs its on-save publications) and
- * nothing new is queued. Returns the id of the job that will draw.
+ * Queues a draw of a document's head. When one already waits, the two are
+ * one draw of the kind that comes first (a save's runs its on-save
+ * publications, and a release's yields to the rest), and nothing new is
+ * queued. Returns the id of the job that will draw.
  */
-export async function enqueueDraw(db: Db, job: { readonly orgId: string; readonly kind: 'render' | 'overlay'; readonly documentId: string; readonly payload?: Record<string, unknown> }): Promise<string> {
+export async function enqueueDraw(db: Db, job: { readonly orgId: string; readonly kind: DrawKind; readonly documentId: string; readonly payload?: Record<string, unknown> }): Promise<string> {
   const payload = { ...job.payload, documentId: job.documentId, head: true };
+  const first = (kind: string): string => `case ${kind} when 'render' then 0 when 'overlay' then 1 else 2 end`;
   const rows = await db.query<{ id: string; inserted: boolean }>(
     `insert into jobs (id, org_id, kind, payload, run_at, max_attempts, dedupe_key) values ($1, $2, $3, $4, now(), $5, $6)
        on conflict (dedupe_key) where state = 'queued' do update set
-         kind = case when excluded.kind = 'render' then 'render' else jobs.kind end,
-         payload = case when excluded.kind = 'render' then excluded.payload else jobs.payload end,
+         kind = case when ${first('excluded.kind')} < ${first('jobs.kind')} then excluded.kind else jobs.kind end,
+         payload = case when ${first('excluded.kind')} < ${first('jobs.kind')} then excluded.payload else jobs.payload end,
          updated_at = now()
        returning id, (xmax = 0) as inserted`,
     [randomId(), job.orgId, job.kind, JSON.stringify(payload), DEFAULT_ATTEMPTS[job.kind], drawKey(job.documentId)],
@@ -146,15 +151,16 @@ export async function releaseJobs(db: Db, workerId: string, ids: readonly string
 
 /**
  * Claims the oldest runnable job of its lane for this worker, or nothing:
- * a save's draw first, since a person waits for it, then the rest. A job
- * whose dedupe key is running waits for it.
+ * a save's draw first, since a person waits for it, then the rest, and a
+ * new release's redraws last. A job whose dedupe key is running waits for
+ * it.
  */
 export async function claim(db: Db, workerId: string, lane: JobLane = 'hub'): Promise<JobRow | undefined> {
   const rows = await db.query<JobRow>(
     `update jobs set state = 'running', locked_by = $1, locked_at = now(), attempts = attempts + 1, updated_at = now()
       where id = (select q.id from jobs q where q.state = 'queued' and q.run_at <= now() and (q.kind = 'connector-run') = $2
                     and (q.dedupe_key is null or not exists (select 1 from jobs r where r.state = 'running' and r.dedupe_key = q.dedupe_key))
-                    order by (q.kind = 'render') desc, q.run_at, q.created_at limit 1 for update skip locked)
+                    order by case q.kind when 'render' then 0 when 'redraw' then 2 when 'release-redraw' then 2 else 1 end, q.run_at, q.created_at limit 1 for update skip locked)
       returning *`,
     [workerId, lane === 'pool'],
   );
