@@ -124,18 +124,52 @@ export interface Resolved {
  * still finds it, as an alias.
  */
 export async function resolveRef(db: Db, orgId: string, text: string, home?: string): Promise<Resolved | undefined> {
-  const ref = parseDecisionRef(text);
-  if (!ref) return undefined;
-  if (ref.kind === 'machine') {
-    const row = await placedById(db, orgId, ref.id);
-    return row && { row, alias: false };
+  return (await resolveRefs(db, orgId, [text], home)).get(text);
+}
+
+/**
+ * Every citation of a list at once, as resolveRef reads each: a document that cites fifty records
+ * costs three queries, not a hundred. The map holds the citations that found a record.
+ */
+export async function resolveRefs(db: Db, orgId: string, texts: readonly string[], home?: string): Promise<Map<string, Resolved>> {
+  const out = new Map<string, Resolved>();
+  const machine = new Map<string, string[]>();
+  // The registry each citation looks in, by prefix or (for a local number) by id, and its number.
+  const numbered = new Map<string, { match: 'prefix' | 'id'; key: string; number: number; texts: string[] }>();
+  for (const text of new Set(texts)) {
+    const ref = parseDecisionRef(text);
+    if (!ref) continue;
+    if (ref.kind === 'machine') {
+      machine.set(ref.id, [...(machine.get(ref.id) ?? []), text]);
+      continue;
+    }
+    if (ref.kind === 'local' && !home) continue;
+    const [match, key] = ref.kind === 'local' ? (['id', home!] as const) : (['prefix', ref.prefix] as const);
+    const k = `${match}\0${key}\0${ref.number}`;
+    const entry = numbered.get(k) ?? { match, key, number: ref.number, texts: [] };
+    entry.texts.push(text);
+    numbered.set(k, entry);
   }
-  if (ref.kind === 'local' && !home) return undefined;
-  const [match, key] = ref.kind === 'local' ? ['id', home!] : ['prefix', ref.prefix];
-  const live = await maybe<PlacedRow>(db, `${PLACED} where d.org_id = $1 and r.${match} = $2 and d.number = $3`, [orgId, key, ref.number]);
-  if (live) return { row: live, alias: false };
-  const moved = await maybe<PlacedRow>(db, `${PLACED} join decision_aliases a on a.decision_id = d.id join decision_registries ar on ar.id = a.registry_id where d.org_id = $1 and ar.${match} = $2 and a.number = $3`, [orgId, key, ref.number]);
-  return moved && { row: moved, alias: true };
+  if (machine.size) for (const row of await placedByIds(db, orgId, [...machine.keys()])) for (const t of machine.get(row.id) ?? []) out.set(t, { row, alias: false });
+  for (const match of ['prefix', 'id'] as const) {
+    const wanted = [...numbered.values()].filter((e) => e.match === match);
+    if (!wanted.length) continue;
+    const pairs = [wanted.map((e) => e.key), wanted.map((e) => e.number)];
+    const byPlace = (key: string, number: number) => wanted.find((e) => e.key === key && e.number === number);
+    const live = await db.query<PlacedRow & { q_key: string; q_number: number }>(
+      `${PLACED.replace('select d.*', 'select d.*, q.key as q_key, q.number as q_number')} join unnest($2::text[], $3::int[]) as q(key, number) on r.${match} = q.key and d.number = q.number where d.org_id = $1`,
+      [orgId, ...pairs],
+    );
+    for (const { q_key, q_number, ...row } of live) for (const t of byPlace(q_key, q_number)?.texts ?? []) out.set(t, { row, alias: false });
+    const rest = wanted.filter((e) => !out.has(e.texts[0]!));
+    if (!rest.length) continue;
+    const moved = await db.query<PlacedRow & { q_key: string; q_number: number }>(
+      `${PLACED.replace('select d.*', 'select d.*, q.key as q_key, q.number as q_number')} join decision_aliases a on a.decision_id = d.id join decision_registries ar on ar.id = a.registry_id join unnest($2::text[], $3::int[]) as q(key, number) on ar.${match} = q.key and a.number = q.number where d.org_id = $1`,
+      [orgId, rest.map((e) => e.key), rest.map((e) => e.number)],
+    );
+    for (const { q_key, q_number, ...row } of moved) for (const t of byPlace(q_key, q_number)?.texts ?? []) if (!out.has(t)) out.set(t, { row, alias: true });
+  }
+  return out;
 }
 
 export async function placedByRef(db: Db, orgId: string, text: string, home?: string): Promise<PlacedRow | undefined> {

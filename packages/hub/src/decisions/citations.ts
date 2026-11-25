@@ -12,7 +12,7 @@ import type { AppContext } from '../context.ts';
 import type { Db } from '../db/db.ts';
 import { readAttachments, type Attachment } from '../documents/assets.ts';
 import { loadStored, type ImportMap } from '../documents/model.ts';
-import { placedById, refOf, resolveRef, type PlacedRow } from './repo.ts';
+import { placedById, refOf, resolveRefs, type PlacedRow } from './repo.ts';
 
 /** What the index needs from the hub: the database it writes and the blob store a page is read from. */
 export type IndexContext = Pick<AppContext, 'db' | 'log' | 'blob'>;
@@ -81,16 +81,9 @@ interface Row {
 }
 
 async function resolveAll(db: Db, orgId: string, cites: readonly Cite[], home?: string): Promise<Row[]> {
-  const memo = new Map<string, Awaited<ReturnType<typeof resolveRef>>>();
-  const out: Row[] = [];
-  for (const cite of cites) {
-    const ref = canonicalRef(cite.text, home);
-    if (!ref) continue;
-    if (!memo.has(ref)) memo.set(ref, await resolveRef(db, orgId, ref));
-    const hit = memo.get(ref);
-    out.push({ cite, ref, target: hit?.row, alias: hit?.alias ?? false });
-  }
-  return out;
+  const refs = cites.map((cite) => ({ cite, ref: canonicalRef(cite.text, home) })).filter((c): c is { cite: Cite; ref: string } => c.ref !== undefined);
+  const found = await resolveRefs(db, orgId, refs.map((c) => c.ref));
+  return refs.map(({ cite, ref }) => ({ cite, ref, target: found.get(ref)?.row, alias: found.get(ref)?.alias ?? false }));
 }
 
 const moved = (rows: readonly Row[]): MovedCitation[] => {
@@ -101,15 +94,28 @@ const moved = (rows: readonly Row[]): MovedCitation[] => {
 
 async function insertRows(db: Db, orgId: string, source: { documentId: string; versionId: string } | { decisionId: string }, rows: readonly Row[]): Promise<void> {
   const seen = new Set<string>();
-  for (const r of rows) {
+  const unique = rows.filter((r) => {
     const key = `${r.cite.kind}|${r.cite.id}|${r.cite.text}`;
-    if (seen.has(key)) continue;
-    seen.add(key);
-    await db.query(
-      'insert into decision_citations (org_id, decision_id, cited_ref, cited_as, document_id, version_id, source_decision_id, place_kind, place_id) values ($1, $2, $3, $4, $5, $6, $7, $8, $9)',
-      [orgId, r.target?.id ?? null, r.ref, r.cite.text, 'documentId' in source ? source.documentId : null, 'documentId' in source ? source.versionId : null, 'decisionId' in source ? source.decisionId : null, r.cite.kind, r.cite.id],
-    );
-  }
+    return seen.has(key) ? false : (seen.add(key), true);
+  });
+  if (!unique.length) return;
+  // Every row in one statement: a document that cites a record from fifty boxes is one round trip.
+  await db.query(
+    `insert into decision_citations (org_id, decision_id, cited_ref, cited_as, document_id, version_id, source_decision_id, place_kind, place_id)
+       select $1, t.decision_id, t.cited_ref, t.cited_as, $2, $3, $4, t.place_kind, t.place_id
+       from unnest($5::text[], $6::text[], $7::text[], $8::text[], $9::text[]) as t(decision_id, cited_ref, cited_as, place_kind, place_id)`,
+    [
+      orgId,
+      'documentId' in source ? source.documentId : null,
+      'documentId' in source ? source.versionId : null,
+      'decisionId' in source ? source.decisionId : null,
+      unique.map((r) => r.target?.id ?? null),
+      unique.map((r) => r.ref),
+      unique.map((r) => r.cite.text),
+      unique.map((r) => r.cite.kind),
+      unique.map((r) => r.cite.id),
+    ],
+  );
 }
 
 /** The Markdown pages of a version, read from the blob store. */

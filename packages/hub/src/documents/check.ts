@@ -14,8 +14,7 @@ import { HttpError } from '../http.ts';
 import type { CheckOutput, Finding } from '../render/tasks.ts';
 import { resourceInputs, type Attachment } from './assets.ts';
 import type { ImportMap } from './model.ts';
-import { unknownCitations } from '../decisions/read.ts';
-import { refOf, resolveRef } from '../decisions/repo.ts';
+import { refOf, resolveRefs } from '../decisions/repo.ts';
 
 /** What every route that writes a version says about the check it passes. */
 export const REFUSES = 'A version with errors (text that does not parse, a type neither built in nor declared, a name that points at nothing) is refused with 422 and saves nothing; details.errors lists each with its code, message, path, and line. Warnings save';
@@ -47,10 +46,12 @@ export async function checkDocument(ctx: AppContext, scope: CheckScope, text: Ch
   lap('check.resources');
   const out = await ctx.render.run('check', { yaml: text.yaml, imports: text.imports, resources, scores: text.scores });
   lap('check.document');
-  const missing = await unknownCitations(ctx, scope.orgId, out.decisions);
+  // Every citation in one lookup: a record cited by its old number passes with a warning, one that is nowhere fails.
+  const found = await resolveRefs(ctx.db, scope.orgId, out.decisions);
+  const missing = out.decisions.filter((cited) => !found.has(cited));
   const moved: Finding[] = [];
   for (const cited of out.decisions) {
-    const hit = await resolveRef(ctx.db, scope.orgId, cited);
+    const hit = found.get(cited);
     if (hit?.alias) moved.push({ code: 'decision-moved', message: `decision ${cited} moved; it is ${refOf(hit.row)} now. The old citation still resolves`, hint: `cite ${refOf(hit.row)}` });
   }
   lap('check.decisions');

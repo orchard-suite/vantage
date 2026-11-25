@@ -10,7 +10,7 @@ import { accessibleWorkspaces, memberWorkspaces, requireWorkspace } from '../aut
 import { HttpError, notFound } from '../http.ts';
 import { machineRef } from '@vantage/model';
 import { categoryName } from './numbering.ts';
-import { aliasesOf, linksOf, linksToDocument, listPlaced, placedByIds, placedByRef, refOf, registriesIn, registryByPrefix, revisionsOf, stubOf, type ListFilter, type PlacedRow, type RegistryRow } from './repo.ts';
+import { aliasesOf, linksOf, linksToDocument, listPlaced, placedByIds, placedByRef, refOf, resolveRefs, registriesIn, registryByPrefix, revisionsOf, stubOf, type ListFilter, type PlacedRow, type RegistryRow } from './repo.ts';
 import type { Decision, DecisionRevision, DecisionStub, Governs, Registry } from './types.ts';
 
 export interface Reach {
@@ -201,9 +201,8 @@ export async function documentDecisions(ctx: AppContext, p: Principal, documentI
 
 /** Citations a document makes that name no record in the organization; a save refuses them. */
 export async function unknownCitations(ctx: AppContext, orgId: string, refs: readonly string[]): Promise<string[]> {
-  const out: string[] = [];
-  for (const ref of refs) if (!(await placedByRef(ctx.db, orgId, ref))) out.push(ref);
-  return out;
+  const found = await resolveRefs(ctx.db, orgId, refs);
+  return refs.filter((ref) => !found.has(ref));
 }
 
 export function badRef(ref: string): HttpError {

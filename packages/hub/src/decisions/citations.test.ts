@@ -1,7 +1,28 @@
 import { describe, expect, test } from 'bun:test';
 import { SAMPLE_YAML } from '../testing.ts';
 import { backfillCitations } from './citations.ts';
-import { grant, seeded, workspaceOf } from './test-kit.ts';
+import { citingPage, citingYaml, grant, seeded, workspaceOf } from './test-kit.ts';
+import { saveDocument } from '../documents/save.ts';
+import { incomingFiles } from '../documents/pages.ts';
+import type { Db } from '../db/db.ts';
+import type { AppContext } from '../context.ts';
+
+/** A context whose database counts every query, in and out of transactions. */
+function counting(ctx: AppContext): { ctx: AppContext; queries: () => number } {
+  let n = 0;
+  const wrap = (db: Db): Db => ({
+    query<T extends object>(text: string, params?: readonly unknown[]) {
+      n++;
+      return db.query<T>(text, params);
+    },
+    exec: (text) => db.exec(text),
+    transaction: (fn) => db.transaction((tx) => fn(wrap(tx))),
+    listen: (channel, handler) => db.listen(channel, handler),
+    notify: (channel, payload) => db.notify(channel, payload),
+    close: () => db.close(),
+  });
+  return { ctx: { ...ctx, db: wrap(ctx.db) }, queries: () => n };
+}
 
 describe('the citation index', () => {
   test('a save indexes each box and page that cites a record, and the next save replaces it', async () => {
@@ -17,6 +38,23 @@ describe('the citation index', () => {
 
     await t.json(`/api/v1/workspaces/${ws.slug}/documents/${doc.slug}`, { method: 'PUT', headers: me.headers, body: JSON.stringify({ yaml: SAMPLE_YAML }) });
     expect((await cited('SHOP-2001')).documents).toHaveLength(0);
+  });
+
+  test('a save looks its citations up in a few queries, however many records it cites', async () => {
+    const { t, me, ws, create, cited } = await seeded();
+    for (let i = 0; i < 8; i++) await create({ title: `Record ${i}` });
+    const refs = Array.from({ length: 8 }, (_, i) => `SHOP-${2001 + i}`);
+    const queriesFor = async (cites: readonly string[], name: string): Promise<number> => {
+      const c = counting(t.ctx);
+      const files = incomingFiles(t.ctx, 'default', { 'pages/guide.md': new TextEncoder().encode(cites.map(citingPage).join('\n')) });
+      const r = await saveDocument(c.ctx, { orgId: 'default', workspaceId: ws.id, name, yaml: citingYaml(cites.join(', ')), files, authorUserId: null, who: 'test', surface: 'api' });
+      expect(r.status).toBe('saved');
+      return c.queries();
+    };
+    const one = await queriesFor(refs.slice(0, 1), 'one');
+    const eight = await queriesFor(refs, 'eight');
+    expect(eight).toBe(one);
+    expect((await cited('SHOP-2008', me.headers)).documents.map((d) => d.documentName)).toEqual(['eight']);
   });
 
   test('a record write indexes its prose and its Related, and a record citation waits for a number nobody holds yet', async () => {
