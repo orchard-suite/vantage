@@ -1,6 +1,6 @@
 ---
 name: vantage-work
-description: "Work a Vantage hub's tracked items as an agent: take one from the queue, claim it, do it, ask a person when stuck, and finish the run with a record and a handoff note. Use when asked to pick up, work, or finish an item."
+description: "Work a Vantage hub's tracked items as an agent: find or take one, claim it, do it, ask a person when stuck, and finish with a record and a handoff note. Use when asked to pick up or finish an item, and before building anything in a repository whose vantage.yaml names a work kind."
 ---
 
 # Work an item
@@ -28,6 +28,25 @@ lifecycle moves it through, and the people and runs that hold it. Read
    state's page, `SW-12#notes`, `SW-12#files`. Its card names the moves
    open to you; a refused move names them too, so you never read the
    lifecycle first.
+
+## Start from a conversation
+
+Work a person asks for in a conversation is tracked work too, and it is
+tracked before its first change, not after it lands.
+
+1. **See who else is here.** Read the repository's `vantage.yaml`. List
+   its work kind's items in `doing` (`vantage_outline SW`): each names
+   who holds it. One that covers your work, or the same files, belongs
+   to another run. Tell that run, or the person, before you start.
+2. **Find or file the item.** `vantage_find` the kind for the work. With
+   none, write one (`vantage_write` to the kind), under its roadmap item
+   (`part-of`), linked to the record that decided it (`decision`). A
+   decision made in this conversation is recorded first, with `decide`.
+3. **Claim it and start it**, in one call, as in "Take one".
+4. **Name it in every commit.** Where `vantage.yaml` names a `work` kind,
+   each commit message ends with a trailer naming the item, or the
+   roadmap item it is part of: `Work: SW-12`. The repository's commit
+   rules may refuse a commit without one.
 
 ## While you work
 

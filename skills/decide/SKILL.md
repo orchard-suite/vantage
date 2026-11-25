@@ -108,7 +108,31 @@ a record each.
 Fill every section. Plain words, short sentences. No em dashes or en
 dashes. Never name a person anywhere but the decision makers.
 
-## 5. Refactor
+## 5. File the work it owes
+
+A record is not done until the work it owes is on a roadmap. Do this in
+the same pass as the record, before anyone writes code for it.
+
+1. **Ask what it owes.** Something to build, change, take out, or play,
+   now or later. A record that only writes down what already stands owes
+   nothing; say so in your answer.
+2. **Find the roadmap.** The program's `vantage.yaml` names its kinds:
+   `roadmap` (outcomes, such as `SHOPR`) and `work` (parts of them, such
+   as `SHOPW`). Where it names neither, the estate's settings or the
+   program's own records say where its work is tracked; file it there.
+3. **Find or file each item.** `vantage_find` the kind for the work
+   first, and widen an item that covers it rather than add a second. A
+   new item is a `vantage_write` to the kind, with what done looks like.
+   A part goes under its roadmap item (`part-of`).
+4. **Link both ways.** Link each item to the record
+   (`vantage_item`, `link: {rel: decision}`), and the boxes it adds,
+   changes, or retires. Name the items in the record's text, where it
+   says what the decision means for the code.
+5. **Claim what starts now.** When this conversation goes on to build
+   it, claim the work item and move it to doing before the first change,
+   as `vantage-work` says. Work that waits stays open.
+
+## 6. Refactor
 
 Renumber a record, move it to another category, or move it to another
 registry, when a registry is cleaned up or reorganized. The record keeps
@@ -129,7 +153,7 @@ never handed out again.
    owner the new citation. The old one keeps working until they change it.
    Repoint links outside the hub (repositories, docs) the same way.
 
-## 6. Migrate a repository
+## 7. Migrate a repository
 
 Move a repository's in-repo records into its program's registry, in one
 commit.
