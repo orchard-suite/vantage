@@ -24,7 +24,7 @@ describe('save and render', () => {
     const timed = lines.filter((l) => l['msg'] === 'save.phases');
     expect(timed.map((l) => l['status'])).toEqual(['saved', 'failed']);
     const phases = timed[0]!['phases'] as Record<string, number>;
-    expect(Object.keys(phases)).toEqual(expect.arrayContaining(['lock', 'parse', 'check.resources', 'check.document', 'version', 'citations', 'draw', 'commit']));
+    expect(Object.keys(phases)).toEqual(expect.arrayContaining(['lock', 'check.resources', 'check.document', 'version', 'citations', 'draw', 'commit']));
     expect(Object.values(phases).reduce((a, b) => a + b, 0)).toBeLessThanOrEqual(timed[0]!['ms'] as number);
   });
 

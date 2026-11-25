@@ -138,6 +138,11 @@ export function boundSources(docs: readonly Document[]): string[] {
   return [...out].sort();
 }
 
+/** The sources a loaded document and every file it imports draw from. */
+export function loadedSources(loaded: Loaded): string[] {
+  return boundSources(loaded.document ? [loaded.document, ...loaded.imported] : []);
+}
+
 /** The viewer bundle for a model, sanitized, drawn from the version's resources. */
 export function bundleFor(model: Model, opts: BundleOptions & Required<Resources>): Record<string, unknown> {
   return sanitizeBundle(buildBundle(model, opts));

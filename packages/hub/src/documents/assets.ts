@@ -6,7 +6,7 @@
  * that repeats a file stores nothing new.
  */
 import { ARTIFACT_DIR, isDocumentPath, type Model } from '@vantage/model';
-import { LayeredIconSource, MapAssetSource, documentFiles, fileTypeOf, modelResources, type Resources } from '@vantage/render';
+import { LayeredIconSource, MapAssetSource, fileTypeOf, modelResources, type Resources } from '@vantage/render';
 import { defaultIcons } from '@vantage/server';
 import type { AppContext } from '../context.ts';
 import { sha256Bytes } from '../crypto.ts';
@@ -73,9 +73,9 @@ export function overlayAttachments(head: readonly Attachment[], added: readonly 
  * YAML or in a page. `pages` holds the Markdown among them, so a picture
  * only a page embeds stays attached.
  */
-export function keptAttachments(all: readonly Attachment[], model: Model | undefined, pages: Readonly<Record<string, Uint8Array>>): Attachment[] {
-  const named = new Set(model ? documentFiles(model, new MapAssetSource(pages)) : all.map((a) => a.path));
-  const kept = all.filter((a) => named.has(a.path));
+export function keptAttachments(all: readonly Attachment[], named: readonly string[] | null): Attachment[] {
+  const held = new Set(named ?? all.map((a) => a.path));
+  const kept = all.filter((a) => held.has(a.path));
   const total = kept.reduce((s, a) => s + a.size, 0);
   if (total > ASSET_LIMITS.versionBytes) throw badRequest(`the version's files total ${total} bytes; the limit is ${ASSET_LIMITS.versionBytes}`);
   return kept;

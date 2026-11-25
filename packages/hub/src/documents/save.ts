@@ -15,16 +15,16 @@ import type { Logger } from '../log.ts';
 import type { Surface } from '../audit.ts';
 import { audit } from '../audit.ts';
 import { badRequest } from '../http.ts';
-import { boundSources, loadStored, searchText, type ImportMap, type Loaded } from './model.ts';
+import { loadStored, loadedSources, type ImportMap } from './model.ts';
 import { mergeYaml, unifiedDiff } from './merge.ts';
 import { versionById, type DocumentRow, type VersionRow } from './repo.ts';
 import { enqueueDraw } from '../worker/jobs.ts';
 import { DOC_CHANNEL_PREFIX } from '../worker/artifacts.ts';
 import { keptAttachments, overlayAttachments, type Attachment } from './assets.ts';
 import type { FileMerge } from './pages.ts';
-import { documentCites, indexDocument, movedCitationsOf, pageBytes, type MovedCitation } from '../decisions/citations.ts';
+import { indexDocument, movedCitationsOf, type MovedCitation } from '../decisions/citations.ts';
 import { registerKind } from '../tracking/kinds.ts';
-import { requireClean } from './check.ts';
+import { checkDocument, refuseErrors } from './check.ts';
 
 
 export interface SaveInput {
@@ -96,22 +96,13 @@ async function saveInTransaction(ctx: AppContext, input: SaveInput, phases: Phas
     phases.lap('begin');
     let doc = input.documentId ? await maybe<DocumentRow>(tx, 'select * from documents where id = $1 for update', [input.documentId]) : undefined;
     if (input.documentId && !doc) throw new Error(`document ${input.documentId} not found`);
-    if (!doc) {
-      const loaded = loadStored(input.yaml, input.imports);
-      const name = input.name ?? loaded.model?.title ?? 'Untitled';
-      const slug = await uniqueSlug(tx, input.workspaceId, slugOf(input.slug ?? name) || 'untitled');
-      const id = randomId();
-      await tx.query('insert into documents (id, org_id, workspace_id, name, slug, created_by) values ($1, $2, $3, $4, $5, $6)', [id, input.orgId, input.workspaceId, name, slug, input.authorUserId]);
-      doc = (await maybe<DocumentRow>(tx, 'select * from documents where id = $1', [id]))!;
-      log.info('save.document.created', { documentId: id, slug });
-    }
-    const head = doc.head_version_id ? await versionById(tx, doc.head_version_id) : undefined;
+    const head = doc?.head_version_id ? await versionById(tx, doc.head_version_id) : undefined;
     phases.lap('lock');
     let yaml = input.yaml;
     let merged = false;
     // The version the caller read, when the head has moved since.
     const base = head && input.expectedVersionId !== undefined && input.expectedVersionId !== head.id ? await versionById(tx, input.expectedVersionId) : undefined;
-    if (head && input.expectedVersionId !== undefined && input.expectedVersionId !== head.id) {
+    if (doc && head && input.expectedVersionId !== undefined && input.expectedVersionId !== head.id) {
       if (!base || base.document_id !== doc.id) throw new Error(`expected version ${input.expectedVersionId} does not belong to this document`);
       const m = mergeYaml(base.yaml, head.yaml, input.yaml);
       if (!m.ok) {
@@ -124,23 +115,33 @@ async function saveInTransaction(ctx: AppContext, input: SaveInput, phases: Phas
     }
     const imports = input.imports ?? head?.imports ?? {};
     phases.lap('merge');
-    const loaded = loadStored(yaml, imports);
-    phases.lap('parse');
     const files = input.files ? await input.files({ base, head }) : { attachments: [...(input.attachments ?? [])] };
     phases.lap('files');
-    if ('conflict' in files) return { status: 'conflict', document: doc, head: head!, ...files.conflict } satisfies SaveResult;
+    if ('conflict' in files) {
+      if (!doc || !head) throw new Error('a new document has no head to conflict with');
+      return { status: 'conflict', document: doc, head, ...files.conflict } satisfies SaveResult;
+    }
     const offered = overlayAttachments(head?.attachments ?? [], files.attachments);
-    const pages = await pageBytes(ctx, input.orgId, offered);
-    const attachments = keptAttachments(offered, loaded.model, pages);
-    phases.lap('pages');
+    // The text as it would be stored, after any merge, checked and read once on a render thread: a version with errors is never written, whichever way it came. Its reads go through this transaction.
+    const scope = { orgId: input.orgId, workspaceId: input.workspaceId, attachments: offered };
+    const checked = await checkDocument({ ...ctx, db: tx }, scope, { yaml, imports, save: true }, (phase) => phases.lap(phase));
+    const facts = checked.save!;
+    const attachments = keptAttachments(offered, facts.files);
     // A file the caller brings that the version would not keep is a mistake to name, never one to drop in silence.
     const unnamed = input.files ? unnamedFiles(files.attachments, attachments) : [];
     if (unnamed.length) {
-      log.info('save.refused.unnamed', { documentId: doc.id, paths: unnamed });
+      log.info('save.refused.unnamed', { documentId: doc?.id ?? null, paths: unnamed });
       throw badRequest(`nothing was saved: no doc view or page names ${unnamed.join(', ')}. A page needs a doc view whose file is its path; a picture needs the YAML or a page that embeds it; an artifact needs an artifacts entry`, { paths: unnamed });
     }
-    // The text as it would be stored, after any merge: a version with errors is never written, whichever way it came. Its reads go through this transaction.
-    await requireClean({ ...ctx, db: tx }, { orgId: input.orgId, workspaceId: input.workspaceId, attachments }, { yaml, imports }, (phase) => phases.lap(phase));
+    refuseErrors(ctx, scope, checked);
+    if (!doc) {
+      const name = input.name ?? facts.title ?? 'Untitled';
+      const slug = await uniqueSlug(tx, input.workspaceId, slugOf(input.slug ?? name) || 'untitled');
+      const id = randomId();
+      await tx.query('insert into documents (id, org_id, workspace_id, name, slug, created_by) values ($1, $2, $3, $4, $5, $6)', [id, input.orgId, input.workspaceId, name, slug, input.authorUserId]);
+      doc = (await maybe<DocumentRow>(tx, 'select * from documents where id = $1', [id]))!;
+      log.info('save.document.created', { documentId: id, slug });
+    }
     const hash = await sha256(JSON.stringify(attachments.length ? { yaml, imports, attachments: attachments.map((a) => [a.path, a.hash]) } : { yaml, imports }));
     if (head && head.hash === hash && JSON.stringify(input.pins ?? head.pins) === JSON.stringify(head.pins)) {
       log.info('save.unchanged', { documentId: doc.id, head: head.id });
@@ -162,19 +163,19 @@ async function saveInTransaction(ctx: AppContext, input: SaveInput, phases: Phas
       head?.id ?? null,
     ]);
     phases.lap('version');
-    const name = input.name && input.documentId === undefined ? input.name : loaded.model?.title ?? doc.name;
-    const binds = sourcesOf(loaded);
-    await tx.query("update documents set head_version_id = $2, name = $3, search = to_tsvector('english', $4), bind_sources = $5, updated_at = now() where id = $1", [doc.id, id, name, searchText(loaded.model, name), JSON.stringify(binds)]);
+    const name = input.name && input.documentId === undefined ? input.name : facts.title ?? doc.name;
+    const binds = facts.binds;
+    await tx.query("update documents set head_version_id = $2, name = $3, search = to_tsvector('english', $4), bind_sources = $5, updated_at = now() where id = $1", [doc.id, id, name, `${name}${facts.searchAfterName}`, JSON.stringify(binds)]);
     phases.lap('head');
-    const moved = await indexDocument(tx, input.orgId, doc.id, id, documentCites(loaded.model, pages));
+    const moved = await indexDocument(tx, input.orgId, doc.id, id, facts.cites);
     phases.lap('citations');
     // A kind block makes the document a kind the hub enforces; a save that would break one saves nothing.
-    await registerKind(tx, { orgId: input.orgId, workspaceId: input.workspaceId, documentId: doc.id, versionId: id, doc: loaded.document });
+    await registerKind(tx, { orgId: input.orgId, workspaceId: input.workspaceId, documentId: doc.id, versionId: id, doc: facts.kindDocument });
     phases.lap('kind');
     const jobId = await enqueueDraw(tx, { orgId: input.orgId, kind: 'render', documentId: doc.id, payload: { versionId: id } });
     // Open viewers hear of the save as it commits, and lay the new version out themselves while the hub draws it.
     await tx.notify(channelName(DOC_CHANNEL_PREFIX, doc.id), JSON.stringify({ versionId: id, saved: true }));
-    await audit(tx, log, { orgId: input.orgId, who: input.who, what: 'document.save', surface: input.surface, target: `document:${doc.id}`, details: { versionId: id, merged, message: input.message ?? '', diagnostics: loaded.diagnostics.length } });
+    await audit(tx, log, { orgId: input.orgId, who: input.who, what: 'document.save', surface: input.surface, target: `document:${doc.id}`, details: { versionId: id, merged, message: input.message ?? '', diagnostics: facts.diagnostics } });
     phases.lap('draw');
     const version = (await versionById(tx, id))!;
     log.info('save.version.created', { documentId: doc.id, versionId: id, parent: head?.id ?? null, merged, renderJob: jobId, binds, files: attachments.length, });
@@ -188,10 +189,6 @@ function unnamedFiles(brought: readonly Attachment[], kept: readonly Attachment[
   return brought.map((a) => a.path).filter((path) => !held.has(path)).sort();
 }
 
-function sourcesOf(loaded: Loaded): string[] {
-  return boundSources(loaded.document ? [loaded.document, ...loaded.imported] : []);
-}
-
 /**
  * Recomputes every document's source list from its head version, so a
  * release that reads more of a document (an `observe` block, an imported
@@ -201,7 +198,7 @@ export async function refreshBindSources(db: Db, log: Logger): Promise<number> {
   const rows = await db.query<{ id: string; bind_sources: string[]; yaml: string; imports: ImportMap }>('select d.id, d.bind_sources, v.yaml, v.imports from documents d join versions v on v.id = d.head_version_id');
   let changed = 0;
   for (const r of rows) {
-    const binds = sourcesOf(loadStored(r.yaml, r.imports));
+    const binds = loadedSources(loadStored(r.yaml, r.imports));
     if (JSON.stringify(binds) === JSON.stringify(r.bind_sources ?? [])) continue;
     await db.query('update documents set bind_sources = $2 where id = $1', [r.id, JSON.stringify(binds)]);
     changed++;

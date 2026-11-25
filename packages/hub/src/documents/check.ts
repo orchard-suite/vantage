@@ -35,6 +35,8 @@ export interface CheckText {
   readonly imports?: ImportMap | undefined;
   readonly files?: Readonly<Record<string, Uint8Array>> | undefined;
   readonly scores?: boolean | undefined;
+  /** Also answer what a save takes from the model. */
+  readonly save?: boolean | undefined;
 }
 
 /** Marks the end of a named phase, for a caller that times its own. */
@@ -44,7 +46,7 @@ export async function checkDocument(ctx: AppContext, scope: CheckScope, text: Ch
   const held = await resourceInputs(ctx, { orgId: scope.orgId, workspaceId: scope.workspaceId, attachments: scope.attachments ?? [] });
   const resources = { ...held, files: { ...held.files, ...(text.files ?? {}) } };
   lap('check.resources');
-  const out = await ctx.render.run('check', { yaml: text.yaml, imports: text.imports, resources, scores: text.scores });
+  const out = await ctx.render.run('check', { yaml: text.yaml, imports: text.imports, resources, scores: text.scores, save: text.save });
   lap('check.document');
   // Every citation in one lookup: a record cited by its old number passes with a warning, one that is nowhere fails.
   const found = await resolveRefs(ctx.db, scope.orgId, out.decisions);
@@ -60,9 +62,8 @@ export async function checkDocument(ctx: AppContext, scope: CheckScope, text: Ch
   return { ...out, warnings: [...out.warnings, ...moved], errors: [...out.errors, ...unknown] };
 }
 
-/** Throws 422 with every error when the document has any; the message spells them out for a writer that sees only text. */
-export async function requireClean(ctx: AppContext, scope: CheckScope, text: CheckText, lap?: Lap): Promise<void> {
-  const out = await checkDocument(ctx, scope, text, lap);
+/** Throws 422 with every error a check found; the message spells them out for a writer that sees only text. */
+export function refuseErrors(ctx: AppContext, scope: CheckScope, out: CheckOutput): void {
   if (!out.errors.length) return;
   const n = out.errors.length;
   ctx.log.info('save.refused', { workspaceId: scope.workspaceId, errors: n, codes: [...new Set(out.errors.map((e) => e.code))] });

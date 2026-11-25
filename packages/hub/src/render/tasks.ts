@@ -15,6 +15,7 @@ import { savedDraw, type SavedDrawInput } from './saved-draw-task.ts';
 import { produce, type ProduceInput, type ProduceOutput } from './produce-task.ts';
 import { reviewDocument, type ReviewInput, type ReviewOutput } from './review-task.ts';
 import { checkPush, type PushInput, type PushOutput } from './push-task.ts';
+import { saveFacts, type SaveFacts } from './save-facts.ts';
 
 export interface StoredText {
   readonly yaml: string;
@@ -158,6 +159,8 @@ export interface CheckInput {
   readonly resources?: ResourceData | undefined;
   /** Also lay every view out and answer its score and notes. */
   readonly scores?: boolean | undefined;
+  /** Also answer what a save takes from the model, from the same parse. */
+  readonly save?: boolean | undefined;
 }
 
 /** One problem a check found: its stable code, what is wrong, and where. */
@@ -182,6 +185,8 @@ export interface CheckOutput {
   readonly views: readonly { readonly id: string; readonly title: string; readonly kind: string; readonly score?: number; readonly notes?: readonly string[] }[];
   /** Decision records the boxes and pages cite, as written, each once; the hub checks they exist. */
   readonly decisions: readonly string[];
+  /** What a save takes from the model, when asked. */
+  readonly save?: SaveFacts;
 }
 
 /**
@@ -213,7 +218,8 @@ function check(input: CheckInput): CheckOutput {
     for (const n of model.nodes.values()) for (const d of n.decisions ?? []) cited.add(d);
     for (const page of docPages(model, res.assets).values()) for (const d of page.decisions) cited.add(d);
   }
-  return { errors, warnings: all.filter((d) => d.severity === 'warning').map(say), notes: all.filter((d) => d.severity === 'info').map(say), views, decisions: [...cited] };
+  const save = input.save ? { save: saveFacts(input.yaml, input.imports ?? {}, input.resources?.files ?? {}) } : {};
+  return { errors, warnings: all.filter((d) => d.severity === 'warning').map(say), notes: all.filter((d) => d.severity === 'info').map(say), views, decisions: [...cited], ...save };
 }
 
 const RUNNERS: { [K in TaskKind]: (input: TaskInput<K>) => TaskOutput<K> | Promise<TaskOutput<K>> } = {
