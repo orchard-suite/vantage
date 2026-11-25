@@ -2,6 +2,12 @@
 
 All notable changes to this project will be documented in this file.
 
+## [4.4.4](https://github.com/orchard-suite/vantage/compare/v4.4.3...v4.4.4) (2026-11-25)
+
+### Bug Fixes
+
+* **vantage:** retry the example upload of a release ([15a695a](https://github.com/orchard-suite/vantage/commit/15a695a422b59193f56d116a1a282de8da7dec82))
+
 ## [4.4.3](https://github.com/orchard-suite/vantage/compare/v4.4.2...v4.4.3) (2026-11-25)
 
 ### Bug Fixes
