@@ -3,7 +3,8 @@
  * the expected parent, a three-way merge when the head moved, the check
  * that refuses a version with errors, a draw of the head (one per burst), a
  * search index update, the decision citations the head makes, and an audit
- * line.
+ * line. Each save logs one `save.phases` line with the milliseconds of
+ * every phase, whatever its outcome.
  */
 import { slug as slugOf } from '@vantage/model';
 import type { Db } from '../db/db.ts';
@@ -59,7 +60,40 @@ export type SaveResult =
 export async function saveDocument(ctx: AppContext, input: SaveInput): Promise<SaveResult> {
   const { db, log } = ctx;
   log.info('save.start', { workspaceId: input.workspaceId, documentId: input.documentId ?? null, surface: input.surface, expected: input.expectedVersionId ?? null });
-  const result = await db.transaction(async (tx) => {
+  const phases = new Phases();
+  let status: SaveResult['status'] | 'failed' = 'failed';
+  try {
+    const result = await saveInTransaction(ctx, input, phases);
+    phases.lap('commit');
+    status = result.status;
+    log.info('save.end', { status: result.status, documentId: result.document.id });
+    return result;
+  } finally {
+    log.info('save.phases', { documentId: input.documentId ?? null, surface: input.surface, status, ms: phases.total(), phases: phases.ms });
+  }
+}
+
+/** Milliseconds spent in each named phase, measured from the end of the one before. */
+class Phases {
+  readonly ms: Record<string, number> = {};
+  private readonly started = Date.now();
+  private last = this.started;
+
+  lap(name: string): void {
+    const now = Date.now();
+    this.ms[name] = (this.ms[name] ?? 0) + now - this.last;
+    this.last = now;
+  }
+
+  total(): number {
+    return Date.now() - this.started;
+  }
+}
+
+async function saveInTransaction(ctx: AppContext, input: SaveInput, phases: Phases): Promise<SaveResult> {
+  const { db, log } = ctx;
+  return db.transaction(async (tx) => {
+    phases.lap('begin');
     let doc = input.documentId ? await maybe<DocumentRow>(tx, 'select * from documents where id = $1 for update', [input.documentId]) : undefined;
     if (input.documentId && !doc) throw new Error(`document ${input.documentId} not found`);
     if (!doc) {
@@ -72,6 +106,7 @@ export async function saveDocument(ctx: AppContext, input: SaveInput): Promise<S
       log.info('save.document.created', { documentId: id, slug });
     }
     const head = doc.head_version_id ? await versionById(tx, doc.head_version_id) : undefined;
+    phases.lap('lock');
     let yaml = input.yaml;
     let merged = false;
     // The version the caller read, when the head has moved since.
@@ -88,12 +123,16 @@ export async function saveDocument(ctx: AppContext, input: SaveInput): Promise<S
       log.info('save.merged', { documentId: doc.id, head: head.id, expected: base.id, changed: m.changed });
     }
     const imports = input.imports ?? head?.imports ?? {};
+    phases.lap('merge');
     const loaded = loadStored(yaml, imports);
+    phases.lap('parse');
     const files = input.files ? await input.files({ base, head }) : { attachments: [...(input.attachments ?? [])] };
+    phases.lap('files');
     if ('conflict' in files) return { status: 'conflict', document: doc, head: head!, ...files.conflict } satisfies SaveResult;
     const offered = overlayAttachments(head?.attachments ?? [], files.attachments);
     const pages = await pageBytes(ctx, input.orgId, offered);
     const attachments = keptAttachments(offered, loaded.model, pages);
+    phases.lap('pages');
     // A file the caller brings that the version would not keep is a mistake to name, never one to drop in silence.
     const unnamed = input.files ? unnamedFiles(files.attachments, attachments) : [];
     if (unnamed.length) {
@@ -101,7 +140,7 @@ export async function saveDocument(ctx: AppContext, input: SaveInput): Promise<S
       throw badRequest(`nothing was saved: no doc view or page names ${unnamed.join(', ')}. A page needs a doc view whose file is its path; a picture needs the YAML or a page that embeds it; an artifact needs an artifacts entry`, { paths: unnamed });
     }
     // The text as it would be stored, after any merge: a version with errors is never written, whichever way it came. Its reads go through this transaction.
-    await requireClean({ ...ctx, db: tx }, { orgId: input.orgId, workspaceId: input.workspaceId, attachments }, { yaml, imports });
+    await requireClean({ ...ctx, db: tx }, { orgId: input.orgId, workspaceId: input.workspaceId, attachments }, { yaml, imports }, (phase) => phases.lap(phase));
     const hash = await sha256(JSON.stringify(attachments.length ? { yaml, imports, attachments: attachments.map((a) => [a.path, a.hash]) } : { yaml, imports }));
     if (head && head.hash === hash && JSON.stringify(input.pins ?? head.pins) === JSON.stringify(head.pins)) {
       log.info('save.unchanged', { documentId: doc.id, head: head.id });
@@ -122,22 +161,25 @@ export async function saveDocument(ctx: AppContext, input: SaveInput): Promise<S
       input.message ?? '',
       head?.id ?? null,
     ]);
+    phases.lap('version');
     const name = input.name && input.documentId === undefined ? input.name : loaded.model?.title ?? doc.name;
     const binds = sourcesOf(loaded);
     await tx.query("update documents set head_version_id = $2, name = $3, search = to_tsvector('english', $4), bind_sources = $5, updated_at = now() where id = $1", [doc.id, id, name, searchText(loaded.model, name), JSON.stringify(binds)]);
+    phases.lap('head');
     const moved = await indexDocument(tx, input.orgId, doc.id, id, documentCites(loaded.model, pages));
+    phases.lap('citations');
     // A kind block makes the document a kind the hub enforces; a save that would break one saves nothing.
     await registerKind(tx, { orgId: input.orgId, workspaceId: input.workspaceId, documentId: doc.id, versionId: id, doc: loaded.document });
+    phases.lap('kind');
     const jobId = await enqueueDraw(tx, { orgId: input.orgId, kind: 'render', documentId: doc.id, payload: { versionId: id } });
     // Open viewers hear of the save as it commits, and lay the new version out themselves while the hub draws it.
     await tx.notify(channelName(DOC_CHANNEL_PREFIX, doc.id), JSON.stringify({ versionId: id, saved: true }));
     await audit(tx, log, { orgId: input.orgId, who: input.who, what: 'document.save', surface: input.surface, target: `document:${doc.id}`, details: { versionId: id, merged, message: input.message ?? '', diagnostics: loaded.diagnostics.length } });
+    phases.lap('draw');
     const version = (await versionById(tx, id))!;
     log.info('save.version.created', { documentId: doc.id, versionId: id, parent: head?.id ?? null, merged, renderJob: jobId, binds, files: attachments.length, });
     return { status: 'saved', document: { ...doc, head_version_id: id, name }, version, merged, moved } satisfies SaveResult;
   });
-  log.info('save.end', { status: result.status, documentId: result.document.id });
-  return result;
 }
 
 /** The paths among the files a save brought that the version does not keep. */

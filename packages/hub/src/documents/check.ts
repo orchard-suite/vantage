@@ -38,24 +38,30 @@ export interface CheckText {
   readonly scores?: boolean | undefined;
 }
 
-export async function checkDocument(ctx: AppContext, scope: CheckScope, text: CheckText): Promise<CheckOutput> {
+/** Marks the end of a named phase, for a caller that times its own. */
+export type Lap = (phase: string) => void;
+
+export async function checkDocument(ctx: AppContext, scope: CheckScope, text: CheckText, lap: Lap = () => undefined): Promise<CheckOutput> {
   const held = await resourceInputs(ctx, { orgId: scope.orgId, workspaceId: scope.workspaceId, attachments: scope.attachments ?? [] });
   const resources = { ...held, files: { ...held.files, ...(text.files ?? {}) } };
+  lap('check.resources');
   const out = await ctx.render.run('check', { yaml: text.yaml, imports: text.imports, resources, scores: text.scores });
+  lap('check.document');
   const missing = await unknownCitations(ctx, scope.orgId, out.decisions);
   const moved: Finding[] = [];
   for (const cited of out.decisions) {
     const hit = await resolveRef(ctx.db, scope.orgId, cited);
     if (hit?.alias) moved.push({ code: 'decision-moved', message: `decision ${cited} moved; it is ${refOf(hit.row)} now. The old citation still resolves`, hint: `cite ${refOf(hit.row)}` });
   }
+  lap('check.decisions');
   if (!missing.length && !moved.length) return out;
   const unknown = missing.map((r): Finding => ({ code: 'unknown-decision', message: `decision ${r} is not a record in any registry here`, hint: 'cite one that exists (vantage_outline a registry lists them)' }));
   return { ...out, warnings: [...out.warnings, ...moved], errors: [...out.errors, ...unknown] };
 }
 
 /** Throws 422 with every error when the document has any; the message spells them out for a writer that sees only text. */
-export async function requireClean(ctx: AppContext, scope: CheckScope, text: CheckText): Promise<void> {
-  const out = await checkDocument(ctx, scope, text);
+export async function requireClean(ctx: AppContext, scope: CheckScope, text: CheckText, lap?: Lap): Promise<void> {
+  const out = await checkDocument(ctx, scope, text, lap);
   if (!out.errors.length) return;
   const n = out.errors.length;
   ctx.log.info('save.refused', { workspaceId: scope.workspaceId, errors: n, codes: [...new Set(out.errors.map((e) => e.code))] });

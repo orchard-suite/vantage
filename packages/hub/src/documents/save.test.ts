@@ -9,8 +9,25 @@ import { storedArtifact } from './derived.ts';
 import { runGc } from '../worker/gc.ts';
 import { JobLog } from '../worker/jobs.ts';
 import { channelName } from '../db/db.ts';
+import { createLogger } from '../log.ts';
 
 describe('save and render', () => {
+  test('every save logs one line with the milliseconds of each phase, refused saves too', async () => {
+    const base = await testContext();
+    const lines: Record<string, unknown>[] = [];
+    const ctx = { ...base, log: createLogger('info', { write: (l) => lines.push(JSON.parse(l) as Record<string, unknown>) }) };
+    const { principal } = await testUser(ctx, 'author');
+    const ws = (await accessibleWorkspaces(ctx.db, principal))[0]!;
+    const input = { orgId: 'default', workspaceId: ws.id, authorUserId: principal.userId, who: principal.userId, surface: 'api' as const, yaml: SAMPLE_YAML };
+    expect((await saveDocument(ctx, input)).status).toBe('saved');
+    await expect(saveDocument(ctx, { ...input, yaml: 'nodes: [' })).rejects.toThrow();
+    const timed = lines.filter((l) => l['msg'] === 'save.phases');
+    expect(timed.map((l) => l['status'])).toEqual(['saved', 'failed']);
+    const phases = timed[0]!['phases'] as Record<string, number>;
+    expect(Object.keys(phases)).toEqual(expect.arrayContaining(['lock', 'parse', 'check.resources', 'check.document', 'version', 'citations', 'draw', 'commit']));
+    expect(Object.values(phases).reduce((a, b) => a + b, 0)).toBeLessThanOrEqual(timed[0]!['ms'] as number);
+  });
+
   test('save creates versions, merges parallel edits, and reports conflicts with a diff', async () => {
     const ctx = await testContext();
     const { principal } = await testUser(ctx, 'author');
