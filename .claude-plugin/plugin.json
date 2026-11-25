@@ -1,7 +1,7 @@
 {
   "name": "vantage",
   "description": "Code-first software and infrastructure diagrams that tell a story. MCP tools to validate, render, explore layouts, and export, plus skills for finding the story, authoring, and reviewing.",
-  "version": "4.4.2",
+  "version": "4.4.3",
   "author": { "name": "The Orchard authors" },
   "homepage": "https://github.com/orchard-suite/vantage",
   "repository": "https://github.com/orchard-suite/vantage",

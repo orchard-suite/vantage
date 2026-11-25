@@ -2,6 +2,12 @@
 
 All notable changes to this project will be documented in this file.
 
+## [4.4.3](https://github.com/orchard-suite/vantage/compare/v4.4.2...v4.4.3) (2026-11-25)
+
+### Bug Fixes
+
+* **vantage:** log how long each phase of a save takes ([7080a5c](https://github.com/orchard-suite/vantage/commit/7080a5c7009b97d10566c549c29870aebaf22017))
+
 ## [4.4.2](https://github.com/orchard-suite/vantage/compare/v4.4.1...v4.4.2) (2026-11-25)
 
 ### Bug Fixes
