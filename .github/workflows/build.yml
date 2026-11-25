@@ -29,10 +29,17 @@ jobs:
             grep -q '^views:' "$f" || continue   # shared model files have no views
             bun packages/cli/src/main.ts render "$f" --format html --out dist/examples
           done
+      # GitHub's upload endpoint fails now and then; a release waits a little and tries again, never stops on one 5xx.
       - name: Attach to the release
         env:
           GH_TOKEN: ${{ github.token }}
-        run: gh release upload "${{ inputs.tag }}" dist/examples/*.html --clobber
+        run: |
+          for attempt in 1 2 3 4 5; do
+            gh release upload "${{ inputs.tag }}" dist/examples/*.html --clobber && exit 0
+            echo "upload attempt $attempt failed; trying again" >&2
+            sleep $((attempt * 10))
+          done
+          exit 1
 
   # The hub image is signed with cosign keyless as this workflow's GitHub
   # identity, with a syft SBOM attested, so the cluster's image policy
