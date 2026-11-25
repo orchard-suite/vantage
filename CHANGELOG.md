@@ -2,6 +2,12 @@
 
 All notable changes to this project will be documented in this file.
 
+## [4.5.0](https://github.com/orchard-suite/vantage/compare/v4.4.6...v4.5.0) (2026-11-25)
+
+### Features
+
+* **vantage:** redraw every document when a release starts ([274795d](https://github.com/orchard-suite/vantage/commit/274795ddbec2dfc0845a93d81d8dae5e8791a65d))
+
 ## [4.4.6](https://github.com/orchard-suite/vantage/compare/v4.4.5...v4.4.6) (2026-11-25)
 
 ### Bug Fixes
