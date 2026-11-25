@@ -3,17 +3,19 @@
  * stored picture of every view whose digest matches the last render's, so
  * a save that changes one view lays out one view.
  *
- * A relation view reads the nodes it draws or moves, their ancestors and every
- * descendant (a folded box counts what it hides), the relations that touch
- * them, the anchors the view before it left on those nodes, and the
- * document-wide settings. A walkthrough reads its relation view and its own
+ * A relation view reads the nodes it draws or moves in full, and of their
+ * ancestors and descendants only where each sits in the tree (a folded box
+ * counts what it hides, and the depths a reader can open follow the tree);
+ * what a box it does not draw says never reaches the picture. It reads too
+ * the relations that touch the nodes it draws, the anchors the view before
+ * it left on the nodes it reads, and the document-wide settings. A walkthrough reads its relation view and its own
  * steps. A sequence, flow, or timeline reads the nodes it names, and a page
  * reads the views it holds, and a doc view reads its own Markdown and, through the
  * shared key, the pictures it embeds. A walkthrough over a view that is not a relation
  * view does not lay out, and takes the digest of the whole document.
  */
 import { createHash } from 'node:crypto';
-import { computeVisible, type Anchors } from '@vantage/layout';
+import { computeVisible, reparented, type Anchors } from '@vantage/layout';
 import { ancestorsOf, descendantsOf, type Model, type ModelNode, type ResolvedView } from '@vantage/model';
 import { freshnessOf } from '@vantage/render';
 
@@ -78,13 +80,20 @@ export class ViewDigests {
 
   private relation(view: RelationView, anchors: Anchors | undefined): string {
     const read = nodesRead(this.model, view);
+    const drawn = nodesDrawn(this.model, view);
     const ids = [...read].sort();
     const h = createHash('sha256').update(JSON.stringify([view, { roots: this.model.roots, icons: [...this.model.icons], theme: this.model.theme }, anchorList(anchors, read)]));
-    for (const id of ids) h.update(this.node(id));
+    for (const id of ids) h.update(drawn.has(id) ? this.node(id) : this.place(id));
     const byNode = this.relations();
     const seen = new Set<string>();
-    for (const id of ids) for (const r of byNode.get(id) ?? []) if (!seen.has(r)) (seen.add(r), h.update(r));
+    for (const id of ids) if (drawn.has(id)) for (const r of byNode.get(id) ?? []) if (!seen.has(r)) (seen.add(r), h.update(r));
     return h.digest('hex');
+  }
+
+  /** Where a node the view does not draw sits in the tree: all the picture takes from it. */
+  private place(id: string): string {
+    const n = this.model.nodes.get(id)!;
+    return JSON.stringify(['place', n.id, n.parentId ?? null, n.childIds, n.depth]);
   }
 
   private node(id: string): string {
@@ -130,6 +139,18 @@ export function nodesRead(model: Model, view: RelationView): Set<string> {
   for (const r of view.relations) for (const id of [r.from, r.to, ...r.via]) add(id);
   for (const id of [...view.extraNodes, ...view.subtree, ...Object.keys(view.reparent), ...Object.values(view.reparent)]) add(id);
   return read;
+}
+
+/**
+ * The nodes a relation view draws: the boxes it shows, in its own tree and
+ * in the document's. A relation whose end is hidden or folded away is drawn
+ * to the box that shows it, and the view's text carries the relation, so
+ * the rest of what it reads counts only by its place in the tree.
+ */
+export function nodesDrawn(model: Model, view: RelationView): Set<string> {
+  const drawn = new Set(computeVisible(model, view).nodes.keys());
+  if (Object.keys(view.reparent).length) for (const id of computeVisible(reparented(model, view.reparent), view).nodes.keys()) drawn.add(id);
+  return drawn;
 }
 
 /** Every node a view names anywhere in its own text: an over-count is safe, a miss is not. */

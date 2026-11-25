@@ -2,7 +2,7 @@ export * from './types.ts';
 export * from './geometry.ts';
 export { chipWidth, DEFAULT_STYLE, RULES, type LayoutStyle } from './style.ts';
 export { textWidth, wrapText, type WrappedText, type FontWeight } from './text/measure.ts';
-export { layoutRelationView } from './relation.ts';
+export { layoutRelationView, reparented } from './relation.ts';
 export { layoutSequenceView } from './sequence.ts';
 export { layoutFlowView } from './flowchart.ts';
 export { layoutTimelineView } from './timeline.ts';

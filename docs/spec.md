@@ -634,7 +634,9 @@ diagrams, points an embed at a storage account static site or at the hub.
 - A render takes the last render of the document as a cache: each view has
   a digest of what its picture reads, and a view whose digest matches is
   taken as it was, its stored entry and all. A save lays out only the views
-  it changed.
+  it changed. A relation view's digest reads the boxes it draws in full and
+  the boxes it only holds by their place in the tree, so a source refresh
+  lays out only the views whose pictures it changed.
 - A render is drawn in ranges of views side by side, one per render thread.
   A relation view breaks layout ties with the box centres the relation
   view before it left, so a range that starts mid-document starts from the
