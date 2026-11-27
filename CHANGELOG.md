@@ -2,6 +2,12 @@
 
 All notable changes to this project will be documented in this file.
 
+## [4.9.0](https://github.com/orchard-suite/vantage/compare/v4.8.0...v4.9.0) (2026-11-27)
+
+### Features
+
+* **vantage:** keep the scope tree and workspace owners ([263f805](https://github.com/orchard-suite/vantage/commit/263f8053c080637713cf08c70688f9a8191a3b76))
+
 ## [4.8.0](https://github.com/orchard-suite/vantage/compare/v4.7.0...v4.8.0) (2026-11-27)
 
 ### Features
