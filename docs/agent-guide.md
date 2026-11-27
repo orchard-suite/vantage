@@ -1257,8 +1257,9 @@ A record is cited three ways:
 Numbers are four digits. The first is the category from the registry's
 scheme (by default 0 Governance, 1 Infrastructure, 2 Security, 3 Data, 4
 Compute, 5 Development, 6 Operations); the last three run in order inside
-the category. A number is never reused: the next one follows the highest
-ever taken.
+the category. The next number follows the highest taken there. A number
+is never reused while its record lives, nor after a move; only a record
+discarded by its writer gives its number back.
 
 A record holds a title, a status (Proposed, Accepted, Deprecated,
 Superseded), the decision date, Last updated, the decision makers by name,
@@ -1315,8 +1316,20 @@ machine form (`adr:<ULID>`). Both are read-only: a write ignores them. The
 - A reversal is `vantage_decision_supersede`: a new record that takes the
   next number and marks the old one Superseded by it. The old record keeps
   its body. Without `governs`, the new record governs what the old one did.
+- `vantage_decision_discard` takes back a record you wrote by mistake.
+  It removes the record and frees its number, so the next record in its
+  category takes it when it was the highest there. It works only while
+  nothing points to the record: no document or other record cites it, no
+  record names it in `related` or a supersede link, no item links it, no
+  old citation of it still resolves, and every revision of it is yours.
+  What it governs, its revisions, and its own citations go with it, and
+  the audit log keeps its whole text. Anything that points to it makes it
+  real: the discard is refused with the list of what points to it, and
+  you retire the record instead, with `status: deprecated` or
+  `vantage_decision_supersede`. Run `dryRun: true` first: it answers the
+  same list, or that the record can be discarded.
 - The record tools that are not text (`vantage_decision_supersede`,
-  `vantage_decision_move`, `vantage_decision_import`,
+  `vantage_decision_move`, `vantage_decision_discard`, `vantage_decision_import`,
   `vantage_decision_next`, `vantage_registries`) are called through
   `vantage_tool`.
 - Link each record to what it governs with `governs`, one line each:

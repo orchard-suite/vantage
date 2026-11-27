@@ -196,7 +196,8 @@ A record is text at its citation: an agent finds, reads, patches, and
 writes it with the five tools above, one sentence at a time. The record
 tools behind `vantage_tool` do what is not text: `vantage_registries`,
 `vantage_decision_supersede`, `vantage_decision_move`,
-`vantage_decision_next`, and `vantage_decision_import`, which brings a
+`vantage_decision_discard`, `vantage_decision_next`, and
+`vantage_decision_import`, which brings a
 folder of a repository's Markdown records in by its path, with their
 numbers, dates, status, decision makers, and supersede links.
 

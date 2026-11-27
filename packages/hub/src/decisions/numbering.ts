@@ -1,8 +1,8 @@
 /**
  * Record numbers: four digits, the first the category, the last three in
- * order within it. The next number follows the highest ever taken in the
+ * order within it. The next number follows the highest taken in the
  * category, so a gap left by a record that was never moved over stays a
- * gap, and nothing is ever handed out twice.
+ * gap. A number is handed out again only after its record is discarded.
  */
 import { formatNumber } from '@vantage/model';
 import type { Category } from './types.ts';

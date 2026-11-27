@@ -194,8 +194,15 @@ commit.
 
 ## Rules
 
-- A record is never deleted and a number is never reused, not even after
-  a move. To retire a decision, set its status to `deprecated`.
+- Discard a record only when you wrote it by mistake and nothing points
+  to it yet: `vantage_decision_discard` with `dryRun: true`, then without.
+  It removes the record and frees its number. It is refused once a
+  document or record cites it, a record names it in related or a
+  supersede link, an item links it, an old citation of it resolves, or
+  anyone else has changed it. Then it is real.
+- A real record is never deleted and its number is never reused, not
+  even after a move. To retire a decision that was made, set its status
+  to `deprecated`; to replace it, supersede it.
 - Read a record before you change it, and change only what the decision
   changed.
 - Cite records as `SHOP-2001` in diagrams and pages: a box's `decisions:`

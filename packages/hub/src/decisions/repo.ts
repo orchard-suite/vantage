@@ -93,7 +93,7 @@ export async function countDecisions(db: Db, registryIds: readonly string[]): Pr
   return Number((await db.query<{ n: string }>('select count(*)::text as n from decisions where registry_id = any($1::text[])', [[...registryIds]]))[0]?.n ?? 0);
 }
 
-/** Every number the registry ever handed out: its records' numbers and the numbers records held before they moved. Records are never deleted, so this is the whole history. */
+/** The numbers the registry holds: its records' numbers and the numbers records held before they moved. A discarded record (discard.ts) leaves no row, so its number is free again; every other number stays taken for good. */
 export async function takenNumbers(db: Db, registryId: string): Promise<number[]> {
   return (await db.query<{ number: number }>('select number from decisions where registry_id = $1 union select number from decision_aliases where registry_id = $1', [registryId])).map((r) => r.number);
 }

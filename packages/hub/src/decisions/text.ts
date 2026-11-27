@@ -1,8 +1,9 @@
-/** What the record tools answer an agent: one line per record or registry, and the report of a move or an import. A record's own text form is text/record-text.ts. */
+/** What the record tools answer an agent: one line per record or registry, and the report of a move, a discard, or an import. A record's own text form is text/record-text.ts. */
 import { STANCE_LABEL, STATUS_LABEL, type Alignment, type Decision, type Registry } from './types.ts';
 import { schemeText } from './numbering.ts';
 import type { ImportReport } from './import-apply.ts';
 import type { MoveReport } from './move.ts';
+import { pointerLine, type DiscardReport } from './discard.ts';
 
 export function alignmentText(a: Alignment): string {
   return [STANCE_LABEL[a.stance], a.rule, a.note ? `: ${a.note}` : ''].filter(Boolean).join(' ').replace(' :', ':');
@@ -15,6 +16,14 @@ export function moveText(r: MoveReport, publicUrl: string): string {
   if (r.cannot.length) out.push('', r.dryRun ? 'Cannot rewrite (the alias keeps them resolving):' : 'Could not rewrite (the alias keeps them resolving):', ...r.cannot.map(line));
   if (r.hidden) out.push('', `${r.hidden} more cite it in places you cannot open; the alias keeps them resolving.`);
   if (r.followed) out.push('', `${r.followed} cite it by id (Related, governs links, adr:<ULID>) and follow on their own.`);
+  return out.join('\n');
+}
+
+export function discardText(r: DiscardReport): string {
+  if (r.discarded) return `Discarded ${r.ref} (${r.title}). Its number is free for the next record in its category. The audit log keeps its whole text.`;
+  if (!r.pointers.length && !r.hidden) return `${r.ref} (${r.title}) can be discarded: nothing points to it, and every revision is yours. Its number would be free for the next record in its category.`;
+  const out = [`${r.ref} (${r.title}) cannot be discarded. Retire it instead: set its status to deprecated, or supersede it with vantage_decision_supersede. What points to it:`, ...r.pointers.map((x) => `- ${pointerLine(x)}`)];
+  if (r.hidden) out.push(`- ${r.hidden} more in places you cannot open`);
   return out.join('\n');
 }
 

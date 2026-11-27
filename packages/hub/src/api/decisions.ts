@@ -14,6 +14,7 @@ import { createDecision, createRegistry, peekNextNumber, supersedeDecision, upda
 import { importDecisions } from '../decisions/import-apply.ts';
 import { decisionCitations } from '../decisions/backlinks.ts';
 import { moveDecision } from '../decisions/move.ts';
+import { discardDecision } from '../decisions/discard.ts';
 import { StatusSchema } from '../decisions/types.ts';
 
 const RECORD = 'title, category, status, decidedOn, updatedOn, deciders, context, decision, consequences, alternatives [{option, rejected}], related, alignment {stance, rule, note}, governs [{document, box | view}]';
@@ -91,6 +92,9 @@ export function decisionRoutes(ctx: AppContext, reg: OpenApiRegistry): Hono<HubE
 
   reg.add({ method: 'post', path: '/decisions/:ref/move', summary: 'Renumber a record, move it to another category, or to another registry. It keeps its id, its old citation stays an alias that resolves, and every citation the hub knows of is rewritten; a source the caller cannot write is reported, not a failure', tag: 'decisions', params: ['ref'], body: { registry: 'optional: the prefix to move to', number: 'optional: the exact new number', category: 'optional: the new category; the next number there', dryRun: 'true reports and writes nothing', message: 'optional: for the history' }, auth: 'author' });
   app.post('/decisions/:ref/move', async (c) => c.json(await moveDecision(ctx, principal(c), c.req.param('ref'), await c.req.json())));
+
+  reg.add({ method: 'post', path: '/decisions/:ref/discard', summary: 'Take back a record its writer made by mistake: it is removed and its number is free for the next record in its category. Only while nothing points to it (no citation, related or supersede link, item link, or old citation, and no revision by anyone else); the audit log keeps its whole text', tag: 'decisions', params: ['ref'], body: { dryRun: 'true answers what points to it and writes nothing', message: 'optional: why, for the audit log' }, auth: 'author', responses: { '409': 'something points to it; details.pointers lists what' } });
+  app.post('/decisions/:ref/discard', async (c) => c.json(await discardDecision(ctx, principal(c), c.req.param('ref'), await c.req.json())));
 
   reg.add({ method: 'get', path: '/decisions/:ref/history', summary: 'Every revision of a record, newest first', tag: 'decisions', params: ['ref'], auth: 'viewer' });
   app.get('/decisions/:ref/history', async (c) => c.json({ revisions: await decisionHistory(ctx, principal(c), c.req.param('ref')) }));
