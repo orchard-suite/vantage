@@ -83,7 +83,7 @@ async function targetNumber(db: Db, row: PlacedRow, to: RegistryRow, input: z.ou
   if (input.number !== undefined) {
     if (input.category !== undefined && categoryOf(input.number) !== input.category) throw badRequest(`${formatNumber(input.number)} is not in category ${input.category}; send the number or the category`);
     const problem = numberProblem(to.categories, input.number, taken);
-    if (problem) throw badRequest(`${problem}; a number is never reused`);
+    if (problem) throw badRequest(`${problem}; a number a record holds or held is never reused`);
     return input.number;
   }
   const category = input.category ?? row.category;

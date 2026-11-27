@@ -809,9 +809,10 @@ the systems they decide about (VAN-3001).
   program's registry sits in the workspace its diagrams live in. Two
   registries may use the same number.
 - **Record.** An immutable id (a ULID) and a four-digit number whose first
-  digit is the category; the next number is one past the highest ever
-  taken in the category, under a per-registry lock, and records are never
-  deleted, so no number is handed out twice. A title; a status (Proposed,
+  digit is the category; the next number is one past the highest taken in
+  the category (a record's number or one it held before it moved), under
+  a per-registry lock. No number is handed out twice, except one freed by
+  a discard (VAN-3023). A title; a status (Proposed,
   Accepted, Deprecated, Superseded) with supersedes and superseded-by
   links; the decision date, Last updated, and the decision makers by name;
   Context, Decision, Consequences, and Alternatives considered (each with
@@ -823,6 +824,15 @@ the systems they decide about (VAN-3001).
   record that supersedes the old one, which keeps its body. Every write
   keeps the whole record as a revision (`decision_revisions`) and an audit
   entry, shown in the workspace's activity.
+- **Discard.** A record's writer may take it back while nothing points to
+  it (VAN-3023): no citation in a document or another record, no record
+  that names it in Related or a supersede link, no item link, no alias,
+  and no revision by anyone else. The record goes with its governs links,
+  its revisions, and its own citations, and its number is free for the
+  next record in its category. The audit log keeps an entry with its whole
+  text, who discarded it, and when. Anything that points to it refuses the
+  discard (409) with the list, and the record is deprecated or superseded
+  instead. A dry run answers the same list and writes nothing.
 - **Citations.** `SHOP-2001` everywhere; `ADR-2001` only inside a record
   of the same registry; `adr:<ULID>` as the machine form. A box cites
   records with `decisions:` in the YAML, and a page with
@@ -856,13 +866,13 @@ the systems they decide about (VAN-3001).
   The viewer badges each governed box with its count and lists the records
   in the box's panel. Search covers records. REST under
   `/api/v1/registries` and `/api/v1/decisions/:ref` (read, refine,
-  supersede, history, `citations`, `move`),
+  supersede, history, `citations`, `move`, `discard`),
   `/api/v1/registries/:prefix/next` and `/import`, and
   `/api/v1/documents/:id/decisions`. MCP: `vantage_registries`,
   `vantage_decisions`, `vantage_decision`, `vantage_decision_create`,
   `vantage_decision_update`, `vantage_decision_supersede`,
-  `vantage_decision_move`, `vantage_decision_next`,
-  `vantage_decision_import`.
+  `vantage_decision_move`, `vantage_decision_discard`,
+  `vantage_decision_next`, `vantage_decision_import`.
 - **Import.** Markdown records (Nygard, MADR, a metadata table, front
   matter) come in with their number, dates, status, decision makers, and
   supersede and related links. A title loses the citation it starts

@@ -1,6 +1,6 @@
 /**
  * The decision record tools that are actions: registries, supersede, move,
- * the next number, and import from Markdown. Reading, listing, writing, and
+ * discard, the next number, and import from Markdown. Reading, listing, writing, and
  * refining a record are the five verbs in text-tools.ts.
  * Each call runs as the bearer's principal through the same service as
  * the API.
@@ -14,7 +14,8 @@ import { listRegistries } from '../decisions/read.ts';
 import { createRegistry, peekNextNumber, supersedeDecision, updateRegistry } from '../decisions/write.ts';
 import { importDecisions } from '../decisions/import-apply.ts';
 import { moveDecision } from '../decisions/move.ts';
-import { importText, moveText, registryLine } from '../decisions/text.ts';
+import { discardDecision } from '../decisions/discard.ts';
+import { discardText, importText, moveText, registryLine } from '../decisions/text.ts';
 import { AlignmentSchema, AlternativeSchema, CategoriesSchema, GovernsSchema } from '../decisions/types.ts';
 
 
@@ -75,7 +76,7 @@ export function registerDecisionTools(server: McpServer, ctx: AppContext, p: Pri
 
   server.registerTool(
     'vantage_decision_next',
-    { description: 'The number the next record in a category would take: one past the highest ever taken there. Numbers are never reused.', inputSchema: { registry: z.string(), category: z.number().int().min(0).max(9) } },
+    { description: 'The number the next record in a category would take: one past the highest any record there holds or held before it moved. Only a discarded record gives its number back.', inputSchema: { registry: z.string(), category: z.number().int().min(0).max(9) } },
     guarded<{ registry: string; category: number }>('vantage_decision_next', async (a) => {
       const n = await peekNextNumber(ctx, p, a.registry, a.category);
       return text(`${n.ref} (${n.categoryName})`);
@@ -111,6 +112,23 @@ export function registerDecisionTools(server: McpServer, ctx: AppContext, p: Pri
     guarded<{ ref: string; registry?: string | undefined; number?: number | undefined; category?: number | undefined; dryRun?: boolean | undefined; message?: string | undefined }>('vantage_decision_move', async ({ ref, ...rest }) => {
       const r = await moveDecision(ctx, p, ref, Object.fromEntries(Object.entries(rest).filter(([, v]) => v !== undefined)));
       return text(moveText(r, url));
+    }),
+  );
+
+  server.registerTool(
+    'vantage_decision_discard',
+    {
+      description:
+        'Take back a record you wrote by mistake: it is removed and its number is free for the next record in its category. Only while nothing points to it: no document or other record cites it, no record names it in related or a supersede link, no item links it, no old citation of it resolves, and every revision of it is yours. What it governs goes with it. Otherwise it is refused with the list of what points to it; retire it instead (deprecate or supersede). Run with dryRun: true first. The audit log keeps its whole text.',
+      inputSchema: {
+        ref: z.string().describe('The record to discard: SHOP-2001 or adr:<ULID>'),
+        dryRun: z.boolean().optional().describe('Answer what points to it and write nothing'),
+        message: z.string().optional().describe('Why it is discarded, for the audit log'),
+      },
+    },
+    guarded<{ ref: string; dryRun?: boolean | undefined; message?: string | undefined }>('vantage_decision_discard', async ({ ref, ...rest }) => {
+      const r = await discardDecision(ctx, p, ref, Object.fromEntries(Object.entries(rest).filter(([, v]) => v !== undefined)));
+      return text(discardText(r), r.dryRun && (r.pointers.length > 0 || r.hidden > 0));
     }),
   );
 
