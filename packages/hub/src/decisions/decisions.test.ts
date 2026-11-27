@@ -195,7 +195,7 @@ describe('decision tools', () => {
     expect(await a.call('vantage_outline', { address: 'LEGACY#deprecated' })).toContain('LEGACY-0003  Deprecated');
     expect(await door('vantage_decision_next', { registry: 'LEGACY', category: 2 })).toBe('LEGACY-2003 (Security)');
     expect(await door('vantage_decision_import', { registry: 'LEGACY', files })).toContain('Imported 0 into LEGACY; 3 already there');
-    expect(await a.call('vantage_find', { query: 'device code' })).toContain('LEGACY-2002:');
+    expect(await a.call('vantage_find', { query: 'device code', in: 'LEGACY' })).toContain('LEGACY-2002:');
 
     // The same files in the other order link the same way.
     await door('vantage_registries', { action: 'create', workspace: ws.slug, prefix: 'OLDER', name: 'Older' });

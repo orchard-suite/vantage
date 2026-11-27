@@ -18,6 +18,7 @@ import { guideText, schemaText } from '@vantage/mcp';
 import { PERSONAL, thingAddress, type Address } from './address.ts';
 import { recordText } from './record-text.ts';
 import { itemThing, placeAddress } from './items.ts';
+import { documentLink, recordLink } from './links.ts';
 
 export type Role = 'viewer' | 'author';
 
@@ -28,6 +29,8 @@ export interface TextThing {
   readonly version: string;
   readonly text: string;
   readonly kind: 'yaml' | 'markdown' | 'json';
+  /** The thing's page in the hub; the guide and the schema have none. */
+  readonly link?: string;
 }
 
 export async function personalWorkspace(ctx: AppContext, p: Principal, role: Role): Promise<AccessibleWorkspace> {
@@ -92,21 +95,21 @@ export async function readThing(ctx: AppContext, p: Principal, given: Address): 
       return { address: 'schema', version: HUB_VERSION, text: schemaText(), kind: 'json' };
     case 'document': {
       const { ws, doc, head } = await requireDocumentAt(ctx, p, a, 'viewer');
-      return { address: `${ws.slug}/${doc.slug}`, version: head.id, text: head.yaml, kind: 'yaml' };
+      return { address: `${ws.slug}/${doc.slug}`, version: head.id, text: head.yaml, kind: 'yaml', link: documentLink(ctx, ws.slug, doc.slug) };
     }
     case 'page': {
       const { ws, doc, head } = await requireDocumentAt(ctx, p, a, 'viewer');
       if (a.page === STALE) {
         const s = await staleOf(ctx, doc.org_id, `${ws.slug}/${doc.slug}`, head.yaml);
-        return { address: `${ws.slug}/${doc.slug}/${STALE}`, version: `${head.id}.${s.head?.slice(0, 12) ?? 'none'}`, text: s.text, kind: 'markdown' };
+        return { address: `${ws.slug}/${doc.slug}/${STALE}`, version: `${head.id}.${s.head?.slice(0, 12) ?? 'none'}`, text: s.text, kind: 'markdown', link: documentLink(ctx, ws.slug, doc.slug) };
       }
       const body = await readPage(ctx, head, a.page);
       if (body === undefined) throw new HttpError(404, `no page ${a.page} in ${ws.slug}/${doc.slug}; its pages: ${pagePaths(head).join(', ') || 'none'}`);
-      return { address: `${ws.slug}/${doc.slug}/${a.page}`, version: head.id, text: body, kind: 'markdown' };
+      return { address: `${ws.slug}/${doc.slug}/${a.page}`, version: head.id, text: body, kind: 'markdown', link: documentLink(ctx, ws.slug, doc.slug) };
     }
     case 'record': {
       const { decision, version } = await recordAt(ctx, p, a.ref);
-      return { address: decision.ref, version, text: recordText(decision), kind: 'markdown' };
+      return { address: decision.ref, version, text: recordText(decision), kind: 'markdown', link: recordLink(ctx, decision.workspace, decision.ref) };
     }
     default:
       throw badRequest(`${thingAddress(a) || 'that'} has no text of its own; vantage_outline it for what is inside`);

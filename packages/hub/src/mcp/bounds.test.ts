@@ -31,7 +31,7 @@ describe('answers with a size limit', () => {
     const writes = Array.from({ length: BUDGET.listRows + 4 }, (_, i) => ({ address: `${ws}/doc-${i}`, text: SAMPLE_YAML.replace('title: Sample', `title: Sample ${i}`) }));
     await a.call('vantage_write', { writes });
     const counted = await a.call('vantage_find', { query: 'orders', in: ws, count: true });
-    expect(counted.split('\n').filter((l) => /^\S+\/doc-\d+: \d+$/.test(l)).length).toBe(BUDGET.listRows);
+    expect(counted.split('\n').filter((l) => /^\S+\/doc-\d+: \d+  http:\/\/hub\.test\/w\/\S+$/.test(l)).length).toBe(BUDGET.listRows);
     expect(counted).toContain('4 more things left out');
   });
 

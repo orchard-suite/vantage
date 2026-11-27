@@ -1089,7 +1089,13 @@ Climb, and stop as soon as you can act:
 
 1. `vantage_outline` says what is at an address, as names and sizes. With
    no address it lists the workspaces and registries.
-2. `vantage_find` answers the lines that match, as `address:line: text`.
+2. `vantage_find` answers the lines that hold every word, as
+   `address:line: text`, under a line that names each thing and its
+   link. With no `in` it searches the whole hub: records come first, then
+   documents and their pages, and personal workspaces are left out (name
+   one, or `~`, in `in` to look there). When no line holds every word it
+   answers how many lines in each thing hold some of them, and the call
+   that reads more; it never answers loose lines.
 3. `vantage_read` answers one part, or several in one call.
 4. `vantage_patch` changes what is saved. `vantage_write` writes something
    new.

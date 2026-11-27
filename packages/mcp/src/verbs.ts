@@ -18,7 +18,7 @@ export const OUTLINE = {
 
 export const FIND = {
   name: 'vantage_find',
-  description: 'The lines that match, each as address:line: text, ready to read around or to patch. Searches everything you may see, or one address.',
+  description: "The lines that match, as address:line: text under each thing's link. Searches the hub outside personal workspaces, or one address.",
   shape: {
     query: z.string().min(1).describe('Words that must all be on the line, or a pattern with regex: true'),
     in: z.string().optional().describe(`Where to look: ${ADDRESS}`),

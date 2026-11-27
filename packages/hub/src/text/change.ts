@@ -23,6 +23,7 @@ import { documentAt, pagePaths, recordAt, workspaceAt, type DocumentAt } from '.
 import { pathLines } from '../documents/edit.ts';
 import { commitItem, itemThing, placeAddress } from './items.ts';
 import { taught, topicOf, type Topic } from './teach.ts';
+import { documentLink, recordLink } from './links.ts';
 
 export interface ChangeResult {
   /** The thing as the hub names it now; a new record's is the citation it was given. */
@@ -64,7 +65,6 @@ interface RecordWork {
   base: string | undefined;
 }
 
-const link = (ctx: AppContext, ws: string, doc: string): string => `${ctx.config.PUBLIC_URL}/w/${encodeURIComponent(ws)}/${encodeURIComponent(doc)}`;
 
 async function commitDocument(ctx: AppContext, p: Principal, w: DocumentWork, assets: Readonly<Record<string, Uint8Array>> | undefined, opts: ChangeOptions): Promise<ChangeResult> {
   const ws = await workspaceAt(ctx, p, w.workspace, 'author');
@@ -88,16 +88,15 @@ async function commitDocument(ctx: AppContext, p: Principal, w: DocumentWork, as
   const address = `${ws.slug}/${r.document.slug}`;
   if (r.status === 'conflict') return { address, status: 'conflict', version: r.head.id, message: `conflict${r.path ? ` in page ${r.path}` : ''}: ${r.conflicts} region(s) changed on both sides; the head is ${r.head.id}. Read it again and patch the text as it stands`, preview: r.preview, ...(r.path ? { path: r.path } : {}) };
   const moved = r.moved.length ? ` These records moved; cite them as they are now: ${r.moved.map((m) => `${m.cited} is ${m.ref}`).join(', ')}.` : '';
-  if (r.status === 'unchanged') return { address, status: 'unchanged', version: r.version.id, link: link(ctx, ws.slug, r.document.slug), message: `unchanged: ${address} is still version ${r.version.id}.${moved}` };
-  return { address, status: at ? 'saved' : 'created', version: r.version.id, link: link(ctx, ws.slug, r.document.slug), message: `saved ${address} version ${r.version.id}${r.merged ? ' (merged with a change made since you read it)' : ''}. ${link(ctx, ws.slug, r.document.slug)}${moved}` };
+  if (r.status === 'unchanged') return { address, status: 'unchanged', version: r.version.id, link: documentLink(ctx, ws.slug, r.document.slug), message: `unchanged: ${address} is still version ${r.version.id}.${moved}` };
+  return { address, status: at ? 'saved' : 'created', version: r.version.id, link: documentLink(ctx, ws.slug, r.document.slug), message: `saved ${address} version ${r.version.id}${r.merged ? ' (merged with a change made since you read it)' : ''}. ${documentLink(ctx, ws.slug, r.document.slug)}${moved}` };
 }
 
-const recordLink = (ctx: AppContext, d: Decision): string => `${ctx.config.PUBLIC_URL}/w/${d.workspace}/decisions/${d.ref}`;
 
 async function commitRecord(ctx: AppContext, p: Principal, w: RecordWork, opts: ChangeOptions): Promise<ChangeResult> {
   if (w.create) {
     const d = await createDecision(ctx, p, w.target, createInput(parseRecordText(w.text)));
-    return { address: d.ref, status: 'created', version: (await recordAt(ctx, p, d.ref)).version, link: recordLink(ctx, d), message: `created ${d.ref}: ${d.title}. ${recordLink(ctx, d)}` };
+    return { address: d.ref, status: 'created', version: (await recordAt(ctx, p, d.ref)).version, link: recordLink(ctx, d.workspace, d.ref), message: `created ${d.ref}: ${d.title}. ${recordLink(ctx, d.workspace, d.ref)}` };
   }
   const at = await recordAt(ctx, p, w.target, 'author');
   const current = recordText(at.decision);
@@ -113,7 +112,7 @@ async function commitRecord(ctx: AppContext, p: Principal, w: RecordWork, opts: 
   const patch = changedFields(parseRecordText(current), parseRecordText(next));
   if (!Object.keys(patch).length) return { address: at.decision.ref, status: 'unchanged', version: at.version, message: `unchanged: ${at.decision.ref}` };
   const d = await updateDecision(ctx, p, at.decision.ref, { ...patch, ...(opts.minor ? { minor: true } : {}), ...(opts.message ? { message: opts.message.slice(0, 500) } : {}) });
-  return { address: d.ref, status: 'saved', version: (await recordAt(ctx, p, d.ref)).version, link: recordLink(ctx, d), message: `saved ${d.ref} (${Object.keys(patch).join(', ')}); last updated ${d.updatedOn}` };
+  return { address: d.ref, status: 'saved', version: (await recordAt(ctx, p, d.ref)).version, link: recordLink(ctx, d.workspace, d.ref), message: `saved ${d.ref} (${Object.keys(patch).join(', ')}); last updated ${d.updatedOn}` };
 }
 
 async function settle(run: () => Promise<ChangeResult>, address: string, topic: Topic): Promise<ChangeResult> {

@@ -29,10 +29,21 @@ const size = (v: unknown): number => JSON.stringify(v).length;
 /** Where the same content would sit on a disk. */
 const DISK = '/work/project/docs';
 
+/** One file on the disk, by its path under the docs folder. */
+export interface DiskFile {
+  readonly path: string;
+  readonly text: string;
+}
+
 export const disk = {
   search(path: string, pattern: string, text: string): Cost {
     const hits = text.split('\n').flatMap((l, i) => (l.toLowerCase().includes(pattern.toLowerCase()) ? [`${path}:${i + 1}:${l}`] : []));
     return { in: size({ pattern, path }), out: hits.join('\n').length, calls: 1 };
+  },
+  /** A search through every file under a folder, the way an agent asks a plain question of a repository's docs. */
+  grep(dir: string, files: readonly DiskFile[], pattern: string): Cost {
+    const hits = files.flatMap((f) => f.text.split('\n').flatMap((l, i) => (l.toLowerCase().includes(pattern.toLowerCase()) ? [`${dir}/${f.path}:${i + 1}:${l}`] : [])));
+    return { in: size({ pattern, path: dir }), out: hits.join('\n').length, calls: 1 };
   },
   read(path: string, text: string, from: number, to: number): Cost {
     const lines = text.split('\n').slice(from - 1, to).map((l, i) => `${from + i}\t${l}`);
@@ -55,6 +66,8 @@ export interface Fixture {
   readonly page: string;
   readonly record: string;
   readonly item: string;
+  /** A team workspace's records and documents, as the same files would sit on a disk, for the tasks that search across the hub. */
+  readonly shared: readonly DiskFile[];
   readonly dir: string;
 }
 
@@ -103,6 +116,31 @@ kind: { prefix: SHIP, name: Shop roadmap, base: roadmap-item }
 views: []
 `;
 
+/** A team's records, one of which answers a plain question asked across the hub. */
+const SHARED_RECORDS = [
+  ['Apps sign in through one identity provider', 'Every app signs in through the one identity provider, with a short lived token.', 'Each app kept its own accounts, and turning a person off meant a ticket per app.'],
+  ['Orders go through one API', 'Only the Shop API writes orders.', 'Two apps wrote to the orders store, and their rules drifted apart.'],
+  ['Prices come from one list', 'The price list is the one source of prices; every app reads it from the cache.', 'Apps kept copies of prices, and a sale showed two prices.'],
+  ['Every service logs to one place', 'Every service sends its logs to the shared log store.', 'Apps kept logs on their own hosts, and an outage was read host by host.'],
+].map(([title, decision, context]) => `---\ntitle: ${title}\nstatus: accepted\ncategory: 2\ndecided: 2026-11-01\ndeciders: [The maintainers]\n---\n\n## Context\n\n${context}\n\n## Decision\n\n${decision}\n\n## Consequences\n\nOne place to change it, and one more thing every app depends on.\n`);
+
+/** The standard a repository is held to: a document whose docs contract names it. */
+const STANDARD = `title: Shop service standard
+docs:
+  kind: standard
+  repository: github.com/acme/shop
+  audience: engineers who change the shop
+  rules:
+    - Every runbook step names the box it acts on.
+nodes:
+  - name: Shop API
+    type: api
+views: []
+`;
+
+/** A person's scratch notes, full of the question's words: a search across the hub never answers from them. */
+const SCRATCH = `title: Scratch\nnodes:\n${Array.from({ length: 20 }, (_, i) => `  - name: Idea ${i}\n    type: service\n    description: maybe apps sign in some other way, idea ${i}`).join('\n')}\nviews: []\n`;
+
 /** The same roadmap as a Markdown table on a disk: what an agent edits there to move one item. */
 const ROADMAP_TABLE = ['| Outcome | Horizon | Owner |', '|---|---|---|', ...Array.from({ length: 20 }, (_, i) => `| Outcome ${i + 1}: the shop answers lane ${i + 1} from the cache | ${i < 5 ? 'now' : i < 12 ? 'next' : 'later'} | team ${i % 4} |`)].join('\n');
 
@@ -132,12 +170,21 @@ export async function fixture(): Promise<Fixture> {
   const item = /=== SW-1[^\n]*\n([\s\S]*)$/.exec(await hub.call('vantage_read', { addresses: ['SW-1'] }))![1]!;
   await hub.call('vantage_write', { writes: [{ address: '~/shop-roadmap', text: ROADMAP }] });
   for (let i = 1; i <= 20; i++) await hub.call('vantage_write', { writes: [{ address: 'SHIP', text: `---\ntitle: "Outcome ${i}: the shop answers lane ${i} from the cache"\nlabels:\n  horizon: ${i <= 5 ? 'now' : i <= 12 ? 'next' : 'later'}\n---\n\nLane ${i} answers from the cache in under 50 ms.` }] });
-  return { t, hub, hubHeaders: me.headers, laptop: lap, ws, yaml, page, record, item, dir: mkdtempSync(join(tmpdir(), 'vantage-cost-')) };
+  await hub.call('vantage_tool', { tool: 'vantage_workspaces', arguments: { action: 'create', name: 'Platform' } });
+  await hub.call('vantage_tool', { tool: 'vantage_registries', arguments: { action: 'create', workspace: 'platform', prefix: 'PLAT', name: 'Platform decisions' } });
+  for (const text of SHARED_RECORDS) await hub.call('vantage_write', { writes: [{ address: 'PLAT', text }] });
+  await hub.call('vantage_write', { writes: [{ address: 'platform/shop-standard', text: STANDARD }, { address: '~/scratch', text: SCRATCH }] });
+  const shared: DiskFile[] = [{ path: 'shop-standard.vantage.yaml', text: STANDARD }];
+  for (let i = 1; i <= SHARED_RECORDS.length; i++) {
+    const ref = `PLAT-${2000 + i}`;
+    shared.push({ path: `decisions/${ref}.md`, text: new RegExp(`=== ${ref}[^\\n]*\\n([\\s\\S]*)$`).exec(await hub.call('vantage_read', { addresses: [ref] }))![1]! });
+  }
+  return { t, hub, hubHeaders: me.headers, laptop: lap, ws, yaml, page, record, item, shared, dir: mkdtempSync(join(tmpdir(), 'vantage-cost-')) };
 }
 
 export interface Task {
   readonly name: string;
-  readonly kind: 'box' | 'view' | 'page' | 'record' | 'item' | 'roadmap';
+  readonly kind: 'box' | 'view' | 'page' | 'record' | 'item' | 'roadmap' | 'search';
   /** Does the task through the hub's door. */
   run(f: Fixture): Promise<unknown>;
   /** What the same task costs on a disk. */
@@ -224,6 +271,25 @@ export const TASKS: readonly Task[] = [
       const r = section(f.item, 'done-when');
       return sum(disk.search(`${DISK}/work/SW-1.md`, '## Done when', f.item), disk.read(`${DISK}/work/SW-1.md`, f.item, r.from, r.to));
     },
+  },
+  {
+    name: 'answer a plain question across the hub',
+    kind: 'search',
+    run: async (f) => {
+      await f.hub.call('vantage_find', { query: 'how do apps sign in' });
+      return f.hub.call('vantage_read', { addresses: ['PLAT-2001#decision'] });
+    },
+    disk: (f) => {
+      const file = f.shared.find((x) => x.path === 'decisions/PLAT-2001.md')!;
+      const r = section(file.text, 'decision');
+      return sum(disk.grep(DISK, f.shared, 'sign in'), disk.read(`${DISK}/${file.path}`, file.text, r.from, r.to));
+    },
+  },
+  {
+    name: 'find the standard that binds a repository',
+    kind: 'search',
+    run: (f) => f.hub.call('vantage_find', { query: 'repository: github.com/acme/shop' }),
+    disk: (f) => disk.grep(DISK, f.shared, 'repository: github.com/acme/shop'),
   },
   {
     name: "move one roadmap item's horizon",

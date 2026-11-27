@@ -50,7 +50,8 @@ describe('the agent door over http', () => {
     expect(doc).toContain(`${ws}/sample/pages/guide.md`);
     expect(await a.call('vantage_outline', { address: `${ws}/sample/pages/guide.md` })).toContain('#refunds  Refunds  L7-9  20 chars');
 
-    const found = await a.call('vantage_find', { query: 'takes orders' });
+    const found = await a.call('vantage_find', { query: 'takes orders', in: '~' });
+    expect(found).toContain(`${ws}/sample  http://hub.test/w/${ws}/sample`);
     expect(found).toContain(`${ws}/sample:8:`);
     expect(found).toContain(`${ws}/sample/pages/guide.md:5: The [[shop-api]] takes orders.`);
 

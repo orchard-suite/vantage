@@ -20,6 +20,7 @@ import { put } from '../tracking/write.ts';
 import type { Address } from './address.ts';
 import { itemTemplate, itemText, parseItemText, refuseFixed } from './item-text.ts';
 import type { TextThing } from './things.ts';
+import { itemLink, workspaceSlug } from './links.ts';
 
 const n = (x: number): string => x.toLocaleString('en-US');
 
@@ -37,7 +38,7 @@ export async function placeAddress(ctx: AppContext, p: Principal, a: Address): P
 export async function itemThing(ctx: AppContext, p: Principal, key: string): Promise<TextThing> {
   const f = await findItem(ctx, p, key);
   const card = await cardOf(ctx, f);
-  return { address: f.item.key, version: String(f.item.position), text: itemText(card, await bodyOf(ctx, f.item)), kind: 'markdown' };
+  return { address: f.item.key, version: String(f.item.position), text: itemText(card, await bodyOf(ctx, f.item)), kind: 'markdown', link: itemLink(ctx, await workspaceSlug(ctx, f.item.workspaceId), f.item.key) };
 }
 
 const PARTS = ['notes', 'history', 'links', 'files'] as const;
@@ -118,21 +119,21 @@ export async function itemOutline(ctx: AppContext, p: Principal, key: string): P
     `moves open to you: ${c.moves.join('; ') || 'none'}`,
     ...(c.span ? [`span: ${spanText(c.span)}`] : []),
     ...(c.milestone ? [`milestone: ${rollupText(c.milestone)}`] : []),
-    `link: ${ctx.config.PUBLIC_URL}/w/${encodeURIComponent((await ctx.db.query<{ slug: string }>('select slug from workspaces where id = $1', [f.item.workspaceId]))[0]?.slug ?? '')}/work/${c.key}`,
+    `link: ${itemLink(ctx, await workspaceSlug(ctx, f.item.workspaceId), c.key)}`,
     ...(c.hasBody ? [`body: ${n(body.length)} chars${hs.length ? '' : ', no headings'}`, ...hs] : []),
     `parts: ${c.key}#notes ${c.counts.notes}, #history ${c.counts.events}, #links ${c.counts.links}, #files ${c.counts.files}`,
   ].join('\n');
 }
 
 /** The things a find looks through in a kind: every item the caller may see, up to a cap, picked by the search index past it. */
-export async function itemHays(ctx: AppContext, p: Principal, prefix: string, query: string): Promise<{ hays: { address: string; text: string; first: number }[]; picked?: string }> {
+export async function itemHays(ctx: AppContext, p: Principal, prefix: string, query: string): Promise<{ hays: { address: string; text: string; first: number; link?: string }[]; picked?: string }> {
   const all = await findItems(ctx, p, { kinds: [prefix], limit: 1 });
   const cap = 60;
   const rows = all.total <= cap ? await findItems(ctx, p, { kinds: [prefix], limit: cap }) : await findItems(ctx, p, { kinds: [prefix], q: query, limit: 12 });
   const hays = [];
   for (const r of rows.rows) {
     const t = await itemThing(ctx, p, r.key);
-    hays.push({ address: t.address, text: t.text, first: 1 });
+    hays.push({ address: t.address, text: t.text, first: 1, ...(t.link ? { link: t.link } : {}) });
   }
   return { hays, ...(all.total > cap ? { picked: `the ${rows.rows.length} best matching of ${all.total} items` } : {}) };
 }
@@ -153,7 +154,7 @@ export async function commitItem(ctx: AppContext, p: Principal, target: { create
     if (!kind) throw new HttpError(404, `no kind ${target.prefix}`);
     const r = await put(ctx, p, { kind: kind.prefix, ...(next.title !== undefined ? { title: next.title } : {}), labels: next.labels, ...(next.parent ? { parent: next.parent } : {}), ...(kind.definition.owner ? {} : { body: next.body }) }, key);
     const v = await itemThing(ctx, p, r.key);
-    return { address: r.key, status: 'created', version: v.version, message: `${r.line}. ${ctx.config.PUBLIC_URL}/w/~/work/${r.key}` };
+    return { address: r.key, status: 'created', version: v.version, message: `${r.line}. ${v.link ?? ''}` };
   }
   const current = await itemThing(ctx, p, target.key);
   if (base !== undefined && base !== current.version) return { address: current.address, status: 'conflict', version: current.version, message: `conflict: ${current.address} changed since version ${base}; it is version ${current.version} now. Read it again and patch the text as it stands` };

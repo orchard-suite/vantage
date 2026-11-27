@@ -200,6 +200,7 @@ export async function renderVersion(ctx: AppContext, version: VersionRow, opts: 
   const out = await drawDocument(poolRunner(ctx, { lane: LANE_OF[opts.trigger] }), { ...input, cached: source?.cached }, { previousDigest: opts.replace ? previous?.digest : undefined });
   const drawMs = Date.now() - started - inputMs;
 
+  await indexSearch(ctx, doc, version, input.resources.files);
   if (out.kind === 'skipped') {
     // A matching digest means this release would draw the same picture, so the render counts as this release's.
     await ctx.db.query('update render_states set renderer = $2 where version_hash = $1', [version.hash, RENDERER]);
@@ -210,7 +211,6 @@ export async function renderVersion(ctx: AppContext, version: VersionRow, opts: 
   }
 
   const stored = await storeRender(ctx, doc, version, out, source, { jlog: opts.jlog, log });
-  await indexPages(ctx, doc, version, input.resources.files);
   await notifyDocument(ctx, doc.id, version.id, version.hash);
   const pictureMs = Date.now() - started;
   ctx.metrics.renderPass.record(pictureMs / 1000, { pass: 'picture', trigger: opts.trigger });
@@ -229,15 +229,14 @@ export async function renderVersion(ctx: AppContext, version: VersionRow, opts: 
 }
 
 /**
- * A save indexes what the YAML says; the pages are files, read here. The
- * head version's pages join the document's search text when it is drawn.
+ * A save indexes what the YAML says; the pages are files, read here. Every
+ * draw writes the head version's whole search text, its pages included, so
+ * a release that indexes more reaches every document as it redraws.
  */
-async function indexPages(ctx: AppContext, doc: DocumentRow, version: VersionRow, files: Readonly<Record<string, Uint8Array>>): Promise<void> {
-  const pages = pagesSearchText(files);
-  if (!pages) return;
-  const text = `${searchText(loadStored(version.yaml, version.imports).model, doc.name)}\n${pages}`;
+async function indexSearch(ctx: AppContext, doc: DocumentRow, version: VersionRow, files: Readonly<Record<string, Uint8Array>>): Promise<void> {
+  const text = `${searchText(loadStored(version.yaml, version.imports).model, doc.name)}\n${pagesSearchText(files)}`;
   // The index is a convenience: a text Postgres will not index must never fail the draw.
-  await ctx.db.query("update documents set search = to_tsvector('english', $2) where id = $1 and head_version_id = $3", [doc.id, text, version.id]).catch((err: unknown) => ctx.log.warn('search.pages.failed', { documentId: doc.id, versionId: version.id, error: (err as Error).message }));
+  await ctx.db.query("update documents set search = to_tsvector('english', $2) where id = $1 and head_version_id = $3", [doc.id, text, version.id]).catch((err: unknown) => ctx.log.warn('search.index.failed', { documentId: doc.id, versionId: version.id, error: (err as Error).message }));
 }
 
 interface Stored {

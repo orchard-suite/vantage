@@ -148,12 +148,19 @@ export function bundleFor(model: Model, opts: BundleOptions & Required<Resources
   return sanitizeBundle(buildBundle(model, opts));
 }
 
-/** The words search indexes: names, subtitles, facts, descriptions, questions, view titles. */
+/** The words search indexes: names, subtitles, facts, descriptions, questions, view titles, and the docs contract. */
 export function searchText(model: Model | undefined, name: string): string {
   const parts: string[] = [name];
   if (!model) return name;
   parts.push(model.title);
   if (model.description) parts.push(model.description);
+  if (model.docs) {
+    const d = model.docs;
+    if (d.kind) parts.push(`kind: ${d.kind}`);
+    if (d.repository) parts.push(`repository: ${d.repository}`);
+    if (d.audience) parts.push(d.audience);
+    parts.push(...(d.rules ?? []));
+  }
   for (const n of model.nodes.values()) {
     parts.push(n.name);
     if (n.subtitle) parts.push(n.subtitle);

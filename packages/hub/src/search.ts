@@ -12,8 +12,18 @@ export interface SearchHit {
   readonly rank: number;
 }
 
-export async function searchDocuments(db: Db, p: Principal, query: string, limit = 20): Promise<SearchHit[]> {
-  const ids = (await memberWorkspaces(db, p)).map((w) => w.id);
+export interface SearchScope {
+  /** Look in personal workspaces too: the reader's library, the default. A search across the hub leaves them out (VAN-5008). */
+  readonly personal?: boolean;
+}
+
+/** The workspace ids a search looks in: the reader's library, without personal workspaces when the scope says so. */
+export async function searchWorkspaceIds(db: Db, p: Principal, scope: SearchScope = {}): Promise<string[]> {
+  return (await memberWorkspaces(db, p)).filter((w) => scope.personal !== false || w.kind !== 'personal').map((w) => w.id);
+}
+
+export async function searchDocuments(db: Db, p: Principal, query: string, limit = 20, scope: SearchScope = {}): Promise<SearchHit[]> {
+  const ids = await searchWorkspaceIds(db, p, scope);
   if (!ids.length || !query.trim()) return [];
   const rows = await db.query<{ id: string; slug: string; wslug: string; name: string; headline: string; rank: number }>(
     `select d.id, d.slug, w.slug as wslug, d.name,

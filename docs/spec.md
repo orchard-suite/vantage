@@ -1148,7 +1148,8 @@ characters stand alone. The first paragraph is that self-contained lead.
   against the hub and against a disk and are counted in characters and
   calls: find one fact; change one sentence in a box, a view, a page, a
   record, and an item; look at one view; bring in a folder of records;
-  take an item and finish it. A task's budget is its disk cost. The check
+  take an item and finish it; answer a plain question across the hub;
+  find the standard that binds a repository. A task's budget is its disk cost. The check
   gate runs it.
 - **Budgets.** One file holds them (`packages/mcp/src/budget.ts`). The
   standing budgets were set at what the rebuilt surface measured; a change
@@ -1165,7 +1166,10 @@ characters stand alone. The first paragraph is that self-contained lead.
   a YAML path, or a line range. Registry prefixes, kind prefixes, and
   workspace slugs share one namespace (VAN-5002).
 - **Five verbs.** `outline` (names and sizes, never text), `find` (lines
-  with address and line number, or a count), `read` (one or many
+  with address and line number under each thing's link, or a count;
+  across the hub records first, then documents and pages, personal
+  workspaces left out unless named, and a miss answered as counts per
+  thing with the call that reads more, VAN-5008), `read` (one or many
   addresses or parts, bounded, with the version held answered as
   unchanged), `patch` (an exact string replaced once, or set, add, and
   remove by path; many edits across many things in one call; one version

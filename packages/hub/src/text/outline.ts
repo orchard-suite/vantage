@@ -20,6 +20,7 @@ import { BUDGET, countLines, guideOutline, headingOutline, headings, schemaOutli
 import { thingAddress, type Address } from './address.ts';
 import { pagePaths, readThing, recordAt, requireDocumentAt, workspaceAt } from './things.ts';
 import { yamlOutline } from './yaml-outline.ts';
+import { documentLink, recordLink } from './links.ts';
 import { RECORD_TEMPLATE } from './record-text.ts';
 import { itemOutline, kindOutline, placeAddress } from './items.ts';
 import { kindsFor } from '../tracking/read.ts';
@@ -92,7 +93,7 @@ async function workspace(ctx: AppContext, p: Principal, slug: string): Promise<s
 async function document(ctx: AppContext, p: Principal, a: { workspace: string; document: string }): Promise<string> {
   const { ws, doc, head } = await requireDocumentAt(ctx, p, a, 'viewer');
   const address = `${ws.slug}/${doc.slug}`;
-  const lines = [`${address}: ${doc.name}  version ${head.id}  ${n(head.yaml.length)} chars, ${n(countLines(head.yaml))} lines`, `link: ${ctx.config.PUBLIC_URL}/w/${encodeURIComponent(ws.slug)}/${encodeURIComponent(doc.slug)}`];
+  const lines = [`${address}: ${doc.name}  version ${head.id}  ${n(head.yaml.length)} chars, ${n(countLines(head.yaml))} lines`, `link: ${documentLink(ctx, ws.slug, doc.slug)}`];
   const pages = pagePaths(head);
   const files = head.attachments.filter((x) => !pages.includes(x.path));
   const tail: string[] = [];
@@ -137,7 +138,7 @@ async function record(ctx: AppContext, p: Principal, ref: string): Promise<strin
     ...(d.supersededBy ? [`superseded by ${d.supersededBy.ref} ${d.supersededBy.title}`] : []),
     ...(d.supersedes ? [`supersedes ${d.supersedes.ref} ${d.supersedes.title}`] : []),
     ...(d.aliases.length ? [`formerly ${d.aliases.join(', ')}`] : []),
-    `link: ${ctx.config.PUBLIC_URL}/w/${d.workspace}/decisions/${d.ref}`,
+    `link: ${recordLink(ctx, d.workspace, d.ref)}`,
     ...headingOutline(t.text, 2),
   ];
   if (d.governs.length) lines.push(`governs: ${d.governs.map((g) => `${g.workspace}/${g.document} ${g.box ? `box ${g.box}` : `view ${g.view}`}`).join('; ')}`);

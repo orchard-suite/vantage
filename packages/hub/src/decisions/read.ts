@@ -6,7 +6,8 @@
  */
 import type { AppContext } from '../context.ts';
 import type { Principal, Role } from '../auth/principal.ts';
-import { accessibleWorkspaces, memberWorkspaces, requireWorkspace } from '../authz.ts';
+import { accessibleWorkspaces, requireWorkspace } from '../authz.ts';
+import { searchWorkspaceIds, type SearchScope } from '../search.ts';
 import { HttpError, notFound } from '../http.ts';
 import { machineRef } from '@vantage/model';
 import { categoryName } from './numbering.ts';
@@ -143,9 +144,9 @@ export interface DecisionHit {
 }
 
 /** Full-text search over the records in the reader's own library, like document search. */
-export async function searchDecisions(ctx: AppContext, p: Principal, query: string, limit = 20): Promise<DecisionHit[]> {
-  const ws = await memberWorkspaces(ctx.dbRead, p);
-  if (!ws.length || !query.trim()) return [];
+export async function searchDecisions(ctx: AppContext, p: Principal, query: string, limit = 20, scope: SearchScope = {}): Promise<DecisionHit[]> {
+  const ids = await searchWorkspaceIds(ctx.dbRead, p, scope);
+  if (!ids.length || !query.trim()) return [];
   const rows = await ctx.dbRead.query<{ prefix: string; number: number; title: string; status: string; wslug: string; headline: string; rank: number }>(
     `select r.prefix, d.number, d.title, d.status, w.slug as wslug,
             ts_headline('english', d.title || '. ' || d.context || ' ' || d.decision, websearch_to_tsquery('english', $1), 'MaxFragments=1, MaxWords=14, MinWords=4') as headline,
@@ -156,7 +157,7 @@ export async function searchDecisions(ctx: AppContext, p: Principal, query: stri
       where r.workspace_id = any($2::text[]) and d.search @@ websearch_to_tsquery('english', $1)
       order by rank desc, r.prefix, d.number
       limit $3`,
-    [query, ws.map((w) => w.id), Math.min(limit, 100)],
+    [query, ids, Math.min(limit, 100)],
   );
   return rows.map((x) => ({ ref: refOf(x), title: x.title, status: x.status, workspaceSlug: x.wslug, headline: x.headline, rank: Number(x.rank) }));
 }
