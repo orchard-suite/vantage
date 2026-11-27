@@ -2,6 +2,12 @@
 
 All notable changes to this project will be documented in this file.
 
+## [4.8.0](https://github.com/orchard-suite/vantage/compare/v4.7.0...v4.8.0) (2026-11-27)
+
+### Features
+
+* **vantage:** discard a record nothing points to ([f57963e](https://github.com/orchard-suite/vantage/commit/f57963e078e883e3cab4b6a68e751f6c2ab04f60))
+
 ## [4.7.0](https://github.com/orchard-suite/vantage/compare/v4.6.0...v4.7.0) (2026-11-27)
 
 ### Features
