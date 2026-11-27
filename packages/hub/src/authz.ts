@@ -22,6 +22,8 @@ export interface WorkspaceRow {
   readonly slug: string;
   readonly owner_user_id: string | null;
   readonly settings: Record<string, unknown>;
+  /** The owner scope it belongs to; null is the whole estate (VAN-3017). */
+  readonly scope: string | null;
   readonly disabled_at: Date | null;
   readonly purge_after: Date | null;
   readonly created_at: Date;

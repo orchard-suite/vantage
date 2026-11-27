@@ -1079,6 +1079,7 @@ Everything the hub holds is text at an address. Five tools reach all of it.
 | `SHOP-2001` | a decision record |
 | `SHOP`, `platform` | a registry, a workspace: they have an outline and no text |
 | `~` | the person's own workspace |
+| `scopes` | the organization's tree of owners, and each workspace's scope (guide#scopes-and-owners) |
 | `guide`, `schema` | this guide and the JSON Schema |
 
 A part comes after `#`: a heading (`SHOP-2001#decision`,
@@ -1592,6 +1593,52 @@ views: []
   so a planner in one program climbs to the roadmap above it.
 - A page names an item with `[[item:PLAN-3]]`; readers who may see the item
   see its live state there.
+
+## Scopes and owners
+
+A scope is an owner in the organization's tree: everyone, a department, a
+team, a program. The tree is text at the address `scopes`:
+
+```yaml
+source: hub              # or catalog: read from a catalog connector, edits refused
+scopes:
+  - id: acme
+    name: Acme
+    kind: organization   # the estate's own word for the level
+  - id: payments
+    name: Payments
+    kind: department
+    parent: acme         # one parent; never a second
+    steward: ada@example.com
+    facets: [moves-money]
+workspaces:
+  shop: payments         # a workspace not listed belongs to the whole estate
+```
+
+- `vantage_outline scopes` answers the tree indented by depth, with each
+  scope's workspaces. A workspace's outline names its scope and the scopes
+  above it.
+- A workspace's owner sets its scope with one line under `workspaces`:
+  `vantage_patch` with `op: set, path: workspaces.shop, value: payments`.
+  Remove the line and the workspace belongs to the whole estate again.
+- Only an admin changes the tree or its source. A scope id is there once,
+  a parent must be in the tree, and a scope is never its own ancestor.
+- With `source: catalog`, the tree is the catalog's:
+
+  ```yaml
+  source: catalog
+  catalog:
+    connector: platform/catalog   # workspace/connector
+    kinds: [organization, department, team, program]
+    steward: { department: head, team: lead, program: team }
+    facets: facets                # the field that holds facets
+  ```
+
+  The connector's containment relations give each scope its parent. Each
+  run of it refills the copy, and a change to the copy is refused; change
+  the catalog. A scope removed from the tree leaves its workspaces to the
+  whole estate. Setting `source: hub` (and dropping `catalog:`) keeps the
+  copy for authors to keep.
 
 ## Voice walkthroughs in a hub
 

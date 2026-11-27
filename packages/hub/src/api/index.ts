@@ -21,6 +21,7 @@ import { iconRoutes } from './icons.ts';
 import { shareRoutes } from './share.ts';
 import { previewRoutes } from './preview.ts';
 import { textRoutes } from './text.ts';
+import { scopeRoutes } from './scopes.ts';
 import { libraryRoutes } from './library.ts';
 import { reviseRoutes } from './revise.ts';
 import { editorRoutes } from './editor.ts';
@@ -66,6 +67,7 @@ export function apiRoutes(ctx: AppContext): Api {
   app.route('/', reviewRoutes(ctx, reg));
   app.route('/', decisionRoutes(ctx, reg));
   app.route('/', textRoutes(ctx, reg));
+  app.route('/', scopeRoutes(ctx, reg));
   app.route('/', itemRoutes(ctx, reg));
   const doc = reg.document(ctx.config.PUBLIC_URL, API_VERSION);
   ctx.log.info('api.routes', { count: reg.routes.length });

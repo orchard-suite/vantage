@@ -12,6 +12,7 @@ import { documentsBindingAny, documentsBoundTo } from '../documents/repo.ts';
 import { enqueueDraw } from '../worker/jobs.ts';
 import { reworkSource } from '../tracking/worked.ts';
 import { keepHistory } from './history.ts';
+import { fillFromCatalog } from '../scopes/catalog.ts';
 import { activeMapping, recordRun, updateObservedModel, type RunCounts, type RunTrigger, type SourceRow } from './repo.ts';
 
 export interface IngestInput {
@@ -83,6 +84,8 @@ export async function ingestBatch(ctx: AppContext, input: IngestInput): Promise<
   const runId = randomId();
   await recordRun(ctx.db, { id: runId, orgId: source.org_id, source_id: source.id, job_id: input.jobId, trigger: input.trigger, status: 'ok', started_at: input.startedAt, finished_at: new Date(), counts, warnings, error: null });
   await audit(ctx.db, log, { orgId: source.org_id, who: input.who, what: 'source.run', surface: 'worker', target: `connector:${source.id}`, details: { runId, trigger: input.trigger, status: 'ok', ...counts, warnings: warnings.length, modelVersion } });
+  // The organization's scope tree may come from this connector: its copy follows what was just stored.
+  if (batch.entities.length) await fillFromCatalog(ctx, source.org_id, source).catch((err: unknown) => log.warn('ingest.scopes.failed', { error: (err as Error).message }));
   // A ticket this connector reads may be a roadmap item's proof: the item moves when the ticket opens or closes.
   const reworked = await reworkSource(ctx.db, source.org_id, source.id);
   if (reworked.length) log.info('ingest.items.reworked', { items: reworked });

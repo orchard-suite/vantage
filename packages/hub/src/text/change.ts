@@ -19,11 +19,13 @@ import { HttpError, badRequest } from '../http.ts';
 import { lineRange, markdownRange, type Edit, type Range } from '@vantage/mcp';
 import { parseAddress, partOf, type Address } from './address.ts';
 import { changedFields, createInput, parseRecordText, recordText } from './record-text.ts';
-import { documentAt, pagePaths, recordAt, workspaceAt, type DocumentAt } from './things.ts';
+import { documentAt, pagePaths, readThing, recordAt, workspaceAt, type DocumentAt } from './things.ts';
 import { pathLines } from '../documents/edit.ts';
 import { commitItem, itemThing, placeAddress } from './items.ts';
 import { taught, topicOf, type Topic } from './teach.ts';
 import { documentLink, recordLink } from './links.ts';
+import { writeScopes } from '../scopes/write.ts';
+import { SCOPES } from '../scopes/text.ts';
 
 export interface ChangeResult {
   /** The thing as the hub names it now; a new record's is the citation it was given. */
@@ -115,6 +117,11 @@ async function commitRecord(ctx: AppContext, p: Principal, w: RecordWork, opts: 
   return { address: d.ref, status: 'saved', version: (await recordAt(ctx, p, d.ref)).version, link: recordLink(ctx, d.workspace, d.ref), message: `saved ${d.ref} (${Object.keys(patch).join(', ')}); last updated ${d.updatedOn}` };
 }
 
+async function commitScopes(ctx: AppContext, p: Principal, text: string, opts: ChangeOptions): Promise<ChangeResult> {
+  const r = await writeScopes(ctx, p, text, opts.surface);
+  return { address: SCOPES, status: r.status, version: r.version, message: r.message };
+}
+
 async function settle(run: () => Promise<ChangeResult>, address: string, topic: Topic): Promise<ChangeResult> {
   try {
     return await run();
@@ -136,6 +143,7 @@ export async function write(ctx: AppContext, p: Principal, writes: readonly Writ
   const records: RecordWork[] = [];
   const items: { target: { create: true; prefix: string } | { create: false; key: string }; text: string; base: string | undefined; address: string }[] = [];
   const refused: ChangeResult[] = [];
+  let scopes: string | undefined;
   const docWork = (workspace: string, slug: string | undefined): DocumentWork => {
     const key = `${workspace}/${slug ?? ''}`;
     let w = docs.get(key);
@@ -156,6 +164,7 @@ export async function write(ctx: AppContext, p: Principal, writes: readonly Writ
         w.base ??= x.base;
       } else if (a.kind === 'record') records.push({ target: a.ref, create: false, text: x.text, base: x.base });
       else if (a.kind === 'registry') records.push({ target: a.prefix, create: true, text: x.text, base: undefined });
+      else if (a.kind === 'scopes') scopes = x.text;
       else throw badRequest(`${x.address} is not a thing a write can make`);
     } catch (err) {
       refused.push({ address: x.address, status: 'refused', message: `${x.address} was not saved: ${taught(err, 'working-in-a-hub')}` });
@@ -167,6 +176,7 @@ export async function write(ctx: AppContext, p: Principal, writes: readonly Writ
   for (const w of docs.values()) out.push(await settle(() => commitDocument(ctx, p, w, docs.size === 1 ? decoded : undefined, opts), w.slug ? `${w.workspace}/${w.slug}` : w.workspace, 'working-in-a-hub'));
   for (const r of records) out.push(await settle(() => commitRecord(ctx, p, r, opts), r.target, 'decision-records-in-a-hub'));
   for (const i of items) out.push(await settle(() => commitItem(ctx, p, i.target, i.text, i.base), i.address, 'working-with-items'));
+  if (scopes !== undefined) out.push(await settle(() => commitScopes(ctx, p, scopes!, opts), SCOPES, 'scopes-and-owners'));
   return out;
 }
 
@@ -212,7 +222,7 @@ function swap(text: string, e: Edit, range: Range | undefined, where: string): s
 }
 
 interface Open {
-  readonly kind: 'document' | 'record' | 'item';
+  readonly kind: 'document' | 'record' | 'item' | 'scopes';
   readonly key: string;
   failed?: string;
   doc?: { at: DocumentAt; yaml: string; pages: Map<string, string>; touched: Set<string>; yamlTouched: boolean };
@@ -224,11 +234,14 @@ export async function patch(ctx: AppContext, p: Principal, edits: readonly Edit[
   const open = new Map<string, Open>();
   const order: string[] = [];
   const thing = async (a: Address): Promise<Open> => {
-    if (a.kind !== 'document' && a.kind !== 'page' && a.kind !== 'record' && a.kind !== 'item') throw badRequest('a patch changes a document, a page, a record, or an item; a new thing is a vantage_write');
-    const key = a.kind === 'record' ? a.ref : a.kind === 'item' ? a.key : `${a.workspace}/${a.document}`;
+    if (a.kind !== 'document' && a.kind !== 'page' && a.kind !== 'record' && a.kind !== 'item' && a.kind !== 'scopes') throw badRequest('a patch changes a document, a page, a record, an item, or the scope tree; a new thing is a vantage_write');
+    const key = a.kind === 'record' ? a.ref : a.kind === 'item' ? a.key : a.kind === 'scopes' ? SCOPES : `${a.workspace}/${a.document}`;
     let o = open.get(key);
     if (o) return o;
-    if (a.kind === 'item') {
+    if (a.kind === 'scopes') {
+      const current = (await readThing(ctx, p, a)).text;
+      o = { kind: 'scopes', key, record: { text: current, current } };
+    } else if (a.kind === 'item') {
       const current = (await itemThing(ctx, p, a.key)).text;
       o = { kind: 'item', key: a.key, record: { text: current, current } };
     } else if (a.kind === 'record') {
@@ -254,7 +267,14 @@ export async function patch(ctx: AppContext, p: Principal, edits: readonly Edit[
       o = await thing(a);
       if (o.failed) continue;
       const part = partOf(a);
-      if (a.kind === 'record' || a.kind === 'item') {
+      if (a.kind === 'scopes') {
+        const r = o.record!;
+        if (e.op) {
+          const path = e.path ?? part;
+          if (!path) throw badRequest('set, add, and remove take a path: workspaces.shop');
+          r.text = applyEdits(r.text, [EditOperationSchema.parse({ op: e.op, path, ...(e.op === 'remove' ? {} : { value: e.value }) })]);
+        } else r.text = swap(r.text, e, part ? lineRange(part, r.text.split('\n').length) ?? pathLines(r.text, part) ?? missing(o.key, part) : undefined, e.address);
+      } else if (a.kind === 'record' || a.kind === 'item') {
         if (e.op) throw badRequest("a record or an item changes by old and new; its header's fields are text too (status: proposed)");
         const r = o.record!;
         r.text = swap(r.text, e, part ? markdownRange(r.text, part) ?? missing(o.key, part) : undefined, e.address);
@@ -294,6 +314,11 @@ export async function patch(ctx: AppContext, p: Principal, edits: readonly Edit[
     if (o.kind === 'record') {
       const r = o.record!;
       out.push(await settle(() => commitRecord(ctx, p, { target: o.key, create: false, text: r.text, base: undefined }, opts), o.key, 'decision-records-in-a-hub'));
+      continue;
+    }
+    if (o.kind === 'scopes') {
+      const r = o.record!;
+      out.push(await settle(() => commitScopes(ctx, p, r.text, opts), SCOPES, 'scopes-and-owners'));
       continue;
     }
     if (o.kind === 'item') {

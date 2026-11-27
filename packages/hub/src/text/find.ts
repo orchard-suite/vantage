@@ -77,6 +77,7 @@ async function haystack(ctx: AppContext, p: Principal, given: Address, query: st
     case 'page':
     case 'record':
     case 'schema':
+    case 'scopes':
       return { hays: [await thingHay(ctx, p, a)] };
     case 'registry':
       return { hays: await registryHays(ctx, p, a.prefix) };

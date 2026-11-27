@@ -19,6 +19,7 @@ import { PERSONAL, thingAddress, type Address } from './address.ts';
 import { recordText } from './record-text.ts';
 import { itemThing, placeAddress } from './items.ts';
 import { documentLink, recordLink } from './links.ts';
+import { scopesState, scopesText, scopesVersion } from '../scopes/text.ts';
 
 export type Role = 'viewer' | 'author';
 
@@ -29,7 +30,7 @@ export interface TextThing {
   readonly version: string;
   readonly text: string;
   readonly kind: 'yaml' | 'markdown' | 'json';
-  /** The thing's page in the hub; the guide and the schema have none. */
+  /** The thing's page in the hub; the guide, the schema, and the scope tree have none. */
   readonly link?: string;
 }
 
@@ -93,6 +94,10 @@ export async function readThing(ctx: AppContext, p: Principal, given: Address): 
       return { address: 'guide', version: HUB_VERSION, text: guideText(), kind: 'markdown' };
     case 'schema':
       return { address: 'schema', version: HUB_VERSION, text: schemaText(), kind: 'json' };
+    case 'scopes': {
+      const text = scopesText(await scopesState(ctx, p));
+      return { address: 'scopes', version: await scopesVersion(text), text, kind: 'yaml' };
+    }
     case 'document': {
       const { ws, doc, head } = await requireDocumentAt(ctx, p, a, 'viewer');
       return { address: `${ws.slug}/${doc.slug}`, version: head.id, text: head.yaml, kind: 'yaml', link: documentLink(ctx, ws.slug, doc.slug) };

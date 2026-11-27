@@ -468,6 +468,24 @@ diagrams, points an embed at a storage account static site or at the hub.
   an admin lets, so a hub for a whole organization does not sprawl. The
   sidebar offers a new team workspace to the people who may make one.
 - Grants on a workspace: viewer or author, to a person, a team, or the org.
+- Scopes (VAN-3017): the organization's tree of owners. A scope has one
+  parent, a kind in the estate's own word (organization, division,
+  department, team, program), a steward, and facets. The hub never invents
+  levels; it only follows parents. A workspace names one owner scope, and
+  one with none belongs to the whole estate. Where the tree comes from is
+  the organization's setting: `source: hub`, where an admin keeps it, or
+  `source: catalog`, where the catalog connector it names
+  (`workspace/connector`) reads the organization's kinds (by default
+  organization, department, team, and program), each one's parent by its
+  containment relation, its steward by the relation the setting names per
+  kind, and its facets from one field. Each run that stores what the
+  connector read refills the hub's copy, and the hub refuses edits to it.
+  Leaving the catalog keeps the copy for authors to keep. The tree is text
+  at the address `scopes`, read and changed through the five verbs and
+  the REST text routes; `GET` and `PUT /api/v1/scopes` and
+  `PUT /api/v1/workspaces/:workspace/scope` answer and take the same. The
+  tree and its source are an admin's to change; a workspace's scope is its
+  owner's.
 - Roles: org admin (everything), workspace author, workspace viewer, and
   a flag an admin sets on a person: may make team workspaces.
 - A person's library (sidebar, home, Shared with you, search, the API's
@@ -1171,7 +1189,7 @@ characters stand alone. The first paragraph is that self-contained lead.
   `vantage.agent.chars`.
 - **Text space.** Every thing has an address and one text form that loses
   nothing: `workspace/document` (YAML), `workspace/document/pages/x.md`,
-  `SHOP-2001`, `SHOP`, `~` (the person's own workspace), `guide`,
+  `SHOP-2001`, `SHOP`, `~` (the person's own workspace), `scopes`, `guide`,
   `schema`; a part after `#` is a heading,
   a YAML path, or a line range. Registry prefixes, kind prefixes, and
   workspace slugs share one namespace (VAN-5002).

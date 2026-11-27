@@ -24,6 +24,7 @@ import { documentLink, recordLink } from './links.ts';
 import { RECORD_TEMPLATE } from './record-text.ts';
 import { itemOutline, kindOutline, placeAddress } from './items.ts';
 import { kindsFor } from '../tracking/read.ts';
+import { scopeLine, scopesOutline } from '../scopes/outline.ts';
 
 const n = (x: number): string => x.toLocaleString('en-US');
 const day = (d: Date): string => d.toISOString().slice(0, 10);
@@ -75,7 +76,7 @@ async function root(ctx: AppContext, p: Principal): Promise<string> {
   lines.push('', 'kinds of tracked items (outline one for its items):');
   for (const k of kinds) lines.push(`  ${k.prefix}  ${k.name}  (workspace ${workspaces.find((w) => w.id === k.workspace_id)?.slug ?? 'shared'})`);
   if (!kinds.length) lines.push('  none; a kind is a document with a kind block (guide#kinds-and-items)');
-  lines.push('', 'guide  the language and the rules, by topic', 'schema  the JSON Schema of a document, by part');
+  lines.push('', 'scopes  the owners in the organization, and the workspace each one owns', 'guide  the language and the rules, by topic', 'schema  the JSON Schema of a document, by part');
   return fit(lines, 'vantage_outline one workspace or registry');
 }
 
@@ -83,7 +84,8 @@ async function workspace(ctx: AppContext, p: Principal, slug: string): Promise<s
   const ws = await workspaceAt(ctx, p, slug, 'viewer');
   const docs = await documentLines(ctx, ws.id);
   const registries = await listRegistries(ctx, p, ws.slug);
-  const lines = [`${ws.slug}: ${ws.name} (${ws.kind}, you are ${ws.role}), ${n(docs.length)} document${docs.length === 1 ? '' : 's'}`];
+  const scope = await scopeLine(ctx, p.orgId, ws.scope);
+  const lines = [`${ws.slug}: ${ws.name} (${ws.kind}, you are ${ws.role}), ${n(docs.length)} document${docs.length === 1 ? '' : 's'}`, scope ?? 'scope: none, so the whole estate (vantage_outline scopes)'];
   for (const d of docs) lines.push(`  ${ws.slug}/${d.slug}  ${d.name}  ${d.chars === null ? 'no version yet' : `${n(d.chars)} chars`}${d.pages ? `, ${d.pages} page${d.pages === 1 ? '' : 's'}` : ''}  updated ${day(d.updated_at)}`);
   for (const r of registries) lines.push(`  registry ${r.prefix}  ${r.name}  ${n(await countDecisions(ctx.db, [r.id]))} records`);
   for (const k of (await kindsFor(ctx, p)).filter((x) => x.workspace_id === ws.id)) lines.push(`  kind ${k.prefix}  ${k.name}  (outline ${k.prefix} for its items)`);
@@ -176,6 +178,8 @@ export async function outline(ctx: AppContext, p: Principal, given: Address): Pr
       return guideOutline();
     case 'schema':
       return schemaOutline();
+    case 'scopes':
+      return fit(await scopesOutline(ctx, p), 'vantage_read scopes#scopes.<id>');
     case 'workspace':
       return workspace(ctx, p, a.workspace);
     case 'document':
