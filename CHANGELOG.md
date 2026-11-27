@@ -2,6 +2,12 @@
 
 All notable changes to this project will be documented in this file.
 
+## [4.7.0](https://github.com/orchard-suite/vantage/compare/v4.6.0...v4.7.0) (2026-11-27)
+
+### Features
+
+* **vantage:** keep hub search inside disk budget ([64bbf2f](https://github.com/orchard-suite/vantage/commit/64bbf2f091abc633863106edf2a4d913e99c6846))
+
 ## [4.6.0](https://github.com/orchard-suite/vantage/compare/v4.5.0...v4.6.0) (2026-11-25)
 
 ### Features
