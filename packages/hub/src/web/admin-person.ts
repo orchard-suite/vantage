@@ -10,6 +10,7 @@ import { avatar } from './frame.ts';
 import { plural } from './library.ts';
 import { act, adminPage, bytes, diskBar, diskKey, type AdminFrame } from './admin-kit.ts';
 import { workspaceList, wsAdminHref, wsTone } from './admin.ts';
+import { dayOf } from '../day.ts';
 
 export interface AdminPersonModel extends AdminFrame {
   readonly granted: boolean;
@@ -41,7 +42,7 @@ export function adminPersonHtml(m: AdminPersonModel): string {
         act(p.disabled ? 'Enable' : 'Disable', 'PATCH', url, { disabled: !p.disabled }, p.disabled ? 'primary' : 'ghost', p.disabled ? '' : `Disable ${p.name}? Their tokens and guest links stop working, and their personal space passes to you.`),
       ].join('');
   const pills = [p.admin ? '<span class="pill info">Org admin</span>' : '', m.granted && p.workspaceCreator && !p.admin ? '<span class="pill">Makes team workspaces</span>' : '', p.disabled ? '<span class="pill bad">Disabled</span>' : ''].join('');
-  const head = `<header class="adm-head"><div class="adm-person">${avatar(p.name, 'big')}<div><h1>${escapeHtml(p.name)} ${pills}</h1><p class="adm-meta">${escapeHtml(p.email ?? 'No email')} · first signed in ${p.createdAt.toISOString().slice(0, 10)}</p></div></div><div class="adm-tools">${tools}</div></header>`;
+  const head = `<header class="adm-head"><div class="adm-person">${avatar(p.name, 'big')}<div><h1>${escapeHtml(p.name)} ${pills}</h1><p class="adm-meta">${escapeHtml(p.email ?? 'No email')} · first signed in ${dayOf(p.createdAt)}</p></div></div><div class="adm-tools">${tools}</div></header>`;
   const sum = `<p class="adm-sum">Owns ${plural(p.owns, 'workspace')} holding <b class="a-num">${bytes(p.bytes)}</b> and ${plural(p.diagrams, 'diagram')}. Made ${plural(p.made, 'diagram')} anywhere. Can open ${plural(p.memberOf, 'other workspace')}.</p>`;
   const disk = p.bytes ? `<div class="adm-disk">${diskBar(p.disk, p.bytes, `${bytes(p.bytes)} on disk by kind`)}${diskKey(p.disk)}</div>` : '';
   const body = `${head}${sum}${disk}

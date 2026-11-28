@@ -17,11 +17,12 @@ import type { Change, Edition, PackPin, StandardLine } from './model.ts';
 import { ESTATE, scopeKey, scopeName } from './model.ts';
 import { editionOf } from './repo.ts';
 import { StandardSettingSchema, standardSetting, type StandardSetting } from './setting.ts';
+import { dayOf } from '../day.ts';
 
 /** The address of the estate's settings and the root of every scope's standard. */
 export const STANDARD = 'standard';
 
-const day = (d: Date | null): string | undefined => (d ? d.toISOString().slice(0, 10) : undefined);
+const day = (d: Date | null): string | undefined => (d ? dayOf(d) : undefined);
 
 /** How a line reached the scope: its own, down the tree, or by a facet. */
 export function pathText(l: StandardLine): string {

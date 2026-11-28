@@ -12,7 +12,8 @@ import { badRequest } from '../http.ts';
 import { numberProblem } from './numbering.ts';
 import { insertDecision, listPlaced, lockRegistry, placedById, refOf, resolveRef, takenNumbers, updateDecisionRow } from './repo.ts';
 import { recordUrl, requireRegistry } from './read.ts';
-import { fieldsOf, remember, today, whoOf } from './write.ts';
+import { fieldsOf, remember, whoOf } from './write.ts';
+import { dayOf } from '../day.ts';
 import { isRecordFile, parseRecord, type ImportFile, type ParsedRecord } from './import.ts';
 import { ulid } from './ulid.ts';
 
@@ -87,7 +88,7 @@ export async function importDecisions(ctx: AppContext, p: Principal, prefix: str
         title: r.title,
         status: r.status,
         decided_on: r.decidedOn ?? null,
-        updated_on: r.updatedOn ?? r.decidedOn ?? today(),
+        updated_on: r.updatedOn ?? r.decidedOn ?? dayOf(),
         deciders: r.deciders,
         context: r.context,
         decision: r.decision,

@@ -1,6 +1,7 @@
 #!/usr/bin/env bun
 /** vantage-hub web|worker|migrate */
 import { ConfigError, loadConfig, type Config } from './config.ts';
+import { setTimeZone } from './day.ts';
 import { createLogger, type Logger } from './log.ts';
 import { startTelemetry } from './telemetry.ts';
 import { createHubMetrics, observeProcess, observeQueue } from './metrics.ts';
@@ -66,8 +67,9 @@ export async function main(argv: string[]): Promise<number> {
     }
     throw err;
   }
+  setTimeZone(config.TIME_ZONE);
   const log = createLogger(config.LOG_LEVEL, undefined, { service: 'vantage-hub', cmd });
-  log.info('hub.start', { cmd, authMode: config.AUTH_MODE, blob: config.BLOB_DRIVER, workerEmbedded: config.WORKER_EMBEDDED, port: config.PORT });
+  log.info('hub.start', { cmd, timeZone: config.TIME_ZONE, authMode: config.AUTH_MODE, blob: config.BLOB_DRIVER, workerEmbedded: config.WORKER_EMBEDDED, port: config.PORT });
   const ctx = await buildContext(config, log, cmd);
   const stops: (() => Promise<void>)[] = [ctx.shutdownTelemetry, () => ctx.db.close(), ...(ctx.dbRead !== ctx.db ? [() => ctx.dbRead.close()] : []), () => ctx.render.close()];
   const shutdown = async (signal: string): Promise<void> => {

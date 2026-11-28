@@ -17,7 +17,8 @@ categories:
   6: Operations
 
 # Optional. The time zone for Last updated and decision dates. The local
-# date is sent; with none, the hub stamps the date in UTC.
+# date is sent; with none, the hub stamps today in its own time zone
+# (its TIME_ZONE setting).
 timezone: Europe/Berlin
 
 registries:

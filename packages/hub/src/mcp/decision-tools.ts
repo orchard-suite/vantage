@@ -28,7 +28,7 @@ const body = {
   title: z.string().describe('What was decided, as a short sentence a reader can scan'),
   deciders: z.array(z.string()).describe('The people who made the decision, by name. Ask when you do not know; never guess.'),
   decidedOn: Day.describe('The day the decision was made, YYYY-MM-DD'),
-  updatedOn: Day.optional().describe('Last updated, YYYY-MM-DD in local time; today in UTC when absent'),
+  updatedOn: Day.optional().describe('Last updated, YYYY-MM-DD, the local date; the hub fills in today in its time zone when absent'),
   context: md('Why a decision was needed: the forces and the facts'),
   decision: md('What was decided and what it means in practice'),
   consequences: md('What follows: the benefits and the costs (### Benefits, ### Costs)'),

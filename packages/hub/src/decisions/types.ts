@@ -125,7 +125,7 @@ export const DecisionCreateSchema = z
     status: z.enum(['proposed', 'accepted']).default('accepted'),
     deciders: fields.deciders.min(1, 'name the people who decided'),
     decidedOn: Day,
-    /** Last updated; today (UTC) when absent. Send the local date. */
+    /** Last updated; today in the estate's time zone (TIME_ZONE) when absent. */
     updatedOn: Day.optional(),
     alternatives: fields.alternatives.default([]),
     related: fields.related.default([]),

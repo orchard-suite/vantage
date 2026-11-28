@@ -6,7 +6,7 @@ import { NO_RESOURCES } from './resources.ts';
 
 const enc = new TextEncoder();
 const box = (width: number): string => `<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${width / 2}"><rect width="${width}" height="${width / 2}"/></svg>`;
-const input = (stored: ProduceInput['stored']): ProduceInput => ({ yaml: SAMPLE_YAML, imports: {}, observed: { entities: {}, relations: {} }, resources: NO_RESOURCES, thresholdDays: 7, slug: 'sample', formats: ['png'], views: ['context'], titleBlock: false, stamp: { title: 'Sample', version: 'v1', publishedAt: '2026-11-01T00:00:00.000Z' }, refreshUrl: 'https://hub.example.com/r', stored });
+const input = (stored: ProduceInput['stored']): ProduceInput => ({ yaml: SAMPLE_YAML, imports: {}, observed: { entities: {}, relations: {} }, resources: NO_RESOURCES, thresholdDays: 7, slug: 'sample', formats: ['png'], views: ['context'], titleBlock: false, stamp: { title: 'Sample', version: 'v1', publishedAt: '2026-11-01T00:00:00.000Z' }, publishedOn: '2026-11-01', refreshUrl: 'https://hub.example.com/r', stored });
 
 describe('produce', () => {
   test('a stored PNG drawn smaller than 2x by the pixel budget is reused with a warning', async () => {

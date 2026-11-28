@@ -7,6 +7,7 @@ import { FAVICON } from '@vantage/render';
 import { SHELL_CSS } from './look.ts';
 import { HUB_VERSION } from '../version.ts';
 import { INSTALL_TAGS } from './install.ts';
+import { dayOf } from '../day.ts';
 
 export function escapeHtml(s: string): string {
   return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
@@ -43,7 +44,7 @@ export function updatedLabel(d: Date, now = Date.now()): string {
   if (m < 60) return `Updated ${m}m ago`;
   if (m < 60 * 24) return `Updated ${Math.round(m / 60)}h ago`;
   if (m < 60 * 24 * 14) return `Updated ${Math.round(m / 1440)}d ago`;
-  return `Updated ${d.toISOString().slice(0, 10)}`;
+  return `Updated ${dayOf(d)}`;
 }
 
 /** The viewer page for one document, with the browser telemetry. The boot script pins `?file=` so the viewer's own /api/bundle and /api/events calls name the document. */

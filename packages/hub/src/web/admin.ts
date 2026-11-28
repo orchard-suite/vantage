@@ -16,6 +16,7 @@ import { avatar } from './frame.ts';
 import { plural, when } from './library.ts';
 import { adminPage, bytes, diskBar, diskKey, treemap, type AdminFrame, type MapTile } from './admin-kit.ts';
 import { flows } from './admin-flows.ts';
+import { dayOf } from '../day.ts';
 
 export type AdminPolicy = Pick<Config, 'TEAM_WORKSPACES' | 'PUBLICATION_APPROVAL' | 'CONNECTOR_APPROVAL' | 'GUEST_LINKS' | 'SIGN_IN_GROUPS' | 'AI_BASE_URL' | 'AI_MODEL'>;
 
@@ -42,7 +43,7 @@ export function wsTone(w: Pick<AdminWorkspace, 'kind' | 'disabledAt'>): string {
 
 export function purgeNote(w: Pick<AdminWorkspace, 'disabledAt' | 'purgeAfter'>): string {
   if (!w.disabledAt) return '';
-  return `<span class="pill bad">Disabled${w.purgeAfter ? `, purges ${escapeHtml(w.purgeAfter.toISOString().slice(0, 10))}` : ''}</span>`;
+  return `<span class="pill bad">Disabled${w.purgeAfter ? `, purges ${escapeHtml(dayOf(w.purgeAfter))}` : ''}</span>`;
 }
 
 /** The small marks a workspace carries: connectors in, publications out, and what waits. */

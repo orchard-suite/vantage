@@ -28,6 +28,8 @@ export interface ProduceInput {
   readonly theme?: ThemeName | undefined;
   readonly titleBlock: boolean;
   readonly stamp: Stamp;
+  /** The day the copy is published, in the estate's time zone, for the title block. */
+  readonly publishedOn: string;
   /** Where a published HTML copy asks for a newer version. */
   readonly refreshUrl: string;
   /** Stored pictures by `<view>.<svg|png>`, reused when there is no title block; a stored PNG's SVG says how far the budget scaled it down. */
@@ -58,7 +60,7 @@ export async function produce(input: ProduceInput): Promise<ProduceOutput> {
   const views = pictureViews(input.views?.length ? model.views.filter((v) => input.views!.includes(v.id)) : model.views);
   for (const id of input.views ?? []) if (!views.some((v) => v.id === id)) warnings.push(`view ${id} is not in the document`);
   const { stamp } = input;
-  const block: TitleBlock | undefined = input.titleBlock ? { title: model.title, ...(model.author ? { author: model.author } : {}), ...(model.updated ? { updated: model.updated } : {}), version: stamp.version, published: stamp.publishedAt.slice(0, 10), ...(stamp.liveUrl ? { link: stamp.liveUrl } : {}) } : undefined;
+  const block: TitleBlock | undefined = input.titleBlock ? { title: model.title, ...(model.author ? { author: model.author } : {}), ...(model.updated ? { updated: model.updated } : {}), version: stamp.version, published: input.publishedOn, ...(stamp.liveUrl ? { link: stamp.liveUrl } : {}) } : undefined;
   const res = resourcesFrom(model, input.resources);
   const enc = new TextEncoder();
   const files: ProducedFile[] = [];
