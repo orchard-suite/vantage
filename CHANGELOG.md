@@ -2,6 +2,12 @@
 
 All notable changes to this project will be documented in this file.
 
+## [4.16.0](https://github.com/orchard-suite/vantage/compare/v4.15.0...v4.16.0) (2026-11-28)
+
+### Features
+
+* **vantage:** show a workspace's program profile ([3085878](https://github.com/orchard-suite/vantage/commit/30858782122c9606fa582c12d4a8b6ca381c7d08))
+
 ## [4.15.0](https://github.com/orchard-suite/vantage/compare/v4.14.0...v4.15.0) (2026-11-28)
 
 ### Features
