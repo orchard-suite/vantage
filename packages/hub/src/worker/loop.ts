@@ -22,6 +22,7 @@ import { runGenerate } from '../revise/generate.ts';
 import { createScheduler } from './schedule.ts';
 import { randomId } from '../crypto.ts';
 import { RENDERER } from '../render/renderer.ts';
+import { endException } from '../standards/exception-write.ts';
 
 export interface Worker {
   readonly id: string;
@@ -62,6 +63,7 @@ export function createWorker(ctx: AppContext): Worker {
     if (job.kind === 'drop-files') return dropFiles(ctx, job, jlog);
     if (job.kind === 'revise') return runRevise(ctx, job, jlog);
     if (job.kind === 'generate') return runGenerate(ctx, job, jlog);
+    if (job.kind === 'exception-end') return endException(ctx, job.org_id, Number(job.payload['number']), String(job.payload['ends']));
     return Promise.reject(new Error(`unknown job kind ${String(job.kind)}`));
   };
 

@@ -12,7 +12,7 @@ export const LAPTOP_CORE: readonly string[] = ['vantage_checkout', 'vantage_sync
 export const GROUPS: Readonly<Record<string, { readonly about: string; readonly tools: readonly string[] }>> = {
   documents: { about: 'versions, deleting, moving and renaming, workspaces, layout candidates, exports, imports, icons', tools: ['vantage_history', 'vantage_diff', 'vantage_delete', 'vantage_move', 'vantage_workspaces', 'vantage_explore', 'vantage_export', 'vantage_import', 'vantage_icons', 'vantage_workspace_icons'] },
   review: { about: 'comments, mentions, reactions, voice walkthroughs', tools: ['vantage_comments', 'vantage_comment', 'vantage_resolve_comment', 'vantage_people', 'vantage_mentions', 'vantage_reactions', 'vantage_recordings'] },
-  records: { about: 'registries, supersede, move, discard, import records, publish editions', tools: ['vantage_registries', 'vantage_decision_supersede', 'vantage_decision_move', 'vantage_decision_discard', 'vantage_decision_import', 'vantage_decision_next', 'vantage_standard_publish'] },
+  records: { about: 'registries, supersede, move, discard, imports, publish editions', tools: ['vantage_registries', 'vantage_decision_supersede', 'vantage_decision_move', 'vantage_decision_discard', 'vantage_decision_import', 'vantage_decision_next', 'vantage_standard_publish', 'vantage_exceptions_import'] },
   live: { about: 'connectors, drift, publications', tools: ['vantage_connectors', 'vantage_sources', 'vantage_connector_save', 'vantage_connector_run', 'vantage_drift', 'vantage_publications', 'vantage_publish'] },
   work: { about: 'tracked items: the queue, claims, moves, questions, finishing a run; bring a Markdown roadmap in', tools: ['vantage_queue', 'vantage_item', 'vantage_roadmap_import'] },
 };

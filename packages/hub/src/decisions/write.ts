@@ -212,7 +212,7 @@ export async function updateDecision(ctx: AppContext, p: Principal, ref: string,
   const map = v.inherits ?? (v.position !== undefined && row.inherits.some((i) => i.stance === 'refines') ? await inheritInputs(ctx.db, p.orgId, row.inherits) : undefined);
   const inherits = map ? await resolveInherits(ctx.db, p.orgId, { id: row.id, registryId: registry.id, scope, position }, map) : row.inherits;
   const status = old ? 'superseded' : (v.status ?? row.status);
-  if (status !== row.status || v.inherits) await checkStanding(ctx.db, p.orgId, { ref: refOf(row), status, scope, inherits });
+  if (status !== row.status || v.inherits) await checkStanding(ctx.db, p.orgId, { id: row.id, ref: refOf(row), status, scope, inherits });
   const fields: DecisionFields = {
     title: v.title ?? row.title,
     status,

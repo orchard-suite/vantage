@@ -37,7 +37,7 @@ export function machineGate(body: EditionBody, facts: GateFacts): string[] {
     for (const rule of x.checked_by) if (!packs.has(packOfRule(rule))) out.push(`${l.ref}: checked by ${rule}, but no pack ${packOfRule(rule)} reaches this scope (standard#packs)`);
     for (const d of l.departs ?? []) {
       const from = body.lines.find((x) => x.record === d);
-      if (from) out.push(`${l.ref}: departs from ${from.ref} with no exception in force (VAN-3020); grant one or change the record`);
+      if (from && !body.exceptions.some((e) => e.line_record === d && (!e.records.length || e.records.includes(l.ref)))) out.push(`${l.ref}: departs from ${from.ref} with no exception in force (VAN-3020); grant one or change the record`);
     }
   }
   for (const p of body.pages) {

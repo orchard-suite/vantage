@@ -15,7 +15,6 @@ import type { Principal } from '../auth/principal.ts';
 import { accessibleWorkspaces } from '../authz.ts';
 import { audit, type Surface } from '../audit.ts';
 import { badRequest, forbidden, HttpError } from '../http.ts';
-import { whoOf } from '../decisions/write.ts';
 import { placedByIds, placedByRef, refOf } from '../decisions/repo.ts';
 import { listScopes, type Scope } from '../scopes/repo.ts';
 import { scopeSetting } from '../scopes/setting.ts';
@@ -26,8 +25,9 @@ import { scopeKey, scopeName, type ScopeKey } from './model.ts';
 import { rebuildStandards } from './publish.ts';
 import { conflictOf, editionOf, listConflicts, lockStandards, type ConflictRow, type ConflictSteward, type Ruling } from './repo.ts';
 import { sha256 } from '../crypto.ts';
+import { exceptionOf, inForce } from './exceptions.ts';
 import { standardSetting } from './setting.ts';
-import { actsFor } from './steward.ts';
+import { actsFor, personOf } from './steward.ts';
 
 export const CONFLICTS = 'conflicts';
 export const RULINGS = ['change', 'narrow', 'exception'] as const satisfies readonly Ruling[];
@@ -101,7 +101,7 @@ export async function flagConflict(ctx: AppContext, p: Principal, text: string, 
   // Across the two axes each line's own steward rules; inside one tree, the nearest scope both share.
   const across = (lineOf(a.id).program === undefined) !== (lineOf(b.id).program === undefined);
   const stewards = across ? [...new Map([steward(from(a.id)), steward(from(b.id))].map((s) => [s.scope, s])).values()] : [steward(sharedScope(from(a.id), from(b.id), byId))];
-  const who = whoOf(p);
+  const who = await personOf(ctx.db, p);
   const { number, filed } = await ctx.db.transaction(async (tx) => {
     await lockStandards(tx, p.orgId);
     const twice = await maybe<{ number: number }>(tx, "select number from standard_conflicts where org_id = $1 and state = 'open' and scope = $2 and lines @> $3::jsonb", [p.orgId, key, JSON.stringify([a.id, b.id])]);
@@ -145,11 +145,16 @@ export async function ruleConflict(ctx: AppContext, p: Principal, n: number, tex
   const note = typeof next.header['note'] === 'string' ? next.header['note'].trim() : '';
   if (!note) throw badRequest('a ruling carries a note: what changes, which line narrows, or which exception stands');
   const exception = typeof next.header['exception'] === 'string' ? next.header['exception'].trim() : undefined;
-  if (ruling === 'exception' && !exception) throw badRequest('a ruling of exception names the exception that stands: exception: <its citation>');
+  if (ruling === 'exception') {
+    const n2 = /^exceptions\/(\d+)$/.exec(exception ?? '');
+    if (!n2) throw badRequest('a ruling of exception names the exception that stands: exception: exceptions/<n>');
+    const x = await exceptionOf(ctx.db, p.orgId, Number(n2[1]));
+    if (!x || !inForce(x) || !c.lines.includes(x.line)) throw badRequest(`${exception} is not an exception in force that bends one of this conflict's two lines; grant one first (guide#standards)`);
+  }
   let may = false;
   for (const s of c.stewards) may ||= await actsFor(ctx.db, p, s.steward ?? undefined);
   if (!may && !p.admin) throw forbidden(`only the steward of ${c.stewards.map(stewardText).join(' or ')}, or an admin, rules on conflicts/${n}`);
-  const who = whoOf(p);
+  const who = await personOf(ctx.db, p);
   await ctx.db.transaction(async (tx) => {
     await lockStandards(tx, p.orgId);
     await tx.query("update standard_conflicts set state = 'ruled', ruling = $3, note = $4, exception = $5, ruled_by = $6, ruled_at = now() where org_id = $1 and number = $2", [p.orgId, n, ruling, note, exception ?? null, who]);

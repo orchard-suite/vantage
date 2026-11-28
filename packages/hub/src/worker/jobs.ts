@@ -7,7 +7,7 @@
 import type { Db } from '../db/db.ts';
 import { randomId } from '../crypto.ts';
 
-export type JobKind = 'render' | 'gc' | 'purge' | 'ingest' | 'overlay' | 'redraw' | 'release-redraw' | 'publication-run' | 'review' | 'drop-files' | 'revise' | 'generate' | 'connector-run';
+export type JobKind = 'render' | 'gc' | 'purge' | 'ingest' | 'overlay' | 'redraw' | 'release-redraw' | 'publication-run' | 'review' | 'drop-files' | 'revise' | 'generate' | 'connector-run' | 'exception-end';
 
 /** Who claims a job: the hub's own worker, or the shared connector pool, which holds the connectors' sign-in and runs connector runs only. */
 export type JobLane = 'hub' | 'pool';
@@ -46,7 +46,7 @@ export const JOBS_CHANNEL = 'vantage_jobs';
  * failed run, and its schedule runs it again. Rendering, a pushed batch's
  * ingest, a release's redraws, and maintenance retry.
  */
-export const DEFAULT_ATTEMPTS: Record<JobKind, number> = { render: 3, gc: 3, purge: 3, ingest: 3, overlay: 3, redraw: 2, 'release-redraw': 3, 'publication-run': 1, review: 2, 'drop-files': 3, revise: 1, generate: 1, 'connector-run': 1 };
+export const DEFAULT_ATTEMPTS: Record<JobKind, number> = { render: 3, gc: 3, purge: 3, ingest: 3, overlay: 3, redraw: 2, 'release-redraw': 3, 'publication-run': 1, review: 2, 'drop-files': 3, revise: 1, generate: 1, 'connector-run': 1, 'exception-end': 3 };
 
 export interface NewJob {
   readonly orgId: string;

@@ -16,6 +16,11 @@ import { editionOf } from '../standards/repo.ts';
 import { standardSetting } from '../standards/setting.ts';
 import { parseStandardName, standardThing } from '../standards/text.ts';
 import { writeStandardSettings } from '../standards/write.ts';
+import { badRequest } from '../http.ts';
+import { placedByRef } from '../decisions/repo.ts';
+import { EXCEPTION_STATES, type ExceptionState } from '../standards/exceptions.ts';
+import { exceptionsJson } from '../standards/exception-text.ts';
+import { readException } from '../standards/exception-write.ts';
 
 export function standardRoutes(ctx: AppContext, reg: OpenApiRegistry): Hono<HubEnv> {
   const app = new Hono<HubEnv>();
@@ -41,6 +46,24 @@ export function standardRoutes(ctx: AppContext, reg: OpenApiRegistry): Hono<HubE
   app.post('/standards/:scope/publish', async (c) => {
     const p = principal(c);
     return c.json({ message: await publishEdition(ctx, p, c.req.param('scope'), whoOf(p)) });
+  });
+  reg.add({ method: 'get', path: '/exceptions', summary: "The estate's exceptions, newest first, for the code that writes a policy engine's exemptions: each with its lasting id, the line it bends with what enforces and checks that line, what it covers, its end, and who granted it. inForce=true keeps those granted and not past their end", tag: 'standards', query: ['state', 'line', 'inForce'], auth: 'user', responses: { '200': '{ exceptions: [{ id, number, state, inForce, line: { ref, text, enforcedBy, checkedBy }, covers: { scope, records, things }, reason, safeguard, ends, grantedBy, granted, source }] }' } });
+  app.get('/exceptions', async (c) => {
+    const p = principal(c);
+    const state = c.req.query('state');
+    if (state !== undefined && !EXCEPTION_STATES.includes(state as ExceptionState)) throw badRequest(`state is one of ${EXCEPTION_STATES.join(', ')}`);
+    const line = c.req.query('line') ? (await placedByRef(ctx.db, p.orgId, c.req.query('line')!))?.id ?? '-' : undefined;
+    const all = await exceptionsJson(ctx.db, p.orgId, { state: state as ExceptionState | undefined, line });
+    return c.json({ exceptions: c.req.query('inForce') === 'true' ? all.filter((e) => e.inForce) : all });
+  });
+
+  reg.add({ method: 'get', path: '/exceptions/:number', summary: 'One exception as JSON, and its text', tag: 'standards', params: ['number'], auth: 'user', responses: { '200': '{ exception, text }', '404': 'no such exception' } });
+  app.get('/exceptions/:number', async (c) => {
+    const p = principal(c);
+    const n = Number(c.req.param('number'));
+    const thing = await readException(ctx, p, n);
+    const json = (await exceptionsJson(ctx.db, p.orgId, {})).find((e) => e.number === n)!;
+    return c.json({ exception: json, text: thing.text });
   });
   return app;
 }

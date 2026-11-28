@@ -16,6 +16,7 @@ import { scopeSetting } from '../scopes/setting.ts';
 import { BOTH, bindingKey, scopeKey, scopeName, type ScopeKey } from './model.ts';
 import { editionOf } from './repo.ts';
 import { standardSetting } from './setting.ts';
+import { excepted, inForceExceptions } from './exceptions.ts';
 
 /** The key of the edition that binds a workspace's records: its owner's, or its owner and program's, as far as the tree has them. */
 export async function bindingOf(db: Db, orgId: string, workspaceId: string): Promise<ScopeKey> {
@@ -66,14 +67,16 @@ export async function inheritInputs(db: Db, orgId: string, inherits: readonly In
  * Refuses an accepted record that departs with no exception in force, or that
  * marks a line an open conflict holds with its rival until the ruling.
  */
-export async function checkStanding(db: Db, orgId: string, row: { readonly ref: string; readonly status: DecisionStatus; readonly scope: ScopeKey; readonly inherits: readonly Inherit[] }): Promise<void> {
+export async function checkStanding(db: Db, orgId: string, row: { readonly id?: string; readonly ref: string; readonly status: DecisionStatus; readonly scope: ScopeKey; readonly inherits: readonly Inherit[] }): Promise<void> {
   if (row.status !== 'accepted' || !row.inherits.length) return;
+  const granted = row.inherits.some((i) => i.stance === 'departs') ? await inForceExceptions(db, orgId) : [];
+  const byId = new Map((await listScopes(db, orgId, (await scopeSetting(db, orgId)).source)).map((s) => [s.id, s]));
   const name = async (id: string): Promise<string> => {
     const r = await placedById(db, orgId, id);
     return r ? refOf(r) : id;
   };
   for (const i of row.inherits) {
-    if (i.stance === 'departs') throw badRequest(`${row.ref} departs from ${await name(i.line)}, and no exception in force covers it; a record that departs is accepted only with an exception granted by that line's steward (VAN-3020). Keep it proposed until then.`);
+    if (i.stance === 'departs' && !excepted(granted, i.line, row.id, row.scope, byId)) throw badRequest(`${row.ref} departs from ${await name(i.line)}, and no exception in force covers it; a record that departs is accepted only with an exception granted by that line's steward (VAN-3020). Keep it proposed until then.`);
   }
   const edition = await editionOf(db, orgId, row.scope);
   for (const c of edition?.body.conflicts ?? []) {

@@ -18,7 +18,7 @@ export interface CreatedWorkspace {
 }
 
 /** Slugs an address reads as the hub's own things, never as a workspace. */
-const RESERVED = new Set(['guide', 'schema', 'scopes', 'standard', 'conflicts']);
+const RESERVED = new Set(['guide', 'schema', 'scopes', 'standard', 'conflicts', 'exceptions']);
 
 export async function createTeamWorkspace(ctx: AppContext, p: Principal, who: string, input: { name: string; slug?: string | undefined }): Promise<CreatedWorkspace> {
   if (!(await mayCreateTeamWorkspace(ctx.db, ctx.config.TEAM_WORKSPACES, p))) throw forbidden('only admins and people an admin lets may make team workspaces here');

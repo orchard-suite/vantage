@@ -22,6 +22,8 @@ import { documentLink, recordLink } from './links.ts';
 import { scopesState, scopesText, scopesVersion } from '../scopes/text.ts';
 import { settingsThing, standardThing } from '../standards/text.ts';
 import { conflictsThing, conflictThing } from '../standards/conflicts.ts';
+import { exceptionsThing } from '../standards/exception-text.ts';
+import { readException } from '../standards/exception-write.ts';
 import { scopeThing } from '../scopes/profile.ts';
 
 export type Role = 'viewer' | 'author';
@@ -111,6 +113,10 @@ export async function readThing(ctx: AppContext, p: Principal, given: Address): 
       return { ...(await conflictsThing(ctx, p)), kind: 'markdown' };
     case 'conflict':
       return { ...(await conflictThing(ctx, p, a.number)), kind: 'markdown' };
+    case 'exceptions':
+      return { ...(await exceptionsThing(ctx, p)), kind: 'markdown' };
+    case 'exception':
+      return { ...(await readException(ctx, p, a.number)), kind: 'markdown' };
     case 'document': {
       const { ws, doc, head } = await requireDocumentAt(ctx, p, a, 'viewer');
       return { address: `${ws.slug}/${doc.slug}`, version: head.id, text: head.yaml, kind: 'yaml', link: documentLink(ctx, ws.slug, doc.slug) };

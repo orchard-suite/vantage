@@ -8,8 +8,9 @@ exceptions to them, arranged by who each rule binds and who stewards it.
 Agents read and write all of it at the cost of a local disk; people read,
 steer, and approve. Vantage judges nothing and enforces nothing: a judge
 checks the rules, the systems they guard enforce them, and a catalog shows
-them. Today it holds diagrams, pages, decision records, and tracked work;
-standards, editions, and exceptions are on its roadmap.
+them. It holds diagrams, pages, decision records, tracked work, the
+standards built from the records in editions, the conflicts between their
+lines, and the exceptions to them.
 
 At its heart is a diagram engine: code-first software and infrastructure
 diagrams with human-grade layout. Built for agents to write, built for

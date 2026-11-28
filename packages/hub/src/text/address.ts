@@ -2,7 +2,8 @@
  * An address names one thing in the hub: a workspace, a document, a page,
  * a registry, a decision record, a kind, an item, the scope tree, the
  * estate's standard settings, one scope's built standard, the conflicts
- * between lines and one conflict, the guide, or the schema.
+ * between lines and one conflict, the exceptions to lines and one
+ * exception, the guide, or the schema.
  * A part after `#` names a piece of it. Prefixes are upper case and
  * workspace slugs lower case, so an address needs no type beside it; a
  * prefix is a registry's or a kind's, never both, and placeAddress asks the
@@ -26,6 +27,10 @@ export type Address =
   | { readonly kind: 'conflicts'; readonly part?: string }
   /** One conflict, by its number; a patch of its header rules on it. */
   | { readonly kind: 'conflict'; readonly number: number; readonly part?: string }
+  /** The exceptions to lines, newest first; a write here asks for one. */
+  | { readonly kind: 'exceptions'; readonly part?: string }
+  /** One exception, by its number; a patch of its header grants, revokes, or renews it. */
+  | { readonly kind: 'exception'; readonly number: number; readonly part?: string }
   | { readonly kind: 'workspace'; readonly workspace: string }
   | { readonly kind: 'document'; readonly workspace: string; readonly document: string; readonly part?: string }
   | { readonly kind: 'page'; readonly workspace: string; readonly document: string; readonly page: string; readonly part?: string }
@@ -55,6 +60,12 @@ export function parseAddress(text: string | undefined): Address {
   if (head === 'standard') return { kind: 'standards', ...withPart };
   if (head.startsWith('standard/')) return { kind: 'standard', scope: head.slice('standard/'.length), ...withPart };
   if (head === 'conflicts') return { kind: 'conflicts', ...withPart };
+  if (head === 'exceptions') return { kind: 'exceptions', ...withPart };
+  if (head.startsWith('exceptions/')) {
+    const n = Number(head.slice('exceptions/'.length));
+    if (!Number.isInteger(n) || n < 1) throw badRequest(`${raw} is not an address; an exception is exceptions/<number>`);
+    return { kind: 'exception', number: n, ...withPart };
+  }
   if (head.startsWith('conflicts/')) {
     const n = Number(head.slice('conflicts/'.length));
     if (!Number.isInteger(n) || n < 1) throw badRequest(`${raw} is not an address; a conflict is conflicts/<number>`);
@@ -93,6 +104,10 @@ export function thingAddress(a: Address): string {
       return 'conflicts';
     case 'conflict':
       return `conflicts/${a.number}`;
+    case 'exceptions':
+      return 'exceptions';
+    case 'exception':
+      return `exceptions/${a.number}`;
     case 'workspace':
       return a.workspace;
     case 'document':

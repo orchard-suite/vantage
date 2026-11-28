@@ -35,7 +35,7 @@ export async function writeStandardSettings(ctx: AppContext, p: Principal, text:
   const next = parseSettingsText(text);
   const now = await standardSetting(ctx.db, p.orgId);
   const said: string[] = [];
-  for (const k of ['bindings', 'binds', 'steward_gate', 'withhold', 'clash', 'ranked', 'checks'] as const) {
+  for (const k of ['bindings', 'binds', 'steward_gate', 'withhold', 'clash', 'ranked', 'checks', 'exceptions'] as const) {
     if (same(now[k], next[k])) continue;
     if (!p.admin) throw forbidden(`only an admin changes ${STANDARD}#${k}`);
     said.push(`${k} set`);

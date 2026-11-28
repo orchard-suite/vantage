@@ -75,6 +75,9 @@ export interface Fixture {
   /** One conflict between two lines, and the list of conflicts, as the same files would sit on a disk. */
   readonly conflict: string;
   readonly conflicts: string;
+  /** One exception to a line, and the list of exceptions, as the same files would sit on a disk. */
+  readonly exception: string;
+  readonly exceptions: string;
   /** A team workspace's records and documents, as the same files would sit on a disk, for the tasks that search across the hub. */
   readonly shared: readonly DiskFile[];
   readonly dir: string;
@@ -215,13 +218,16 @@ export async function fixture(): Promise<Fixture> {
   await hub.call('vantage_write', { writes: [{ address: 'conflicts', text: '---\nlines: [RULE-2001, RULE-2003]\nscope: estate\n---\n\nLane 1 and lane 3 share one release, and the two rules cannot both be checked at it.\n' }] });
   const conflict = /^=== conflicts\/1[^\n]*\n([\s\S]*)$/.exec(await hub.call('vantage_read', { addresses: ['conflicts/1'] }))![1]!;
   const conflicts = /^=== conflicts [^\n]*\n([\s\S]*)$/.exec(await hub.call('vantage_read', { addresses: ['conflicts'] }))![1]!;
+  await hub.call('vantage_write', { writes: [{ address: 'exceptions', text: '---\nline: RULE-2002\ncovers:\n  scope: estate\n  things: [cloud:/accounts/acme/lanes/2]\nsafeguard: Lane 2 is checked by hand at each release until its check is fixed.\nends: 2099-01-31\n---\n\nThe check for lane 2 fails on a runner it cannot reach.\n' }] });
+  const exception = /^=== exceptions\/1[^\n]*\n([\s\S]*)$/.exec(await hub.call('vantage_read', { addresses: ['exceptions/1'] }))![1]!;
+  const exceptions = /^=== exceptions [^\n]*\n([\s\S]*)$/.exec(await hub.call('vantage_read', { addresses: ['exceptions'] }))![1]!;
   const built = /^=== standard\/estate  version (\S+)[^\n]*\n([\s\S]*)$/.exec(await hub.call('vantage_read', { addresses: ['standard/estate'] }))!;
   const shared: DiskFile[] = [{ path: 'shop-standard.vantage.yaml', text: STANDARD }];
   for (let i = 1; i <= SHARED_RECORDS.length; i++) {
     const ref = `PLAT-${2000 + i}`;
     shared.push({ path: `decisions/${ref}.md`, text: new RegExp(`=== ${ref}[^\\n]*\\n([\\s\\S]*)$`).exec(await hub.call('vantage_read', { addresses: [ref] }))![1]! });
   }
-  return { t, hub, hubHeaders: me.headers, laptop: lap, ws, yaml, page, record, item, standard: built[2]!, standardVersion: built[1]!, scope, conflict, conflicts, shared, dir: mkdtempSync(join(tmpdir(), 'vantage-cost-')) };
+  return { t, hub, hubHeaders: me.headers, laptop: lap, ws, yaml, page, record, item, standard: built[2]!, standardVersion: built[1]!, scope, conflict, conflicts, exception, exceptions, shared, dir: mkdtempSync(join(tmpdir(), 'vantage-cost-')) };
 }
 
 export interface Task {
@@ -365,6 +371,18 @@ export const TASKS: readonly Task[] = [
     kind: 'standard',
     run: (f) => f.hub.call('vantage_read', { addresses: ['conflicts'] }),
     disk: (f) => disk.read(`${DISK}/conflicts.md`, f.conflicts, 1, f.conflicts.split('\n').length),
+  },
+  {
+    name: 'read an exception: its line, terms, end, and who grants it',
+    kind: 'standard',
+    run: (f) => f.hub.call('vantage_read', { addresses: ['exceptions/1'] }),
+    disk: (f) => disk.read(`${DISK}/exceptions/1.md`, f.exception, 1, f.exception.split('\n').length),
+  },
+  {
+    name: 'list the exceptions and the pressure on each line',
+    kind: 'standard',
+    run: (f) => f.hub.call('vantage_read', { addresses: ['exceptions'] }),
+    disk: (f) => disk.read(`${DISK}/exceptions.md`, f.exceptions, 1, f.exceptions.split('\n').length),
   },
   {
     name: "read a scope's profile, inherited fields and all",

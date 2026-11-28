@@ -6,7 +6,7 @@
  */
 import type { Scope } from '../scopes/repo.ts';
 import { sha256 } from '../crypto.ts';
-import { BOTH, type Change, type ConflictPin, type EditionBody, type PackPin, type PagePin, type ScopeKey, type StandardLine } from './model.ts';
+import { BOTH, splitBinding, type Change, type ConflictPin, type EditionBody, type PackPin, type PagePin, type ScopeKey, type StandardLine } from './model.ts';
 import type { ClashRule } from './setting.ts';
 
 /** A record's line as its registry's scope holds it, before it reaches anywhere. */
@@ -114,6 +114,12 @@ export function chainOf(key: ScopeKey, byId: ReadonlyMap<string, Scope>): ScopeK
   const out: ScopeKey[] = [];
   for (let at: ScopeKey | undefined = byId.has(key) ? key : ''; at !== undefined && !out.includes(at); at = at === '' ? undefined : (byId.get(at)?.parent ?? '')) out.push(at === '' || byId.has(at) ? at : '');
   return out;
+}
+
+/** What stands above a key: a scope's chain, or for an owner and program, the pair, the owner's chain, and the program itself. */
+export function bindingChain(key: ScopeKey, byId: ReadonlyMap<string, Scope>): ScopeKey[] {
+  const pair = splitBinding(key);
+  return pair ? [key, ...chainOf(pair.owner, byId), pair.program] : chainOf(key, byId);
 }
 
 /** The nearest scope at or above both. */
