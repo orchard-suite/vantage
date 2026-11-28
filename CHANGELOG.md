@@ -2,6 +2,18 @@
 
 All notable changes to this project will be documented in this file.
 
+## [4.13.0](https://github.com/orchard-suite/vantage/compare/v4.12.0...v4.13.0) (2026-11-28)
+
+### Features
+
+* **vantage:** add agent identity and run claims ([5dff4f5](https://github.com/orchard-suite/vantage/commit/5dff4f5a285867f008a5c00299380214e2621599))
+* **vantage:** add item owners, delegation, scope ([6aec9ae](https://github.com/orchard-suite/vantage/commit/6aec9ae913764cb131aa6e034c4a15811c32cf9e))
+* **vantage:** inherit lines and flag conflicts ([dc07389](https://github.com/orchard-suite/vantage/commit/dc07389cb75ed4975e25a7d18c38e09b3248f2e0))
+
+### Bug Fixes
+
+* **vantage:** run the cost bench outside the runner ([97bc7dd](https://github.com/orchard-suite/vantage/commit/97bc7dd6df40eefe85a9c80ed80653d34519b482))
+
 ## [4.12.0](https://github.com/orchard-suite/vantage/compare/v4.11.1...v4.12.0) (2026-11-28)
 
 ### Features
