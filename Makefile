@@ -7,8 +7,10 @@ check:
 	bun run --filter @vantage/viewer build
 	bun run check
 
-# Lands main only after the full check passes on this machine.
-land: check
+# Lands main: release-damnit land runs the config's check (make check) on
+# exactly what lands and signs its proof, which the release verifies. From a
+# worktree: make land BRANCH=<branch>.
+land:
 	release-damnit land $(BRANCH)
 
 # The proofs that need a real Postgres (VAN-3006, VAN-3010, VAN-2009), on a
