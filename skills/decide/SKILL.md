@@ -69,7 +69,9 @@ will rewrite most of it.
   sentences that change. Last updated moves. Send `minor: true` only for
   a date or wording fix.
 - The decision is reversed or replaced: **supersede** it with
-  `vantage_decision_supersede`. The old record keeps its body.
+  `vantage_decision_supersede`. The old record keeps its body. When the
+  record that replaced it already exists, patch the old record's header
+  instead: `status: superseded` with `superseded_by: SHOP-2002`.
 - Nothing covers it: **create** it with a `vantage_write` to the registry
   (`SHOP`), in the record's text form. It takes the next number in its
   category; `vantage_decision_next` shows which.

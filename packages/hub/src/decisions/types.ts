@@ -138,7 +138,8 @@ export type DecisionCreate = z.input<typeof DecisionCreateSchema>;
 export const DecisionPatchSchema = z
   .object({
     title: fields.title.optional(),
-    status: z.enum(['proposed', 'accepted', 'deprecated']).optional(),
+    /** superseded only with supersededBy, or on a record already marked so. */
+    status: z.enum(['proposed', 'accepted', 'deprecated', 'superseded']).optional(),
     decidedOn: Day.optional(),
     deciders: fields.deciders.min(1).optional(),
     context: Markdown.optional(),
@@ -148,6 +149,10 @@ export const DecisionPatchSchema = z
     related: fields.related.optional(),
     position: fields.position.optional(),
     governs: fields.governs.optional(),
+    /** The record in the same registry that replaced this one, for a record superseded with none named. */
+    supersededBy: z.string().trim().min(1).max(40).optional(),
+    /** The record this one replaced, when that record is superseded with no successor named. */
+    supersedes: z.string().trim().min(1).max(40).optional(),
     updatedOn: Day.optional(),
     /** A fix to dates or wording: Last updated stays as it was. */
     minor: z.boolean().optional(),
