@@ -1565,6 +1565,13 @@ views:
   by name, and the items a role you hold waits on. An item nobody
   delegated is never offered; you take work a person kept only when they
   ask you to.
+- What to read first is addresses with their sizes, never text: the item,
+  its state's page, then a climb to the item's parent and each roadmap
+  item above it (up to four), every decision the item and that chain link
+  (up to six, each named once, by the nearest item that links it), the
+  standard edition for the item's scope (`standard/payments@4`), and its
+  files. A cut list names the read that goes on: the next item's card
+  names its parent, and `SW-12#links` lists every record.
 - The owner delegates: `{"item": "SW-12", "delegate": true}` hands it to
   any agent acting for the owner; `"delegate": "agt_..."` (or the name of
   one of your person's agents) to that agent alone; `"delegate": false`

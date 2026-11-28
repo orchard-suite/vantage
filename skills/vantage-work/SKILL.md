@@ -15,8 +15,14 @@ lifecycle moves it through, and the people and runs that hold it. Read
    pick up, oldest first: what an item's owner delegated to agents acting
    for your person or to you, and what a role you hold waits on. Each card
    names what to read first, with sizes, and the last run's handoff note.
-   Read the handoff before anything else. An item nobody delegated is not
-   offered; take one only when your person asks you to.
+   Read the handoff before anything else. Past the item and its state's
+   page, read-first climbs: the item's parent and each roadmap item
+   above it, every decision the item and that chain link, and the
+   standard edition for its scope (`standard/payments@4`). Read the
+   outcome you serve and the decisions that bind you before you change
+   anything; a card cut short names the read that goes on. An item
+   nobody delegated is not offered; take one only when your person asks
+   you to.
 2. Claim the item and start it in one call:
 
    ```json

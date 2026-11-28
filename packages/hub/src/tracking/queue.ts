@@ -2,11 +2,14 @@
  * The queue an agent asks (VAN-3010): what it may pick up, given
  * what it can do. It answers cards and addresses with their sizes, never
  * text, and the last handoff note, which is short enough to come along.
+ * What to read first climbs (VAN-3026): past the card and the state's
+ * page, the roadmap items above it, their decisions, and its standard.
  */
 import type { AppContext } from '../context.ts';
 import { runOf, type Principal } from '../auth/principal.ts';
 import { maybe } from '../db/db.ts';
 import type { KindDef } from './kinds.ts';
+import { climb, climbReach } from './climb.ts';
 
 /** One item an agent may take, with what to read first. */
 export interface QueueCard {
@@ -39,11 +42,12 @@ export async function queue(ctx: AppContext, p: Principal, opts: { kinds?: reado
         or exists (select 1 from item_named n where n.item_id = i.id and n.why like 'role:%' and ((n.subject_kind = 'user' and n.subject_id = $3) or (n.subject_kind = 'team' and n.subject_id = any($4::text[])))))`;
   const total = Number((await ctx.db.query<{ n: number }>(`select count(*)::int as n from items i join item_kinds k on k.id = i.kind_id where ${where}`, params))[0]?.n ?? 0);
   const limit = Math.min(Math.max(1, opts.limit ?? 5), 20);
-  const rows = await ctx.db.query<{ id: string; key: string; title: string; state: string; prefix: string; files: number; definition: KindDef; document_id: string }>(
-    `select i.id, i.key, i.title, i.state, k.prefix, i.files, k.definition, k.document_id from items i join item_kinds k on k.id = i.kind_id where ${where} order by i.updated_at asc, i.key limit ${limit}`,
+  const rows = await ctx.db.query<{ id: string; key: string; title: string; state: string; prefix: string; files: number; definition: KindDef; document_id: string; parent_id: string | null; workspace_id: string; scope: string | null }>(
+    `select i.id, i.key, i.title, i.state, k.prefix, i.files, k.definition, k.document_id, i.parent_id, i.workspace_id, i.scope from items i join item_kinds k on k.id = i.kind_id where ${where} order by i.updated_at asc, i.key limit ${limit}`,
     params,
   );
   const cards: QueueCard[] = [];
+  const reach = rows.length ? await climbReach(ctx, p) : undefined;
   for (const r of rows) {
     const read: string[] = [`${r.key} (its card and body)`];
     const page = r.definition.states.find((s) => s.id === r.state)?.page;
@@ -52,6 +56,7 @@ export async function queue(ctx: AppContext, p: Principal, opts: { kinds?: reado
       const a = doc?.attachments.find((x) => x.path === page);
       if (doc && a) read.push(`${doc.ws}/${doc.slug}/${page} (how to work in ${r.state}, ${a.size} bytes, version ${doc.version})`);
     }
+    read.push(...(await climb(ctx, p, reach!, { id: r.id, parentId: r.parent_id, workspaceId: r.workspace_id, scope: r.scope })));
     if (r.files) read.push(`${r.key}#files (${r.files})`);
     const last = await maybe<{ data: { run: { handoff?: string } } }>(ctx.db, "select data from item_events where item_id = $1 and type = 'ran' order by position desc limit 1", [r.id]);
     cards.push({ key: r.key, title: r.title, state: r.state, kind: r.prefix, read, ...(last?.data.run.handoff ? { handoff: last.data.run.handoff } : {}) });
