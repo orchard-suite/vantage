@@ -1,0 +1,4 @@
+[
+  { "old_path": "src/hooks.ts", "new_path": "src/hooks.ts", "new_file": false, "renamed_file": false, "deleted_file": false, "diff": "@@ -1 +1,2 @@\n export const hooks = [];\n+export const retries = 3;\n" },
+  { "old_path": "src/old-retry.ts", "new_path": "src/retry.ts", "new_file": false, "renamed_file": true, "deleted_file": false, "diff": "" }
+]

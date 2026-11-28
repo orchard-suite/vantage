@@ -78,12 +78,16 @@ export const BatchRelationSchema = z
 /** The most characters of one file's change a batch carries; the rest is cut with a marker. */
 export const PATCH_MAX = 4_000;
 
-/** What one commit changed: the files, each with the start of its diff. */
+/** An item's key as a commit's `Work:` trailer names it, such as SW-12. */
+export const WORK_KEY = /^[A-Z][A-Z0-9]{1,11}-\d{1,9}$/;
+
+/** What one commit changed: the files, each with the start of its diff, and the items it names. */
 export const CommitSchema = z
   .object({
     sha: z.string().regex(/^[0-9a-f]{7,64}$/),
     at: z.string().datetime({ offset: true }).optional().describe('When it landed on the branch'),
     title: z.string().max(500).optional().describe('The first line of its message'),
+    work: z.array(z.string().regex(WORK_KEY)).max(50).optional().describe('The items its Work trailers name, by key; the hub links the commit to each as proof'),
     files: z.array(z.object({ path: z.string().min(1), patch: z.string().max(PATCH_MAX + 100).optional() }).strict()).max(300),
   })
   .strict();

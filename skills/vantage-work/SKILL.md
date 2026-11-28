@@ -52,8 +52,11 @@ tracked before its first change, not after it lands.
 3. **Claim it and start it**, in one call, as in "Take one".
 4. **Name it in every commit.** Where `vantage.yaml` names a `work` kind,
    each commit message ends with a trailer naming the item, or the
-   roadmap item it is part of: `Work: SW-12`. The repository's commit
-   rules may refuse a commit without one.
+   roadmap item it is part of: `Work: SW-12`, one trailer per item, in
+   the message's last paragraph. The repository's commit rules may
+   refuse a commit without one. When the `git` connector reads the
+   commit, the hub links it to the item as proof, so a commit a person
+   lands counts as well as yours.
 
 ## While you work
 

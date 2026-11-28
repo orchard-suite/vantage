@@ -1147,8 +1147,12 @@ VAN-0001 sets. The code is `packages/hub/src/tracking/`.
   or as bytes from `GET /api/v1/text/file`. VAN-3011.
 - `evidence:` ties a box, view, page, or page section to repository files
   at a commit. A `git` connector reads a repository's recent history
-  (`changes` on a batch), signed in the way the `github` connector is,
-  with an app token scoped to contents and metadata (VAN-2007); the
+  (`changes` on a batch) from GitHub, signed in the way the `github`
+  connector is, with an app token scoped to contents and metadata
+  (VAN-2007), or from GitLab, cloud or self-hosted (API v4), with a token
+  held as the connector's secret. Each commit carries the item keys its
+  `Work:` trailers name, and the hub links it to each item as proof, once
+  (VAN-3026); the
   hub keeps the latest per repository, and
   `workspace/document/stale` lists every tie a later commit touched, with
   diffs, worked out on read. VAN-3013.

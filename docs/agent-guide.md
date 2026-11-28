@@ -1003,6 +1003,14 @@ view, a whole page, or one section (`page#anchor`) was read from these
 repository files at this commit. A folder ends in `/`; `*` is one path
 segment and `**` any depth.
 
+A `git` connector reads a repository's history from GitHub (github.com
+or an Enterprise server) or from GitLab (gitlab.com or a self-hosted
+server, API v4): `forge: gitlab` picks GitLab, and `url` names a server
+of your own. GitLab signs in with `token`, a secret reference to an
+access token that may read the API; GitHub with `token` or `app`. A
+GitLab project is named by its full path, groups included
+(`acme/platform/relay`, read as `gitlab.com/acme/platform/relay`).
+
 With `docs.repository` set and a `git` connector reading that repository,
 `workspace/document/stale` lists every tie a later commit touched, with
 the commits and the start of each diff; the document's outline counts
@@ -1623,6 +1631,14 @@ views: []
   `proof` link. Building when any proof is under way, shipped when every
   piece is done and every proof box is seen by a connector. A box is proof
   only when it is bound to something a connector reads.
+- A commit names its item with a trailer in the last paragraph of its
+  message, one per item: `Work: SW-12`. The `git` connector reads every
+  commit's trailers, and the hub links each commit to its item as proof,
+  once, with the repository, the hash, and when it landed. A commit says
+  work landed: it puts an item under way, and a parent whose part has
+  one is under way too, but a commit never ships an item by itself. A key
+  no item has is a warning on the connector's run, never guessed. A
+  commit is never linked by hand.
 - A ticket in an outside tracker that a connector reads is proof too:
   `{"rel": "proof", "target": "ticket:ops/jira#OPS-12"}`. It counts as
   under way while the connector reports it open, and done once it drops

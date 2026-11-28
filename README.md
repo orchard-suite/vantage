@@ -246,7 +246,7 @@ cited as `VAN-NNNN`.
 | `packages/viewer` | The browser viewer: picker, pan and zoom, hover and focus, walkthroughs, morphing transitions, and in the hub who is here and follow the presenter |
 | `packages/export` | PDF (vector), draw.io, VSDX, clipboard SVG and PNG, title blocks |
 | `packages/import` | draw.io and VSDX (Visio, Lucidchart export) drawings in, pinned, plus Ilograph, Mermaid, PlantUML, and Markdown diagram blocks laid out fresh: nodes, relations, views, inferred hints, a report |
-| `packages/connectors` | Sources of truth: the push shape with open items, Backstage conversion, Orrery (with firing alerts), kubectl, Cloudflare, Azure Resource Graph, Jira, GitHub, git history, generic HTTP, mappings, merge, bind, freshness, drift |
+| `packages/connectors` | Sources of truth: the push shape with open items, Backstage conversion, Orrery (with firing alerts), kubectl, Cloudflare, Azure Resource Graph, Jira, GitHub, git history from GitHub or GitLab, generic HTTP, mappings, merge, bind, freshness, drift |
 | `packages/publish` | Publications and targets: fs, Azure Blob, git, webhook, SharePoint, Confluence, Teams |
 | `packages/server` | Shared operations plus the Hono HTTP API and live reload |
 | `packages/mcp` | The MCP server |

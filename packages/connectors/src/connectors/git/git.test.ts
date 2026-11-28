@@ -5,7 +5,7 @@ import { keptStore } from '../../kept.ts';
 import { drain, fixtureFetch, testContext } from '../../testing.ts';
 import { gitConnector, GitConfigSchema, repositoryHost, watches } from './git.ts';
 
-const detail = (sha: string, date: string, title: string, files: { filename: string; patch?: string }[]) => ({ sha, commit: { message: `${title}\n\nbody`, committer: { date } }, files });
+const detail = (sha: string, date: string, title: string, files: { filename: string; patch?: string }[], trailers = '') => ({ sha, commit: { message: `${title}\n\nbody${trailers ? `\n\n${trailers}` : ''}`, committer: { date } }, files });
 
 function api() {
   return fixtureFetch('', [
@@ -13,7 +13,7 @@ function api() {
     { match: 'repos/acme/shop/commits?sha=main', json: [{ sha: 'ccc3333' }, { sha: 'bbb2222' }, { sha: 'aaa1111' }] },
     { match: 'commits/aaa1111', json: detail('aaa1111', '2026-11-01T10:00:00Z', 'feat(orders): start', [{ filename: 'src/orders/api.ts', patch: '@@ -0,0 +1 @@\n+start' }]) },
     { match: 'commits/bbb2222', json: detail('bbb2222', '2026-11-02T10:00:00Z', 'docs: readme', [{ filename: 'README.md' }]) },
-    { match: 'commits/ccc3333', json: detail('ccc3333', '2026-11-03T10:00:00Z', 'fix(orders): retry', [{ filename: 'src/orders/api.ts', patch: `@@ -1 +1 @@\n${'+x'.repeat(3000)}` }]) },
+    { match: 'commits/ccc3333', json: detail('ccc3333', '2026-11-03T10:00:00Z', 'fix(orders): retry', [{ filename: 'src/orders/api.ts', patch: `@@ -1 +1 @@\n${'+x'.repeat(3000)}` }], 'Work: SW-12\nWork: PLAN-3') },
   ]);
 }
 
@@ -82,6 +82,27 @@ describe('git connector', () => {
     const config = GitConfigSchema.parse({ repositories: ['acme/shop'], branch: 'main', paths: ['*.md'] });
     const [batch] = await drain(gitConnector.discover(testContext(config, api().fetch)));
     expect(batch!.changes![0]!.commits.map((c) => c.files.map((x) => x.path))).toEqual([[], ['README.md'], []]);
+  });
+
+  test('reads the Work trailers of each commit as the items it names', async () => {
+    const config = GitConfigSchema.parse({ token: 'T', repositories: ['acme/shop'] });
+    const [batch] = await drain(gitConnector.discover(testContext(config, api().fetch, { T: 'ghs' })));
+    expect(batch!.changes![0]!.commits.map((c) => c.work)).toEqual([undefined, undefined, ['SW-12', 'PLAN-3']]);
+  });
+
+  test('a commit kept before trailers were read is read once more for them', async () => {
+    const config = GitConfigSchema.parse({ token: 'T', repositories: ['acme/shop'], branch: 'main' });
+    const old = keptStore({ 'acme/shop@aaa1111': { sha: 'aaa1111', files: [] }, 'acme/shop@bbb2222': { sha: 'bbb2222', files: [] }, 'acme/shop@ccc3333': { sha: 'ccc3333', files: [] } });
+    const f = api();
+    const [batch] = await drain(gitConnector.discover({ ...testContext(config, f.fetch, { T: 'ghs' }), kept: old }));
+    expect(f.calls.filter((c) => c.url.includes('/commits/')).length).toBe(3);
+    expect(batch!.changes![0]!.commits[2]!.work).toEqual(['SW-12', 'PLAN-3']);
+  });
+
+  test('a GitHub config written before forges existed parses as GitHub, unchanged', () => {
+    const c = GitConfigSchema.parse({ url: 'https://git.example.com/api/v3', app: { id: 'Iv23app', privateKey: 'KEY', installation: 7 }, repositories: ['acme/shop'], branch: 'main', depth: 50, paths: ['src/'] });
+    expect(c).toEqual({ forge: 'github', url: 'https://git.example.com/api/v3', app: { id: 'Iv23app', privateKey: 'KEY', installation: 7 }, repositories: ['acme/shop'], branch: 'main', depth: 50, paths: ['src/'] });
+    expect(GitConfigSchema.safeParse({ repositories: ['acme/platform/shop'] }).success).toBe(false);
   });
 
   test('a token and an app together are refused', () => {

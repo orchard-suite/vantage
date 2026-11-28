@@ -1,0 +1,7 @@
+{
+  "id": 4021,
+  "name": "relay",
+  "path_with_namespace": "acme/platform/relay",
+  "default_branch": "main",
+  "web_url": "https://gitlab.com/acme/platform/relay"
+}

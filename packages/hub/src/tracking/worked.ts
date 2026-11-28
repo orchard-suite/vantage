@@ -1,8 +1,10 @@
 /**
  * Worked-out state (VAN-3009). A kind whose lifecycle gives
  * moves to `proof` is moved by the hub, never by a person, when its proof
- * says so: its parts and the items it names as proof, by their state, and
- * the boxes it names as proof, by whether a connector saw their real thing.
+ * says so: its parts and the items it names as proof, by their state; the
+ * boxes it names as proof, by whether a connector saw their real thing; and
+ * the commits that name it (VAN-3026), which say work landed and so put it
+ * under way, but never finish it alone.
  * Done lands only on proof a machine read. Every worked move is an event
  * like any other, made by the hub in the same transaction as the change
  * that caused it.
@@ -15,6 +17,7 @@ import { classOf, type KindDef, type KindRow } from './kinds.ts';
 import { membersOf, namedBy } from './gate.ts';
 import { append, lockFeed, stateById } from './store.ts';
 import type { ItemState } from './state.ts';
+import { isCommitTarget, parseCommitTarget, type CommitProof } from './commit-target.ts';
 
 /** Whether the hub moves items of this kind from their proof. */
 export function isWorked(def: KindDef): boolean {
@@ -26,6 +29,8 @@ export interface Proof {
   readonly items: readonly { readonly key: string; readonly class: ItemState['class']; readonly since: string }[];
   /** Boxes named as proof: seen when a connector read their real thing, unread when nothing binds them to one. */
   readonly boxes: readonly { readonly target: string; readonly seen: boolean | 'unread'; readonly at: string | null }[];
+  /** Commits that name the item in a Work trailer, oldest first. */
+  readonly commits: readonly CommitProof[];
   /** When the newest piece of proof changed. */
   readonly at: string | null;
 }
@@ -35,10 +40,14 @@ const iso = (d: Date | string): string => new Date(d).toISOString();
 /** What an item's proof says now. */
 export async function readProof(db: Db, item: Pick<ItemState, 'id' | 'links'>): Promise<Proof> {
   const named = item.links.filter((l) => l.rel === 'proof');
-  const itemIds = named.filter((l) => !l.target.includes('#') && !l.target.startsWith('ticket:')).map((l) => l.target);
+  const itemIds = named.filter((l) => !l.target.includes('#') && !l.target.startsWith('ticket:') && !isCommitTarget(l.target)).map((l) => l.target);
   // Its parts, the items it names as proof, and the items that link toward it, as a milestone's are.
-  const rows = await db.query<{ key: string; class: ItemState['class']; state_since: Date }>("select key, class, state_since from items where parent_id = $1 or id = any($2::text[]) or id in (select item_id from item_links where rel = 'toward' and target = $1) order by key", [item.id, itemIds]);
-  const items: { key: string; class: ItemState['class']; since: string }[] = rows.map((r) => ({ key: r.key, class: r.class, since: iso(r.state_since) }));
+  // A part not started whose own commits have landed is under way: a parent reads the work on its parts.
+  const rows = await db.query<{ key: string; class: ItemState['class']; state_since: Date; landed: Date | null }>(
+    "select i.key, i.class, i.state_since, (select max(substring(l.target from '@([^@]+)$'))::timestamptz from item_links l where l.item_id = i.id and l.rel = 'proof' and l.target like 'commit:%') as landed from items i where i.parent_id = $1 or i.id = any($2::text[]) or i.id in (select item_id from item_links where rel = 'toward' and target = $1) order by i.key",
+    [item.id, itemIds],
+  );
+  const items: { key: string; class: ItemState['class']; since: string }[] = rows.map((r) => (r.class === 'not-started' && r.landed ? { key: r.key, class: 'in-progress', since: iso(r.landed) } : { key: r.key, class: r.class, since: iso(r.state_since) }));
   // A ticket a connector reads: open while the connector still reports it, done once it has dropped out of what is open.
   for (const l of named.filter((x) => x.target.startsWith('ticket:'))) {
     const [, sourceId, id] = l.target.split(':') as [string, string, string];
@@ -60,22 +69,25 @@ export async function readProof(db: Db, item: Pick<ItemState, 'id' | 'links'>): 
     const missing = !report || report.report.items.some((i) => i.kind === 'declared-not-observed' && i.nodeId === node);
     boxes.push({ target: l.target, seen: !missing, at: report ? iso(report.updated_at) : null });
   }
-  const times = [...items.map((i) => i.since), ...boxes.flatMap((b) => (b.at ? [b.at] : []))].sort();
-  return { items, boxes, at: times[times.length - 1] ?? null };
+  const commits = named.flatMap((l) => parseCommitTarget(l.target) ?? []).sort((a, b) => a.at.localeCompare(b.at));
+  const times = [...items.map((i) => i.since), ...boxes.flatMap((b) => (b.at ? [b.at] : [])), ...commits.map((c) => iso(c.at))].sort();
+  return { items, boxes, commits, at: times[times.length - 1] ?? null };
 }
 
 /**
  * The state the proof says an item is in, by class: done when every piece
  * of proof is done or seen, in progress when any is, not started when none
- * is. Parked parts do not count. No proof says nothing.
+ * is. Parked parts do not count. A commit puts an item under way and never
+ * finishes it: with commits and nothing else, it is in progress. No proof
+ * says nothing.
  */
 export function provenClass(p: Proof): ItemState['class'] | undefined {
   const items = p.items.filter((i) => i.class !== 'parked');
   const boxes = p.boxes.filter((b) => b.seen !== 'unread');
-  if (!items.length && !boxes.length) return undefined;
+  if (!items.length && !boxes.length) return p.commits.length ? 'in-progress' : undefined;
   const done = items.every((i) => i.class === 'done') && boxes.every((b) => b.seen === true);
   if (done) return 'done';
-  if (items.some((i) => i.class !== 'not-started') || boxes.some((b) => b.seen === true)) return 'in-progress';
+  if (p.commits.length || items.some((i) => i.class !== 'not-started') || boxes.some((b) => b.seen === true)) return 'in-progress';
   return 'not-started';
 }
 
@@ -120,7 +132,7 @@ export async function rework(tx: Db, orgId: string, itemIds: Iterable<string>): 
     const path = provenPath(def, s.state, want);
     if (!path.length) continue;
     const members = await membersOf(tx, orgId, def);
-    const summary = `${proof.items.length} item${proof.items.length === 1 ? '' : 's'}, ${proof.boxes.length} box${proof.boxes.length === 1 ? '' : 'es'}`;
+    const summary = `${proof.items.length} item${proof.items.length === 1 ? '' : 's'}, ${proof.boxes.length} box${proof.boxes.length === 1 ? '' : 'es'}${proof.commits.length ? `, ${proof.commits.length} commit${proof.commits.length === 1 ? '' : 's'}` : ''}`;
     for (const to of path) {
       s = await append(tx, { orgId, itemId: s.id, before: s, data: { type: 'moved', from: s.state, to, class: classOf(def, to)!, note: `worked out from its proof (${summary})` }, actor: { userId: null, kind: 'system', agentId: null, surface: 'system' }, key: undefined, answer: `${s.key} moved ${s.state} → ${to} by its proof`, named: (x) => namedBy(def, x, members) });
     }

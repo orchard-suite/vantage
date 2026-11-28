@@ -11,6 +11,7 @@ import { randomId } from '../crypto.ts';
 import { documentsBindingAny, documentsBoundTo } from '../documents/repo.ts';
 import { enqueueDraw } from '../worker/jobs.ts';
 import { reworkSource } from '../tracking/worked.ts';
+import { linkCommits } from '../tracking/commits.ts';
 import { keepHistory } from './history.ts';
 import { fillFromCatalog } from '../scopes/catalog.ts';
 import { activeMapping, recordRun, updateObservedModel, type RunCounts, type RunTrigger, type SourceRow } from './repo.ts';
@@ -39,7 +40,13 @@ export async function ingestBatch(ctx: AppContext, input: IngestInput): Promise<
   const log = ctx.log.child({ sourceId: source.id, source: source.slug, trigger: input.trigger });
   log.info('ingest.start', { entities: input.batch.entities.length, relations: input.batch.relations.length, partial: input.batch.partial ?? false });
   const warnings = [...(input.warnings ?? [])];
-  if (input.batch.changes?.length) await keepHistory(ctx, source.org_id, source.slug, input.batch.observed, input.batch.changes);
+  if (input.batch.changes?.length) {
+    await keepHistory(ctx, source.org_id, source.slug, input.batch.observed, input.batch.changes);
+    // A commit's Work trailers link it to its items as proof (VAN-3026); a key no item has is this run's warning.
+    const commits = await linkCommits(ctx.db, source.org_id, input.batch.changes, input.batch.observed);
+    warnings.push(...commits.unknown);
+    if (commits.linked.length || commits.unknown.length) log.info('ingest.commits.linked', { linked: commits.linked.length, unknown: commits.unknown.length, moved: commits.moved });
+  }
   let batch: Batch = input.batch.source === source.slug ? input.batch : { ...input.batch, source: source.slug };
   if (input.batch.source !== source.slug) log.debug('ingest.source.renamed', { from: input.batch.source, to: source.slug });
   const mapping = await activeMapping(ctx.db, source);

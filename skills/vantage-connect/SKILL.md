@@ -64,7 +64,7 @@ of its source; an item it leaves out is closed.
 - `github` reads open pull requests and issues of `repositories`
   (owner/name) and points them at the `repository` fact (`fact` renames it).
   Labels named for a severity, or mapped in `severities`, set it.
-- `github` and `git` sign in the same way. Prefer `app`: `{ id, privateKey,
+- `github`, and `git` on GitHub, sign in the same way. Prefer `app`: `{ id, privateKey,
   installation? }`, the GitHub App's id and its private key as a secret
   reference. Each run mints a one-hour token per repository, for that
   repository alone, asking for issues, pull requests, and metadata
@@ -75,15 +75,28 @@ of its source; an item it leaves out is closed.
 
 ### Code history
 
-`git` reads the recent history of `repositories` (owner/name) on their
-default branch (or `branch`): each commit and the files it changed, with
-the start of each diff, `depth` commits back (200 by default), narrowed
-to `paths` when given. It draws nothing. The hub keeps the history per
-repository, and every document whose `docs.repository` names it reads
+`git` reads the recent history of `repositories` on their default branch
+(or `branch`): each commit and the files it changed, with the start of
+each diff, `depth` commits back (200 by default), narrowed to `paths`
+when given. It draws nothing. The hub keeps the history per repository,
+and every document whose `docs.repository` names it reads
 `workspace/document/stale`: the boxes and page sections whose evidence
 files a later commit changed, with the diffs. Set `every` to how often
-merges land (60 is usual). Sign it in as an app installed with
-read-only Contents and Metadata on only these repositories. `guide#docs-that-stay-true` has the evidence format.
+merges land (60 is usual). `guide#docs-that-stay-true` has the evidence
+format.
+
+- `forge` is `github` (the default; github.com, or an Enterprise server
+  with `url: https://host/api/v3`) or `gitlab` (gitlab.com, or a
+  self-hosted server with `url: https://host/api/v4`). A GitHub
+  repository is owner/name; a GitLab project is its full path, groups
+  included.
+- On GitHub, sign it in as an app installed with read-only Contents and
+  Metadata on only these repositories. On GitLab, `token` is a secret
+  reference to a project, group, or personal access token with
+  `read_api`; there is no app.
+- Each commit's `Work: SW-12` trailers link it to those items as proof.
+  A key no item has shows as a warning on the connector's run: read the
+  run, fix the key in the commit rules, never guess it.
 
 The boxes show a count and the panel lists the items. When a box should
 show items and does not, check that its entity carries the fact the items

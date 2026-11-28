@@ -64,13 +64,14 @@ export interface Card {
 
 /** A worked item's proof in one line: its pieces by state, and the age of the newest. */
 export function proofText(p: Proof): string {
-  if (!p.items.length && !p.boxes.length) return 'none named; name parts or proof, or it can only be reported done';
+  if (!p.items.length && !p.boxes.length && !p.commits.length) return 'none named; name parts or proof, or it can only be reported done';
   const byClass = (c: string): number => p.items.filter((i) => i.class === c).length;
   const parts = p.items.length ? `${p.items.length} item${p.items.length === 1 ? '' : 's'} (${[['done', 'done'], ['in-progress', 'under way'], ['not-started', 'not started'], ['parked', 'parked']].flatMap(([c, w]) => (byClass(c!) ? [`${byClass(c!)} ${w}`] : [])).join(', ')})` : '';
   const seen = p.boxes.filter((b) => b.seen === true).length;
   const unread = p.boxes.filter((b) => b.seen === 'unread').length;
   const boxes = p.boxes.length ? `${p.boxes.length} box${p.boxes.length === 1 ? '' : 'es'} (${seen} seen${unread ? `, ${unread} bound to nothing a connector reads` : ''})` : '';
-  return `${[parts, boxes].filter(Boolean).join(', ')}; newest ${p.at ? dayOf(p.at) : 'never'}`;
+  const commits = p.commits.length ? `${p.commits.length} commit${p.commits.length === 1 ? '' : 's'} landed` : '';
+  return `${[parts, boxes, commits].filter(Boolean).join(', ')}; newest ${p.at ? dayOf(p.at) : 'never'}`;
 }
 
 async function people(ctx: AppContext, ids: readonly (string | null)[]): Promise<Map<string, string>> {

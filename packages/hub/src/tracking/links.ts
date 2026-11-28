@@ -14,6 +14,7 @@ import { documentAt, workspaceAt } from '../text/things.ts';
 import { ITEM_KEY, OWNER_KEY, findItem, type Found } from './access.ts';
 import type { LinkRel } from './state.ts';
 import { isMilestone } from './milestone.ts';
+import { commitText, isCommitTarget } from './commit-target.ts';
 
 /** The form a link target is kept in, from the words a caller gave. */
 export async function linkTarget(ctx: AppContext, p: Principal, f: Found, rel: LinkRel, target: string): Promise<string> {
@@ -29,6 +30,7 @@ export async function linkTarget(ctx: AppContext, p: Principal, f: Found, rel: L
     const { row } = await requireDecision(ctx, p, t, 'viewer');
     return row.id;
   }
+  if (rel === 'proof' && isCommitTarget(t)) throw badRequest('a commit is linked by the git connector when it reads a Work: <KEY> trailer on the commit; it is never named by hand');
   if (rel === 'proof' && t.startsWith('ticket:')) {
     // A ticket in an outside tracker, read through a connector and never written: it must be open now, so the hub has seen it.
     const m = /^ticket:([^/#]+)\/([^/#]+)#(.+)$/.exec(t);
@@ -58,6 +60,7 @@ export async function linkTarget(ctx: AppContext, p: Principal, f: Found, rel: L
 
 /** A kept link target in the words people use: an item's key, workspace/document#id, a record's citation. */
 export async function linkText(ctx: AppContext, rel: LinkRel, target: string): Promise<string> {
+  if (isCommitTarget(target)) return commitText(target);
   if (target.startsWith('ticket:')) {
     const [, sourceId, id] = target.split(':');
     const s = await maybe<{ ws: string; slug: string }>(ctx.db, 'select w.slug as ws, s.slug from sources s join workspaces w on w.id = s.workspace_id where s.id = $1', [sourceId]);

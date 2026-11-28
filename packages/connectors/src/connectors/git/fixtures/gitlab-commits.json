@@ -1,0 +1,26 @@
+[
+  {
+    "id": "c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3",
+    "short_id": "c3c3c3c3",
+    "title": "fix(relay): retry a dropped hook",
+    "message": "fix(relay): retry a dropped hook\n\nA hook that times out is sent again.\n\nWork: SW-12\nWork: PLAN-3\n",
+    "committed_date": "2026-11-03T10:00:00.000+00:00",
+    "web_url": "https://gitlab.com/acme/platform/relay/-/commit/c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3"
+  },
+  {
+    "id": "b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2",
+    "short_id": "b2b2b2b2",
+    "title": "docs(relay): readme",
+    "message": "docs(relay): readme\n\nWork: someday\n",
+    "committed_date": "2026-11-02T10:00:00.000+00:00",
+    "web_url": "https://gitlab.com/acme/platform/relay/-/commit/b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2"
+  },
+  {
+    "id": "a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1",
+    "short_id": "a1a1a1a1",
+    "title": "feat(relay): start",
+    "message": "feat(relay): start\n",
+    "committed_date": "2026-11-01T10:00:00.000+00:00",
+    "web_url": "https://gitlab.com/acme/platform/relay/-/commit/a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1"
+  }
+]

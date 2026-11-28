@@ -27,7 +27,7 @@ export interface ItemState {
   readonly labels: Readonly<Record<string, LabelValue>>;
   readonly revision: string | null;
   readonly bodyId: string | null;
-  /** Targets by relation: `part-of`, `came-from`, `waits-on`, and `toward` name item ids; `box`, `view`, `adds`, `changes`, and `retires` name document-id#id; `decision` names a record's ULID; `proof` names an item id or a document-id#box. */
+  /** Targets by relation: `part-of`, `came-from`, `waits-on`, and `toward` name item ids; `box`, `view`, `adds`, `changes`, and `retires` name document-id#id; `decision` names a record's ULID; `proof` names an item id, a document-id#box, a `ticket:` a connector reads, or a `commit:` a Work trailer named. */
   readonly links: readonly { readonly rel: LinkRel; readonly target: string }[];
   /** Who claims the item and until when; a claim past its end holds nothing. */
   readonly claim: Claim | null;
