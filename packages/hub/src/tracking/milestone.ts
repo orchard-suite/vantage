@@ -9,11 +9,11 @@ import type { Db } from '../db/db.ts';
 import type { AppContext } from '../context.ts';
 import type { Principal } from '../auth/principal.ts';
 import { reachOf, visibleWhere } from './access.ts';
-import type { KindDef } from './kinds.ts';
+import { rootOf, type KindDef } from './kinds.ts';
 import type { ItemState } from './state.ts';
 
 export function isMilestone(def: KindDef): boolean {
-  return def.base === 'milestone';
+  return rootOf(def) === 'milestone';
 }
 
 export type MilestoneStatus = 'on track' | 'at risk' | 'done';

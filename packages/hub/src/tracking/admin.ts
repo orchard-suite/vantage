@@ -45,6 +45,7 @@ export async function loadKind(ctx: AppContext, p: Principal, prefix: string, ya
     yaml,
     message: 'kinds file from a pipeline',
     authorUserId: p.module ? null : p.userId,
+    writer: p,
     who: p.module ? `app:${p.module.clientId}` : p.userId,
     surface: 'api',
   });

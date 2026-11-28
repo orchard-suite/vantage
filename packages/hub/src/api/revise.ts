@@ -96,7 +96,7 @@ export function reviseRoutes(ctx: AppContext, reg: OpenApiRegistry): Hono<HubEnv
     const { p, workspace, document } = scope;
     const rev = await revisionOf(scope, c.req.param('revision'));
     if (rev.state !== 'ready' || rev.yaml === null || !rev.base_version_id) throw new HttpError(409, `this revision is ${rev.state}, not ready to accept`);
-    const r = await saveDocument(ctx, { orgId: p.orgId, workspaceId: workspace.id, documentId: document.id, yaml: rev.yaml, message: versionMessage(rev), expectedVersionId: rev.base_version_id, authorUserId: p.userId, who: who(p), surface: p.surface });
+    const r = await saveDocument(ctx, { orgId: p.orgId, workspaceId: workspace.id, documentId: document.id, yaml: rev.yaml, message: versionMessage(rev), expectedVersionId: rev.base_version_id, authorUserId: p.userId, writer: p, who: who(p), surface: p.surface });
     if (r.status === 'conflict') {
       ctx.log.info('revise.accept.conflict', { revisionId: rev.id, documentId: document.id, conflicts: r.conflicts });
       return c.json({ ...saveJson(r), error: 'the document changed in the same places since the revision was asked for; ask again' }, 409);

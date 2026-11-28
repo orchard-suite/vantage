@@ -1029,14 +1029,29 @@ VAN-0001 sets. The code is `packages/hub/src/tracking/`.
   (VAN-3007).
 - **Kinds and lifecycles.** A kind is a file: a Vantage document with a
   `kind` block (prefix, labels of text, number, money, date, or choice,
-  roles, parts, the lifecycle view, and an optional shipped base), and
-  saving the document registers it. A lifecycle is a
+  roles, parts, the lifecycle view, and an optional base), and saving the
+  document registers it. A base is a shipped kind or another kind's
+  prefix in any workspace the writer can read; a chain of bases ends at a
+  shipped kind, and a loop is refused. A kind takes its base's labels,
+  roles, parts, and lifecycle, unless it draws its own lifecycle. A change
+  to a base reaches every kind built on it in the same save, and is
+  refused, naming the kinds and items, when it would drop a state one of
+  their items is in or a label one of them needs (VAN-3025). A lifecycle is a
   view of kind `lifecycle`: states in four classes (not started, in
   progress, done, parked), and moves that name who may make them and what
   they need. One gate refuses every move the view does not draw. A parent
   state can be worked out from its parts. A state can have a page, and
   the view shows a live count per state. The hub ships work item,
   roadmap item, and milestone (VAN-3015).
+- **Due dates.** The hub reads the dates a shipped base declares. A work
+  item's `due` is when it is owed: overdue when it falls before today,
+  due soon from today through `DUE_SOON_DAYS` (default 3) after it, both
+  in the hub's time zone, and neither once the item is done or parked.
+  The lists answer `due=soon` and `due=overdue`; the card shows the date
+  and whether it is overdue; the Work tab marks overdue items and filters
+  by them; a kind's outline counts them. One function names the items
+  that became due soon or overdue since a given day, for the daily
+  notices. A module's own labels stay unread (VAN-3025, VAN-3005).
 - **Roadmaps.** A roadmap item names its outcome, who owes it, a horizon
   (now, next, later), its place in that horizon, a start and an end, what
   it waits on, the milestone it works toward, the decision it came from,

@@ -13,6 +13,7 @@ import { channelName, maybe } from '../db/db.ts';
 import { randomId, sha256 } from '../crypto.ts';
 import type { Logger } from '../log.ts';
 import type { Surface } from '../audit.ts';
+import type { Principal } from '../auth/principal.ts';
 import { audit } from '../audit.ts';
 import { badRequest } from '../http.ts';
 import { loadStored, loadedSources, type ImportMap } from './model.ts';
@@ -23,7 +24,7 @@ import { DOC_CHANNEL_PREFIX } from '../worker/artifacts.ts';
 import { keptAttachments, overlayAttachments, type Attachment } from './assets.ts';
 import type { FileMerge } from './pages.ts';
 import { indexDocument, movedCitationsOf, type MovedCitation } from '../decisions/citations.ts';
-import { registerKind } from '../tracking/kinds.ts';
+import { registerKind } from '../tracking/register.ts';
 import { rebuildStandards } from '../standards/publish.ts';
 import { checkDocument, refuseErrors } from './check.ts';
 
@@ -48,6 +49,8 @@ export interface SaveInput {
   /** The version the caller edited from; undefined skips the concurrency check. */
   readonly expectedVersionId?: string | undefined;
   readonly authorUserId: string | null;
+  /** Who saves, when a person or an agent does: a kind's base in another workspace must be one they can read (VAN-3025). */
+  readonly writer?: Principal | undefined;
   readonly who: string;
   readonly surface: Surface;
 }
@@ -173,7 +176,7 @@ async function saveInTransaction(ctx: AppContext, input: SaveInput, phases: Phas
     await rebuildStandards(ctx, tx, input.orgId, input.who);
     phases.lap('citations');
     // A kind block makes the document a kind the hub enforces; a save that would break one saves nothing.
-    await registerKind(tx, { orgId: input.orgId, workspaceId: input.workspaceId, documentId: doc.id, versionId: id, doc: facts.kindDocument });
+    await registerKind(tx, { orgId: input.orgId, workspaceId: input.workspaceId, documentId: doc.id, versionId: id, doc: facts.kindDocument, writer: input.writer });
     phases.lap('kind');
     const jobId = await enqueueDraw(tx, { orgId: input.orgId, kind: 'render', documentId: doc.id, payload: { versionId: id } });
     // Open viewers hear of the save as it commits, and lay the new version out themselves while the hub draws it.

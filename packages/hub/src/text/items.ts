@@ -13,6 +13,7 @@ import { headingOutline } from '@vantage/mcp';
 import { kindByPrefix, type KindDef } from '../tracking/kinds.ts';
 import { horizonOf } from '../tracking/rank.ts';
 import { spanText } from '../tracking/dates.ts';
+import { dueText, readsDue, type DueFilter } from '../tracking/due.ts';
 import { rollupText } from '../tracking/milestone.ts';
 import { findItem } from '../tracking/access.ts';
 import { bodyOf, cardOf, describeKind, filesOf, kindsFor, find as findItems, history, linksOf, notes, type Row } from '../tracking/read.ts';
@@ -69,26 +70,31 @@ export async function itemPart(ctx: AppContext, p: Principal, key: string, part:
   }
 }
 
-const rowLine = (r: Row): string => `  ${r.key}  ${r.state}  ${r.title}${r.owner ? `  owner ${r.owner}` : ''}${r.holders.length ? `  held by ${r.holders.join(', ')}` : ''}${r.run ? `  working: ${r.run}` : ''}${r.proofAt ? `  proof ${r.proofAt}` : ''}${Object.keys(r.labels).length ? `  ${Object.entries(r.labels).map(([k, v]) => `${k}=${v}`).join(' ')}` : ''}${r.span ? `  span ${r.span.start ?? '?'}..${r.span.end ?? '?'}` : ''}`;
+const rowLine = (r: Row): string => `  ${r.key}  ${r.state}  ${r.title}${r.owner ? `  owner ${r.owner}` : ''}${r.holders.length ? `  held by ${r.holders.join(', ')}` : ''}${r.run ? `  working: ${r.run}` : ''}${r.proofAt ? `  proof ${r.proofAt}` : ''}${Object.keys(r.labels).length ? `  ${Object.entries(r.labels).map(([k, v]) => `${k}=${v}`).join(' ')}` : ''}${r.span ? `  span ${r.span.start ?? '?'}..${r.span.end ?? '?'}` : ''}${r.due?.overdue ? '  OVERDUE' : r.due?.soon ? '  due soon' : ''}`;
 
 /** The order a kind's rows come in, in words, as `find` sorts one kind. */
 function orderWords(def: KindDef): string {
   return horizonOf(def) ? 'by horizon, then in their place, then newest first' : 'in their place, then newest first';
 }
 
-/** A kind's outline: its states with live counts, its labels, and its items as rows in the kind's order. A part names a state or a class. */
+/** The parts of a kind's outline that list its items by their due date, for a kind that reads one. */
+const DUE_PARTS: Readonly<Record<string, DueFilter>> = { overdue: 'overdue', 'due-soon': 'soon' };
+
+/** A kind's outline: its states with live counts, its labels, how many are overdue and due soon, and its items as rows in the kind's order. A part names a state, a class, a label choice, or overdue or due-soon. */
 export async function kindOutline(ctx: AppContext, p: Principal, prefix: string, part: string | undefined): Promise<string> {
   const { kind, counts } = await describeKind(ctx, p, prefix);
   const def = kind.definition;
   const within = (await kindsFor(ctx, p)).filter((k) => k.prefix !== kind.prefix && k.definition.parts.includes(kind.prefix)).map((k) => k.prefix);
-  const filter: { state?: string; class?: (typeof def.states)[number]['class']; labels?: Record<string, string> } = {};
+  const filter: { state?: string; class?: (typeof def.states)[number]['class']; labels?: Record<string, string>; due?: DueFilter } = {};
+  const dated = readsDue(def);
   if (part !== undefined) {
     const cls = def.states.find((s) => s.class === part)?.class;
     const choice = def.labels.find((l) => l.type === 'choice' && l.choices?.includes(part));
     if (def.states.some((s) => s.id === part)) filter.state = part;
     else if (cls) filter.class = cls;
     else if (choice) filter.labels = { [choice.name]: part };
-    else throw badRequest(`${kind.prefix} has no state, class, or label choice ${part}; its states: ${def.states.map((s) => s.id).join(', ')}${def.labels.some((l) => l.choices) ? `; its choices: ${def.labels.flatMap((l) => l.choices ?? []).join(', ')}` : ''}`);
+    else if (dated && DUE_PARTS[part]) filter.due = DUE_PARTS[part];
+    else throw badRequest(`${kind.prefix} has no state, class, or label choice ${part}${dated ? ', and it is not overdue or due-soon' : ''}; its states: ${def.states.map((s) => s.id).join(', ')}${def.labels.some((l) => l.choices) ? `; its choices: ${def.labels.flatMap((l) => l.choices ?? []).join(', ')}` : ''}`);
   }
   const total = Object.values(counts).reduce((s, x) => s + x, 0);
   const lines = [
@@ -99,6 +105,7 @@ export async function kindOutline(ctx: AppContext, p: Principal, prefix: string,
     ...(Object.keys(def.roles).length ? [`roles: ${Object.entries(def.roles).map(([r, w]) => `${r} = ${w.join(', ')}`).join('; ')}`] : []),
     ...(def.parts.length ? [`parts may be: ${def.parts.join(', ')}`] : []),
     ...(within.length ? [`part of: ${within.join(', ')}`] : []),
+    ...(dated ? [`due: ${n((await findItems(ctx, p, { kinds: [kind.prefix], due: 'overdue', limit: 1 })).total)} overdue (${kind.prefix}#overdue), ${n((await findItems(ctx, p, { kinds: [kind.prefix], due: 'soon', limit: 1 })).total)} due within ${ctx.config.DUE_SOON_DAYS} days (${kind.prefix}#due-soon)`] : []),
   ];
   const page = await findItems(ctx, p, { kinds: [kind.prefix], ...filter, limit: 40 });
   lines.push('', `items${part ? ` in ${part}` : ''}, ${orderWords(def)} (${n(page.total)}):`, ...page.rows.map(rowLine));
@@ -120,6 +127,7 @@ export async function itemOutline(ctx: AppContext, p: Principal, key: string): P
     ...(c.claim ? [`working now: ${c.claim}`] : []),
     `moves open to you: ${c.moves.join('; ') || 'none'}`,
     ...(c.span ? [`span: ${spanText(c.span)}`] : []),
+    ...(c.due ? [`due: ${dueText(c.due)}`] : []),
     ...(c.milestone ? [`milestone: ${rollupText(c.milestone)}`] : []),
     `link: ${itemLink(ctx, await workspaceSlug(ctx, f.item.workspaceId), c.key)}`,
     ...(c.hasBody ? [`body: ${n(body.length)} chars${hs.length ? '' : ', no headings'}`, ...hs] : []),

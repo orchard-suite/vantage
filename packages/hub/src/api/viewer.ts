@@ -56,7 +56,7 @@ export function viewerRoutes(ctx: AppContext, reg: OpenApiRegistry): Hono<HubEnv
       throw new HttpError(409, 'the document changed since this view loaded', { head: summary(head) });
     }
     const steered = applySteer(head.yaml, input.action);
-    const r = await saveDocument(ctx, { orgId: p.orgId, workspaceId: workspace.id, documentId: document.id, yaml: steered.yaml, message: steered.message, expectedVersionId: head.id, authorUserId: p.userId, who: who(p), surface: p.surface });
+    const r = await saveDocument(ctx, { orgId: p.orgId, workspaceId: workspace.id, documentId: document.id, yaml: steered.yaml, message: steered.message, expectedVersionId: head.id, authorUserId: p.userId, writer: p, who: who(p), surface: p.surface });
     ctx.log.info('steer.applied', { documentId: document.id, kind: input.action.kind, status: r.status, by: p.userId });
     return c.json({ ...saveJson(r), message: steered.message }, r.status === 'conflict' ? 409 : 200);
   });
@@ -70,7 +70,7 @@ export function viewerRoutes(ctx: AppContext, reg: OpenApiRegistry): Hono<HubEnv
     if (head.id !== input.expectedVersion) throw new HttpError(409, 'the document changed since this view loaded', { head: summary(head) });
     const v = await versionById(ctx.db, input.version);
     if (!v || v.document_id !== document.id) throw notFound('version');
-    const r = await saveDocument(ctx, { orgId: p.orgId, workspaceId: workspace.id, documentId: document.id, yaml: v.yaml, imports: v.imports, pins: v.pins, attachments: v.attachments, message: `restore: version ${v.id}`, expectedVersionId: head.id, authorUserId: p.userId, who: who(p), surface: p.surface });
+    const r = await saveDocument(ctx, { orgId: p.orgId, workspaceId: workspace.id, documentId: document.id, yaml: v.yaml, imports: v.imports, pins: v.pins, attachments: v.attachments, message: `restore: version ${v.id}`, expectedVersionId: head.id, authorUserId: p.userId, writer: p, who: who(p), surface: p.surface });
     ctx.log.info('version.restored', { documentId: document.id, from: v.id, status: r.status, by: p.userId });
     return c.json(saveJson(r), r.status === 'conflict' ? 409 : 200);
   });

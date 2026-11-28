@@ -101,6 +101,8 @@ export const ConfigSchema = z
     WORKER_POLL_SECONDS: int(1, 2),
     /** The estate's time zone, an IANA name (America/Chicago). Every day, month, and clock time the hub works out for itself is read in it: a record's Last updated when a write leaves it out, an import's dates, a published copy's date, the dates and times on pages and text answers, every schedule's wall clock, and the day and month an AI token limit resets on. */
     TIME_ZONE: z.string().min(1).default('UTC'),
+    /** Days ahead a work item's due date counts as due soon: today and the days after it, in TIME_ZONE. */
+    DUE_SOON_DAYS: int(0, 3),
     /** Five-field cron for the nightly review of every workspace, read on the wall clock in TIME_ZONE. */
     REVIEW_CRON: z.string().min(9).default('0 3 * * *'),
     /** Jobs one worker runs at once. Rendering runs on the render threads, so this can exceed them. */

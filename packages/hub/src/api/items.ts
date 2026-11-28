@@ -15,6 +15,7 @@ import { HttpError, badRequest } from '../http.ts';
 import { findItem } from '../tracking/access.ts';
 import { membersOf, openMoves } from '../tracking/gate.ts';
 import { bodyOf, cardOf, changes, describeKind, find, get, history, kindsFor, notes, planOf } from '../tracking/read.ts';
+import { DUE_FILTERS, type DueFilter } from '../tracking/due.ts';
 import { attach, hold, link, move, note, put, release, type WriteAnswer } from '../tracking/write.ts';
 import { ask, claim, finish, renew } from '../tracking/work.ts';
 import { queue } from '../tracking/queue.ts';
@@ -242,7 +243,7 @@ export function itemRoutes(ctx: AppContext, reg: OpenApiRegistry): Hono<HubEnv> 
   reg.add({ method: 'get', path: '/items/:item/notes', summary: "An item's notes, newest first, a page at a time", tag: 'items', params: ['item'], query: ['before', 'limit'], auth: 'viewer' });
   app.get('/items/:item/notes', async (c) => c.json(await notes(ctx, await findItem(ctx, principal(c), item(c)), { ...(intParam(c.req.query('before'), 'before') ? { before: intParam(c.req.query('before'), 'before')! } : {}), ...(intParam(c.req.query('limit'), 'limit') ? { limit: intParam(c.req.query('limit'), 'limit')! } : {}) })));
 
-  reg.add({ method: 'get', path: '/items', summary: 'get many by key (keys=VAN-1,VAN-2, held=VAN-1@5), or find: a page of items the caller may see, filtered, with the total; owner=me|email|team:<slug>, scope=<id> (and the scopes under it), delegated=true|false; count=state|class|kind|holder answers counts; list=queue answers what the caller may pick up (the items delegated to its agents, and those a role it holds waits on); fields=title,state answers only those', tag: 'items', query: ['keys', 'held', 'kind', 'state', 'class', 'holder', 'asker', 'owner', 'scope', 'delegated', 'parent', 'q', 'label.<name>', 'limit', 'offset', 'count', 'list', 'fields'], auth: 'user' });
+  reg.add({ method: 'get', path: '/items', summary: 'get many by key (keys=VAN-1,VAN-2, held=VAN-1@5), or find: a page of items the caller may see, filtered, with the total; owner=me|email|team:<slug>, scope=<id> (and the scopes under it), delegated=true|false, due=soon|overdue (a work item due date: within DUE_SOON_DAYS of today, or before today and not done or parked, in the hub time zone); count=state|class|kind|holder answers counts; list=queue answers what the caller may pick up (the items delegated to its agents, and those a role it holds waits on); fields=title,state answers only those', tag: 'items', query: ['keys', 'held', 'kind', 'state', 'class', 'holder', 'asker', 'owner', 'scope', 'delegated', 'due', 'parent', 'q', 'label.<name>', 'limit', 'offset', 'count', 'list', 'fields'], auth: 'user' });
   app.get('/items', async (c) => {
     const p = principal(c);
     const fields = fieldsOf(c.req.query('fields'));
@@ -262,6 +263,8 @@ export function itemRoutes(ctx: AppContext, reg: OpenApiRegistry): Hono<HubEnv> 
     const labels = Object.fromEntries(Object.entries(c.req.queries()).filter(([k]) => k.startsWith('label.')).map(([k, v]) => [k.slice(6), v[0] ?? '']));
     const delegated = c.req.query('delegated');
     if (delegated !== undefined && delegated !== 'true' && delegated !== 'false') throw badRequest('delegated is true or false');
+    const due = c.req.query('due');
+    if (due !== undefined && !(DUE_FILTERS as readonly string[]).includes(due)) throw badRequest(`due is ${DUE_FILTERS.join(' or ')}`);
     const kind = c.req.query('kind');
     const opt = <T,>(v: T | undefined, k: string) => (v === undefined || v === '' ? {} : { [k]: v });
     const r = await find(ctx, p, {
@@ -273,6 +276,7 @@ export function itemRoutes(ctx: AppContext, reg: OpenApiRegistry): Hono<HubEnv> 
       ...opt(c.req.query('owner'), 'owner'),
       ...opt(c.req.query('scope'), 'scope'),
       ...(delegated !== undefined ? { delegated: delegated === 'true' } : {}),
+      ...(due !== undefined ? { due: due as DueFilter } : {}),
       ...opt(c.req.query('parent'), 'parent'),
       ...opt(c.req.query('q'), 'q'),
       labels,
@@ -288,7 +292,7 @@ export function itemRoutes(ctx: AppContext, reg: OpenApiRegistry): Hono<HubEnv> 
     const { p, document } = await scopedDocumentById(ctx, c, 'viewer');
     // A document that defines a kind draws its lifecycle; each state shows a live count of the items the reader may see in it.
     const kind = await maybe<{ prefix: string; definition: KindDef }>(ctx.db, 'select prefix, definition from item_kinds where document_id = $1', [document.id]);
-    const lifecycle = kind && !kind.definition.drawnIn.shipped ? { view: kind.definition.drawnIn.view, prefix: kind.prefix, counts: (await find(ctx, p, { kinds: [kind.prefix], countBy: 'state' })).counts ?? {} } : undefined;
+    const lifecycle = kind && !kind.definition.drawnIn.shipped && !kind.definition.drawnIn.kind ? { view: kind.definition.drawnIn.view, prefix: kind.prefix, counts: (await find(ctx, p, { kinds: [kind.prefix], countBy: 'state' })).counts ?? {} } : undefined;
     return c.json({ items: await planOf(ctx, p, document.id), ...(lifecycle ? { lifecycle } : {}) });
   });
 

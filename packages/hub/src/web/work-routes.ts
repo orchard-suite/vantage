@@ -21,6 +21,7 @@ import { findItem } from '../tracking/access.ts';
 import { membersOf, openMoves } from '../tracking/gate.ts';
 import { bodyOf, cardOf, filesOf, find, history, linksOf, notes } from '../tracking/read.ts';
 import type { KindRow } from '../tracking/kinds.ts';
+import { DUE_FILTERS, readsDue, type DueFilter } from '../tracking/due.ts';
 import { markersFor } from '../tracking/milestone.ts';
 import { itemBody, itemUrl, looksOf, WORK_SCRIPT, type WorkLook, type WorkTabModel } from './work-page.ts';
 
@@ -28,15 +29,19 @@ export async function workTabModel(ctx: AppContext, p: Principal, kinds: readonl
   const current = kinds.find((k) => k.prefix === q['kind']) ?? kinds[0];
   if (!current) return { kinds, counts: {}, rows: [], total: 0, look: 'list', author: false, milestones: [] };
   const state = current.definition.states.some((s) => s.id === q['state']) ? q['state'] : undefined;
+  // A kind that reads due dates can be narrowed to the items overdue or due soon, with a count of each.
+  const dated = readsDue(current.definition);
+  const due = dated && (DUE_FILTERS as readonly string[]).includes(q['due'] ?? '') ? (q['due'] as DueFilter) : undefined;
   const counts = (await find(ctx, p, { kinds: [current.prefix], countBy: 'state' })).counts ?? {};
-  const page = await find(ctx, p, { kinds: [current.prefix], ...(state ? { state } : {}), limit: 100 });
+  const page = await find(ctx, p, { kinds: [current.prefix], ...(state ? { state } : {}), ...(due ? { due } : {}), limit: 100 });
+  const dueCounts = dated ? { overdue: (await find(ctx, p, { kinds: [current.prefix], due: 'overdue', limit: 1 })).total, soon: (await find(ctx, p, { kinds: [current.prefix], due: 'soon', limit: 1 })).total } : undefined;
   const looks = looksOf(current);
   const asked = q['look'] as WorkLook | undefined;
   // A roadmap opens on its board; a kind of work opens as a list.
   const look: WorkLook = asked && looks.includes(asked) ? asked : looks.includes('board') ? 'board' : 'list';
   const author = (await accessibleWorkspaces(ctx.db, p)).find((w) => w.id === current.workspace_id)?.role === 'author';
   const milestones = look === 'timeline' ? await markersFor(ctx, p, current.id) : [];
-  return { kinds, current, counts, rows: page.rows, total: page.total, state, look, author, milestones };
+  return { kinds, current, counts, rows: page.rows, total: page.total, state, due, ...(dueCounts ? { dueCounts } : {}), look, author, milestones };
 }
 
 export function workRoutes(ctx: AppContext, frameUser: (p: Principal) => Promise<HomeUser>, agents: AgentSetup): Hono<HubEnv> {
@@ -52,13 +57,16 @@ export function workRoutes(ctx: AppContext, frameUser: (p: Principal) => Promise
     const card = await cardOf(ctx, f);
     const members = await membersOf(ctx.db, p.orgId, f.kind.definition);
     const [n, h, links, files, body] = await Promise.all([notes(ctx, f), history(ctx, f), linksOf(ctx, f), filesOf(ctx, f), bodyOf(ctx, f.item)]);
-    const docSlug = (await maybe<{ slug: string }>(ctx.db, 'select slug from documents where id = $1', [f.kind.document_id]))?.slug ?? '';
+    // The lifecycle is drawn in the kind's own file, or in the file of the kind it builds on.
+    const drawn = f.kind.definition.drawnIn;
+    const drawer = drawn.kind ? await maybe<{ document_id: string }>(ctx.db, 'select document_id from item_kinds where org_id = $1 and prefix = $2', [p.orgId, drawn.kind]) : undefined;
+    const lifecycleDoc = await maybe<{ slug: string; ws: string }>(ctx.db, 'select d.slug, w.slug as ws from documents d join workspaces w on w.id = d.workspace_id where d.id = $1', [drawer?.document_id ?? f.kind.document_id]);
     const workspace = (await accessibleWorkspaces(ctx.db, p)).find((w) => w.id === f.item.workspaceId);
     const workspaces = await memberWorkspaces(ctx.db, p);
     const documents = await homeDocuments(ctx.dbRead, workspaces, p.userId);
     const { spaces, shared, starred } = frameWorkspaces(workspaces, documents, p.userId);
     const csrf = c.get('csrf');
-    const lifecycleUrl = f.kind.definition.drawnIn.shipped ? undefined : `/w/${encodeURIComponent(ws?.slug ?? '')}/${encodeURIComponent(docSlug)}#${encodeURIComponent(f.kind.definition.drawnIn.view)}`;
+    const lifecycleUrl = drawn.shipped || !lifecycleDoc ? undefined : `/w/${encodeURIComponent(lifecycleDoc.ws)}/${encodeURIComponent(lifecycleDoc.slug)}#${encodeURIComponent(drawn.view)}`;
     const html = itemBody(workspace, workspace ? spaceName(workspace, p.userId) : '', {
       card,
       body,

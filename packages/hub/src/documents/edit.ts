@@ -13,6 +13,7 @@ import { z } from 'zod';
 import type { AppContext } from '../context.ts';
 import type { Db } from '../db/db.ts';
 import type { Logger } from '../log.ts';
+import type { Principal } from '../auth/principal.ts';
 import type { Surface } from '../audit.ts';
 import { badRequest } from '../http.ts';
 import { diff3Merge } from 'node-diff3';
@@ -270,6 +271,8 @@ export interface EditInput {
   /** The version the operations were written against; defaults to the head. */
   readonly expectedVersionId?: string | undefined;
   readonly authorUserId: string | null;
+  /** Who saves; a kind's base in another workspace must be one they can read. */
+  readonly writer?: Principal | undefined;
   readonly who: string;
   readonly surface: Surface;
 }
@@ -303,6 +306,7 @@ export async function editDocument(ctx: AppContext, input: EditInput): Promise<S
     message: input.message ?? describeEdits(input.operations),
     expectedVersionId: base.id,
     authorUserId: input.authorUserId,
+    writer: input.writer,
     who: input.who,
     surface: input.surface,
   });

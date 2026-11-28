@@ -1400,7 +1400,7 @@ title: Shop work
 kind:
   prefix: SW                  # keys are SW-1, SW-2; shares one namespace with registries
   name: Shop work
-  base: work-item             # the hub's shipped kind: its labels, roles, and lifecycle
+  base: work-item             # a shipped kind, or another kind's prefix: its labels, roles, parts, and lifecycle
   labels:
     - { name: area, type: choice, choices: [api, web] }
     - { name: points, type: number }
@@ -1414,8 +1414,23 @@ views: []
   flat values the hub shows, sorts, and filters; a nested value or a
   document is never a label. A kind's labels and roles add to its base's;
   a label it names again takes the base label's place.
-- `base` is one of the kinds the hub ships: `work-item`, `roadmap-item`,
-  or `milestone`.
+- `base` is a kind the hub ships (`work-item`, `roadmap-item`, or
+  `milestone`), or another kind's prefix in any workspace you can read.
+  An estate keeps one kind for many teams this way, and each team adds
+  what it needs: `base: SW` takes SW's labels, roles, parts, and
+  lifecycle, unless the file draws its own lifecycle. A chain of bases
+  ends at a shipped kind; a loop, or a chain that ends at a kind built on
+  nothing, is refused.
+- A change to a base reaches every kind built on it when it is saved. A
+  change that drops a state an item of one of those kinds is in, or a
+  label one of their moves needs, is refused, naming the kinds and the
+  items it would strand. A base keeps its prefix and its kind block while
+  a kind builds on it.
+- A kind built on the work item has a `due` date. The hub reads it: an
+  item is overdue when its due day is before today, and due soon from
+  today through the hub's window (3 days unless the estate sets
+  another), both in the hub's time zone. A done or parked item is
+  neither. Other date labels are shown and sorted, never read.
 - `owner: forms` says another system keeps the content: its items have
   no body, and the system puts them by its own key.
 - A kind with items keeps its prefix and every state an item is in. It
@@ -1475,6 +1490,11 @@ views:
   has one, then by each item's place, then newest first. An item nobody
   placed comes after the placed ones, so a kind nobody orders reads newest
   first.
+- A kind that reads `due` has two more parts: `SW#overdue` and
+  `SW#due-soon`. Its outline counts both, and a row says `OVERDUE` or
+  `due soon`. The card has `due: 2026-11-30, overdue`; set the date in
+  `labels.due`. The Work tab marks overdue cards and rows and filters by
+  Overdue and Due soon.
 - `vantage_read SW-12` is the item's card, then its body. The card names
   the moves open to you now. Its parts are read a page at a time:
   `SW-12#notes`, `SW-12#history`, `SW-12#links`, `SW-12#files`.
@@ -1576,7 +1596,8 @@ views:
   `put` changes a body by `edits: [{"old", "new"}]`, never the whole body.
   A `put` takes `owner`, `scope`, and `delegate`; `find` takes
   `owner=me|<email>|team:<slug>`, `scope=<id>` (the scope and every scope
-  under it), and `delegated=true|false`.
+  under it), `delegated=true|false`, and `due=soon|overdue`. A row and a
+  card carry `due: {date, overdue, soon}` for a kind that reads it.
 
 ### Roadmaps
 

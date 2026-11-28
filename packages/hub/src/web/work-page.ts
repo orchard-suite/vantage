@@ -16,7 +16,8 @@ import type { MoveOption } from '../tracking/gate.ts';
 import type { Marker } from '../tracking/milestone.ts';
 import { spanText } from '../tracking/dates.ts';
 import { rollupText } from '../tracking/milestone.ts';
-import { board, itemUrl, timeline, WORK_VIEWS_CSS } from './work-views.ts';
+import { board, duePill, itemUrl, timeline, WORK_VIEWS_CSS } from './work-views.ts';
+import { dueText, type DueFilter } from '../tracking/due.ts';
 
 /** How the tab shows the same items: a list, a board by horizon, or a timeline by promised date. */
 export type WorkLook = 'list' | 'board' | 'timeline';
@@ -28,6 +29,10 @@ export interface WorkTabModel {
   readonly rows: readonly Row[];
   readonly total: number;
   readonly state?: string | undefined;
+  /** The list narrowed to the items overdue or due soon. */
+  readonly due?: DueFilter | undefined;
+  /** For a kind that reads due dates: how many of its items are overdue and due soon. */
+  readonly dueCounts?: { readonly overdue: number; readonly soon: number };
   readonly look: WorkLook;
   /** Whether the reader writes the workspace, and so may put items in order. */
   readonly author: boolean;
@@ -48,17 +53,18 @@ const PILL: Record<Row['class'], string> = { 'not-started': '', 'in-progress': '
 
 export { itemUrl };
 
-function tabHref(ws: AccessibleWorkspace, kind: string | undefined, state?: string, look?: WorkLook): string {
+function tabHref(ws: AccessibleWorkspace, kind: string | undefined, state?: string, look?: WorkLook, due?: DueFilter): string {
   const p = new URLSearchParams({ tab: 'work' });
   if (kind) p.set('kind', kind);
   if (state) p.set('state', state);
+  if (due) p.set('due', due);
   if (look && look !== 'list') p.set('look', look);
   return `/w/${encodeURIComponent(ws.slug)}?${p.toString()}`;
 }
 
 function rowLink(ws: AccessibleWorkspace, r: Row, stateText: ReadonlyMap<string, string>): string {
   const sub = [r.owner ? `owner ${r.owner}` : 'no owner', r.holders.length ? `held by ${r.holders.join(', ')}` : 'nobody holds it', ...(r.run ? [`working now: ${r.run}`] : []), ...Object.entries(r.labels).filter(([k]) => k !== 'horizon').map(([k, v]) => `${k} ${v}`), ...(r.proofAt ? [`proof ${r.proofAt}`] : [])].join(' · ');
-  return `<a class="dec-row" href="${escapeHtml(itemUrl(ws.slug, r.key))}"><span class="ref">${escapeHtml(r.key)}</span><span class="t"><b>${escapeHtml(r.title)}</b><span>${escapeHtml(sub)}</span></span><span class="pill ${PILL[r.class]}">${escapeHtml(stateText.get(r.state) ?? r.state)}</span><time datetime="${escapeHtml(r.updated)}" title="Last changed">${escapeHtml(r.updated)}</time></a>`;
+  return `<a class="dec-row${r.due?.overdue ? ' overdue' : ''}" href="${escapeHtml(itemUrl(ws.slug, r.key))}"><span class="ref">${escapeHtml(r.key)}</span><span class="t"><b>${escapeHtml(r.title)}</b><span>${escapeHtml(sub)}</span></span>${duePill(r)}<span class="pill ${PILL[r.class]}">${escapeHtml(stateText.get(r.state) ?? r.state)}</span><time datetime="${escapeHtml(r.updated)}" title="Last changed">${escapeHtml(r.updated)}</time></a>`;
 }
 
 export function workTab(ws: AccessibleWorkspace, m: WorkTabModel): string {
@@ -68,14 +74,16 @@ export function workTab(ws: AccessibleWorkspace, m: WorkTabModel): string {
   const chip = (href: string, label: string, n: number | undefined, on: boolean): string => `<a class="chip" href="${escapeHtml(href)}"${on ? ' aria-pressed="true"' : ''}>${label}${n !== undefined ? `<span class="n">${n}</span>` : ''}</a>`;
   const kinds = m.kinds.length > 1 ? `<div class="reg-filters" role="group" aria-label="Kinds">${m.kinds.map((k) => chip(tabHref(ws, k.prefix), `${escapeHtml(k.prefix)} ${escapeHtml(k.name)}`, undefined, k.id === cur.id)).join('')}</div>` : '';
   const all = Object.values(m.counts).reduce((s, x) => s + x, 0);
-  const states = cur.definition.states.map((s) => chip(tabHref(ws, cur.prefix, m.state === s.id ? undefined : s.id), escapeHtml(s.text), m.counts[s.id] ?? 0, m.state === s.id));
+  const states = cur.definition.states.map((s) => chip(tabHref(ws, cur.prefix, m.state === s.id ? undefined : s.id, m.look, m.due), escapeHtml(s.text), m.counts[s.id] ?? 0, m.state === s.id));
+  const dc = m.dueCounts;
+  const dueBar = dc ? `<div class="reg-filters" role="group" aria-label="Filter by due date">${chip(tabHref(ws, cur.prefix, m.state, m.look, m.due === 'overdue' ? undefined : 'overdue'), 'Overdue', dc.overdue, m.due === 'overdue')}${chip(tabHref(ws, cur.prefix, m.state, m.look, m.due === 'soon' ? undefined : 'soon'), 'Due soon', dc.soon, m.due === 'soon')}</div>` : '';
   const looks = looksOf(cur);
   const lookNames: Record<WorkLook, string> = { list: 'List', board: 'Board', timeline: 'Timeline' };
-  const lookBar = looks.length > 1 ? `<div class="reg-filters" role="group" aria-label="Show as">${looks.map((l) => chip(tabHref(ws, cur.prefix, m.state, l), lookNames[l], undefined, m.look === l)).join('')}</div>` : '';
-  const bar = `<div class="reg-bar">${kinds}<div class="reg-filters" role="group" aria-label="Filter by state">${chip(tabHref(ws, cur.prefix, undefined, m.look), 'All', all, !m.state)}${states.join('')}</div>${lookBar}</div>`;
+  const lookBar = looks.length > 1 ? `<div class="reg-filters" role="group" aria-label="Show as">${looks.map((l) => chip(tabHref(ws, cur.prefix, m.state, l, m.due), lookNames[l], undefined, m.look === l)).join('')}</div>` : '';
+  const bar = `<div class="reg-bar">${kinds}<div class="reg-filters" role="group" aria-label="Filter by state">${chip(tabHref(ws, cur.prefix, undefined, m.look, m.due), 'All', all, !m.state)}${states.join('')}</div>${dueBar}${lookBar}</div>`;
   const stateText = new Map(cur.definition.states.map((s) => [s.id, s.text]));
   const more = m.total > m.rows.length ? `<p class="none-here">${m.total - m.rows.length} more; pick a state to narrow the list.</p>` : '';
-  if (!m.rows.length) return `<section aria-labelledby="t-head">${intro}${bar}<p class="none-here">${all ? 'No item is in this state.' : `<b>${escapeHtml(cur.prefix)} has no items yet.</b> Agents make one with <code>vantage_write</code> to <code>${escapeHtml(cur.prefix)}</code>.`}</p></section>`;
+  if (!m.rows.length) return `<section aria-labelledby="t-head">${intro}${bar}<p class="none-here">${all ? (m.due ? `No item here is ${m.due === 'overdue' ? 'overdue' : 'due soon'}.` : 'No item is in this state.') : `<b>${escapeHtml(cur.prefix)} has no items yet.</b> Agents make one with <code>vantage_write</code> to <code>${escapeHtml(cur.prefix)}</code>.`}</p></section>`;
   const body = m.look === 'board' && looks.includes('board') ? board(ws, cur, m.rows, stateText, m.author) : m.look === 'timeline' && looks.includes('timeline') ? timeline(ws, cur, m.rows, stateText, m.milestones) : `<div class="rows">${m.rows.map((r) => rowLink(ws, r, stateText)).join('')}</div>`;
   return `<section aria-labelledby="t-head">${intro}${bar}${body}${more}</section>`;
 }
@@ -113,7 +121,8 @@ export function itemBody(ws: AccessibleWorkspace | undefined, wsName: string, m:
     cell('Held by', escapeHtml(c.holders.join(', ') || 'Nobody')),
     ...(c.claim ? [cell('Working now', escapeHtml(c.claim))] : []),
     ...(c.scope ? [cell('Scope', escapeHtml(c.scope))] : []),
-    ...Object.entries(c.labels).map(([k, v]) => cell(escapeHtml(k), escapeHtml(String(v)))),
+    ...(c.due ? [cell('Due', `${escapeHtml(dueText(c.due))}${c.due.overdue ? ' <span class="pill bad">Overdue</span>' : ''}`)] : []),
+    ...Object.entries(c.labels).filter(([k]) => !(c.due && k === 'due')).map(([k, v]) => cell(escapeHtml(k), escapeHtml(String(v)))),
     ...(c.parent ? [cell('Part of', escapeHtml(c.parent))] : []),
     ...(c.span ? [cell('Span', escapeHtml(spanText(c.span)))] : []),
     ...(c.milestone ? [cell('Milestone', escapeHtml(rollupText(c.milestone)))] : []),

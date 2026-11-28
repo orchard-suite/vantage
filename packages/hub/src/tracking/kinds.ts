@@ -1,32 +1,33 @@
 /**
- * Kinds (VAN-3015). A kind is a document with a kind block, and
- * its lifecycle is a view of kind `lifecycle` in it, or the one a shipped
- * kind draws when it builds on one. Saving the document registers the kind
- * in the same transaction as the version, so a kind the hub enforces is
- * always one a document says. Nothing here runs because an item moved.
+ * Kinds (VAN-3015, VAN-3025). A kind is a document with a kind block, and
+ * its lifecycle is a view of kind `lifecycle` in it, or the one its base
+ * follows: a shipped kind, or another kind whose chain of bases ends at
+ * one. Saving the document registers the kind in the same transaction as
+ * the version (`register.ts`), so a kind the hub enforces is always one a
+ * document says. Nothing here runs because an item moved.
  */
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { BUILT_IN_ROLES, parseDocumentText, type BaseKind, type Document, type KindLabel, type LifecycleMove, type LifecycleState, type StateClass } from '@vantage/model';
+import { BASE_KINDS, BUILT_IN_ROLES, parseDocumentText, type BaseKind, type Document, type KindLabel, type LifecycleMove, type LifecycleState, type StateClass } from '@vantage/model';
 import type { Db } from '../db/db.ts';
 import { maybe } from '../db/db.ts';
-import { randomId } from '../crypto.ts';
-import { renameKinds } from './roster.ts';
 import { badRequest } from '../http.ts';
-import type { Logger } from '../log.ts';
 
 /** A kind as the hub enforces it: the kind block with its base laid under it and its lifecycle read out of the view. */
 export interface KindDef {
   readonly prefix: string;
   readonly name: string;
-  readonly base?: BaseKind;
+  /** What it builds on, as its file names it: a shipped kind, or another kind's prefix (VAN-3025). */
+  readonly base?: string;
+  /** The shipped kind its chain of bases ends at; absent for a kind that builds on none. */
+  readonly root?: BaseKind;
   /** The system that keeps the content; absent when the hub does, and then an item has a body. */
   readonly owner?: string;
   readonly labels: readonly KindLabel[];
   readonly roles: Readonly<Record<string, readonly string[]>>;
   readonly parts: readonly string[];
-  /** Where the lifecycle is drawn: a view in the kind's document, or a shipped kind's. */
-  readonly drawnIn: { readonly view: string; readonly shipped?: BaseKind };
+  /** Where the lifecycle is drawn: a view in the kind's document, a shipped kind's, or the document of the kind it builds on. */
+  readonly drawnIn: { readonly view: string; readonly shipped?: BaseKind; readonly kind?: string };
   readonly states: readonly LifecycleState[];
   readonly moves: readonly LifecycleMove[];
 }
@@ -67,35 +68,68 @@ function lifecycleOf(doc: Document, viewId: string): { states: LifecycleState[];
   return v?.kind === 'lifecycle' ? { states: v.states, moves: v.moves } : undefined;
 }
 
+/** Whether a base names a kind the hub ships, not another kind's prefix. */
+export function isShipped(base: string): base is BaseKind {
+  return (BASE_KINDS as readonly string[]).includes(base);
+}
+
+/** The shipped kind a kind's chain ends at; a definition saved before chains carried it names a shipped base itself. */
+export function rootOf(def: Pick<KindDef, 'base' | 'root'>): BaseKind | undefined {
+  return def.root ?? (def.base !== undefined && isShipped(def.base) ? def.base : undefined);
+}
+
+const shippedDefs = new Map<BaseKind, KindDef>();
+
+/** A shipped kind as the hub enforces it. */
+export function shippedDef(base: BaseKind): KindDef {
+  let def = shippedDefs.get(base);
+  if (!def) {
+    def = kindOf(shippedKind(base))!;
+    shippedDefs.set(base, def);
+  }
+  return def;
+}
+
 /**
  * The kind a document defines, with its base laid under it, or undefined
- * when it has no kind block. Throws a 400 naming what is wrong: a move that
- * names a role nobody declared, a need on a label the kind lacks.
+ * when it has no kind block. A base that is another kind's prefix comes in
+ * as `built`, that kind as the hub already enforces it; a shipped base is
+ * read here. Throws a 400 naming what is wrong: a move that names a role
+ * nobody declared, a need on a label the kind lacks.
  */
-export function kindOf(doc: Document): KindDef | undefined {
+export function kindOf(doc: Document, built?: KindDef): KindDef | undefined {
   const k = doc.kind;
   if (!k) return undefined;
-  const base = k.base ? shippedKind(k.base).kind! : undefined;
-  const lifecycle = k.lifecycle ?? base?.lifecycle;
-  if (!lifecycle) throw badRequest(`kind ${k.prefix} names no lifecycle; name a lifecycle view with lifecycle: <view id>, or build on a shipped kind with base: work-item`);
+  const base = k.base === undefined ? undefined : isShipped(k.base) ? shippedDef(k.base) : built;
+  if (k.base !== undefined && !base) throw badRequest(`kind ${k.prefix} builds on ${k.base}, which is neither a shipped kind (${BASE_KINDS.join(', ')}) nor a kind the hub has`);
   const own = k.lifecycle ? lifecycleOf(doc, k.lifecycle) : undefined;
-  const drawn = own ?? (k.base ? lifecycleOf(shippedKind(k.base), lifecycle) : undefined);
-  if (!drawn) throw badRequest(`kind ${k.prefix} follows ${lifecycle}, which is not a lifecycle view in its file`);
-  // A kind adds its labels to its base's; one it names again takes the base's place.
+  if (k.lifecycle && !own) throw badRequest(`kind ${k.prefix} follows ${k.lifecycle}, which is not a lifecycle view in its file`);
+  if (!own && !base) throw badRequest(`kind ${k.prefix} names no lifecycle; name a lifecycle view with lifecycle: <view id>, or build on a shipped kind with base: work-item`);
+  // A kind adds its labels, roles, and parts to its base's; a label or a role it names again takes the base's place.
   const ownLabels = k.labels ?? [];
   const labels = [...(base?.labels ?? []).filter((b) => !ownLabels.some((l) => l.name === b.name)), ...ownLabels];
   const roles = { ...(base?.roles ?? {}), ...(k.roles ?? {}) };
+  const parts = [...new Set([...(base?.parts ?? []), ...(k.parts ?? [])])];
+  const root = k.base === undefined ? undefined : isShipped(k.base) ? k.base : base?.root;
+  const drawnIn: KindDef['drawnIn'] = own
+    ? { view: k.lifecycle! }
+    : isShipped(k.base!)
+      ? { view: base!.drawnIn.view, shipped: k.base }
+      : base!.drawnIn.shipped || base!.drawnIn.kind
+        ? base!.drawnIn
+        : { view: base!.drawnIn.view, kind: base!.prefix };
   const def: KindDef = {
     prefix: k.prefix,
     name: k.name,
     ...(k.base ? { base: k.base } : {}),
+    ...(root ? { root } : {}),
     ...(k.owner ? { owner: k.owner } : {}),
     labels,
     roles,
-    parts: [...(k.parts ?? [])],
-    drawnIn: own ? { view: k.lifecycle! } : { view: lifecycle, ...(k.base ? { shipped: k.base } : {}) },
-    states: drawn.states,
-    moves: drawn.moves,
+    parts,
+    drawnIn,
+    states: own?.states ?? base!.states,
+    moves: own?.moves ?? base!.moves,
   };
   checkKind(def);
   return def;
@@ -158,70 +192,4 @@ export async function prefixTaken(db: Db, orgId: string, prefix: string, except?
   const k = await maybe<{ document_id: string }>(db, 'select document_id from item_kinds where org_id = $1 and prefix = $2', [orgId, prefix]);
   if (k && k.document_id !== except?.kindDocument) return 'kind';
   return undefined;
-}
-
-/**
- * Registers, changes, or drops the kind a document's head defines, inside
- * the save's transaction, so a save that would break a kind saves nothing.
- * A kind with items keeps its block and its prefix, and keeps every state
- * an item is in.
- */
-export async function registerKind(tx: Db, input: { orgId: string; workspaceId: string; documentId: string; versionId: string; doc: Document | undefined }): Promise<KindRow | undefined> {
-  const existing = await maybe<KindRow>(tx, 'select * from item_kinds where document_id = $1', [input.documentId]);
-  const def = input.doc ? kindOf(input.doc) : undefined;
-  const counted = existing ? await tx.query<{ state: string; n: number }>('select state, count(*)::int as n from items where kind_id = $1 group by state', [existing.id]) : [];
-  const items = counted.reduce((s, r) => s + Number(r.n), 0);
-  if (!def) {
-    if (!existing) return undefined;
-    if (items) throw badRequest(`this document defines kind ${existing.prefix}, which has ${items} item(s); a kind with items keeps its kind block`);
-    await tx.query('delete from item_kinds where id = $1', [existing.id]);
-    return undefined;
-  }
-  if (existing && existing.prefix !== def.prefix && items) throw badRequest(`kind ${existing.prefix} has ${items} item(s), so its prefix never changes; keep prefix: ${existing.prefix}`);
-  const taken = await prefixTaken(tx, input.orgId, def.prefix, { kindDocument: input.documentId });
-  if (taken) throw badRequest(`the prefix ${def.prefix} is taken in this organization by ${taken === 'registry' ? 'a decision registry' : 'another kind'}; prefixes, registries, and workspace names share one namespace, so pick another`);
-  for (const r of counted) {
-    if (!def.states.some((s) => s.id === r.state)) throw badRequest(`${r.n} item(s) of kind ${def.prefix} are in state ${r.state}, which the lifecycle no longer draws; keep the state, or move them out first`);
-  }
-  if (existing) {
-    await tx.query('update item_kinds set prefix = $2, name = $3, definition = $4, version_id = $5, workspace_id = $6, updated_at = now() where id = $1', [existing.id, def.prefix, def.name, JSON.stringify(def), input.versionId, input.workspaceId]);
-    // A changed roster or lifecycle names the kind's items again, so who sees them follows the file.
-    if (items && (JSON.stringify(existing.definition.roles) !== JSON.stringify(def.roles) || JSON.stringify(existing.definition.moves) !== JSON.stringify(def.moves))) await renameKinds(tx, input.orgId, [existing.id]);
-    return { ...existing, prefix: def.prefix, name: def.name, definition: def, version_id: input.versionId, workspace_id: input.workspaceId };
-  }
-  const id = randomId();
-  await tx.query('insert into item_kinds (id, org_id, workspace_id, document_id, prefix, name, definition, version_id) values ($1, $2, $3, $4, $5, $6, $7, $8)', [id, input.orgId, input.workspaceId, input.documentId, def.prefix, def.name, JSON.stringify(def), input.versionId]);
-  return { id, org_id: input.orgId, workspace_id: input.workspaceId, document_id: input.documentId, prefix: def.prefix, name: def.name, definition: def, version_id: input.versionId, next_number: 1 };
-}
-
-/** JSON with every object's keys in order, so a definition read back from jsonb compares equal to the same one built here. */
-function canonical(v: unknown): string {
-  if (Array.isArray(v)) return `[${v.map(canonical).join(',')}]`;
-  if (v && typeof v === 'object') return `{${Object.entries(v).filter(([, x]) => x !== undefined).sort(([a], [b]) => (a < b ? -1 : 1)).map(([k, x]) => `${JSON.stringify(k)}:${canonical(x)}`).join(',')}}`;
-  return JSON.stringify(v);
-}
-
-/**
- * Lays every kind built on a shipped base over that base again, after the
- * migrations, so a label or a state a base gains reaches the kinds already
- * registered on it. A kind whose file no longer reads as a kind is left as
- * it was and logged.
- */
-export async function relayKinds(db: Db, log: Logger): Promise<number> {
-  const rows = await db.query<{ id: string; prefix: string; definition: KindDef; yaml: string }>('select k.id, k.prefix, k.definition, v.yaml from item_kinds k join documents d on d.id = k.document_id join versions v on v.id = d.head_version_id');
-  let changed = 0;
-  for (const r of rows.filter((x) => x.definition.base)) {
-    try {
-      const doc = parseDocumentText(r.yaml, 'kind.vantage.yaml').document;
-      const def = doc ? kindOf(doc) : undefined;
-      if (!def || canonical(def) === canonical(r.definition)) continue;
-      await db.query('update item_kinds set definition = $2, updated_at = now() where id = $1', [r.id, JSON.stringify(def)]);
-      changed++;
-      log.info('kinds.relaid', { kind: r.prefix, base: def.base });
-    } catch (err) {
-      log.warn('kinds.relay.failed', { kind: r.prefix, error: (err as Error).message });
-    }
-  }
-  log.info('kinds.relay.end', { kinds: rows.length, changed });
-  return changed;
 }

@@ -11,6 +11,7 @@ import { unzipSync, zipSync } from 'fflate';
 import type { AppContext } from './context.ts';
 import { artifactsFor, headVersion, listDocuments, documentBySlug } from './documents/repo.ts';
 import { saveDocument, type SaveResult } from './documents/save.ts';
+import type { Principal } from './auth/principal.ts';
 import type { Surface } from './audit.ts';
 import { loadStored, type ImportMap } from './documents/model.ts';
 import { readAttachments, storeAssets } from './documents/assets.ts';
@@ -63,6 +64,8 @@ export async function exportWorkspace(ctx: AppContext, workspaceId: string, opts
 export interface ImportActor {
   readonly orgId: string;
   readonly userId: string | null;
+  /** Who imports; a kind's base in another workspace must be one they can read. */
+  readonly writer?: Principal | undefined;
   readonly who: string;
   readonly surface: Surface;
 }
@@ -94,7 +97,7 @@ export async function importWorkspace(ctx: AppContext, actor: ImportActor, works
     const attachments = await storeAssets(ctx, actor.orgId, found);
     let r: SaveResult;
     try {
-      r = await saveDocument(ctx, { orgId: actor.orgId, workspaceId, documentId: existing?.id, name, slug, yaml, imports, attachments, message: `import ${file}`, authorUserId: actor.userId, who: actor.who, surface: actor.surface });
+      r = await saveDocument(ctx, { orgId: actor.orgId, workspaceId, documentId: existing?.id, name, slug, yaml, imports, attachments, message: `import ${file}`, authorUserId: actor.userId, writer: actor.writer, who: actor.who, surface: actor.surface });
     } catch (err) {
       if (!(err instanceof HttpError) || err.status !== 422) throw err;
       const errors = (err.details?.['errors'] ?? []) as readonly Finding[];

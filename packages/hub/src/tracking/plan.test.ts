@@ -8,7 +8,7 @@ import { findItem } from './access.ts';
 import { find, get } from './read.ts';
 import { hold, link, move, put } from './write.ts';
 import { rankBetween } from './rank.ts';
-import { relayKinds } from './kinds.ts';
+import { relayKinds } from './register.ts';
 import { itemOutline, kindOutline } from '../text/items.ts';
 
 const ROADMAP = `title: Shop roadmap

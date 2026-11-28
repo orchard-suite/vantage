@@ -381,7 +381,10 @@ export const KindSchema = z
   .object({
     prefix: z.string().regex(/^[A-Z][A-Z0-9]{1,11}$/, 'a letter, then upper-case letters and digits, two to twelve long').describe('The key prefix: VAN makes VAN-1, VAN-2'),
     name: z.string().min(1).describe('The kind as people say it: Vantage work'),
-    base: z.enum(BASE_KINDS).optional().describe('A kind the hub ships to build on: its labels, roles, and lifecycle, unless this file names its own'),
+    base: z
+      .union([z.enum(BASE_KINDS), z.string().regex(/^[A-Z][A-Z0-9]{1,11}$/, 'a shipped kind (work-item, roadmap-item, milestone) or another kind\'s prefix')])
+      .optional()
+      .describe("The kind to build on: a kind the hub ships (work-item, roadmap-item, milestone), or another kind's prefix in any workspace you can read, whose own chain of bases ends at a shipped kind. This kind takes its labels, roles, parts, and lifecycle, unless this file names its own lifecycle"),
     owner: z.string().regex(/^[a-z][a-z0-9-]*$/).optional().describe('The system that keeps the content; absent when the hub does, and then an item has a Markdown body'),
     labels: z.array(KindLabelSchema).optional().describe('A few flat values the owner publishes; the hub shows, sorts, and filters them and never reads their meaning'),
     roles: z.record(z.string().regex(/^[a-z][a-z0-9-]*$/), z.array(z.string().min(1))).optional().describe('Roles a move may name, each to the people (by email) and teams (team:<name>) who hold it'),

@@ -8,7 +8,7 @@ import type { AppContext } from '../context.ts';
 import type { Principal } from '../auth/principal.ts';
 import { maybe } from '../db/db.ts';
 import { badRequest } from '../http.ts';
-import { kindByPrefix, kindsIn, stateOf, type KindRow } from './kinds.ts';
+import { kindByPrefix, kindsIn, rootOf, stateOf, type KindRow } from './kinds.ts';
 import { membersOf, moveText, openMoves } from './gate.ts';
 import { findItem, reachOf, visibleWhere, type Found, type Reach } from './access.ts';
 import { linkText } from './links.ts';
@@ -20,6 +20,7 @@ import { isMilestone, rollupOf, type Rollup } from './milestone.ts';
 import { clockOf, dayOf } from '../day.ts';
 import { agentLabels } from '../auth/agents.ts';
 import { checkScope, delegationText, ownerKey, ownerLabels, ownerOf, scopeSql } from './owner.ts';
+import { dueOf, dueWhere, type Due, type DueFilter } from './due.ts';
 
 export interface Card {
   readonly key: string;
@@ -57,6 +58,8 @@ export interface Card {
   readonly span?: Span;
   /** For a milestone: what links toward it, rolled up. */
   readonly milestone?: Rollup;
+  /** For a kind that reads `due`: the day it is owed, and whether it is overdue or due soon today. */
+  readonly due?: Due;
 }
 
 /** A worked item's proof in one line: its pieces by state, and the age of the newest. */
@@ -124,8 +127,11 @@ export async function cardOf(ctx: AppContext, f: Found): Promise<Card> {
     runs: item.runs,
     ...(span ? { span } : {}),
     ...(isMilestone(def) ? { milestone: await rollupOf(ctx.db, item) } : {}),
+    ...withDue(dueOf(rootOf(def), item.labels, item.class, dayOf(), ctx.config.DUE_SOON_DAYS)),
   };
 }
+
+const withDue = (due: Due | undefined): { due?: Due } => (due ? { due } : {});
 
 export async function bodyOf(ctx: AppContext, item: Pick<ItemState, 'bodyId'>): Promise<string> {
   if (!item.bodyId) return '';
@@ -166,6 +172,8 @@ export interface FindQuery {
   readonly parent?: string;
   /** Words in the title, the labels, or the body. */
   readonly q?: string;
+  /** Only the items due soon, or only the items overdue, today in the hub's time zone. */
+  readonly due?: DueFilter;
   readonly limit?: number;
   readonly offset?: number;
   /** Answer counts by this field instead of rows. */
@@ -188,6 +196,8 @@ export interface Row {
   readonly proofAt?: string;
   /** For a parent: the span its parts give it. */
   readonly span?: Span;
+  /** For a kind that reads `due`: the day it is owed, and whether it is overdue or due soon. */
+  readonly due?: Due;
 }
 
 export const FIND_LIMIT = 100;
@@ -229,6 +239,12 @@ export async function find(ctx: AppContext, p: Principal, q: FindQuery, r?: Reac
     add((n) => `i.parent_id = $${n}`, parent.item.id);
   }
   if (q.q?.trim()) add((n) => `i.search @@ plainto_tsquery('english', $${n})`, q.q.trim());
+  const today = dayOf();
+  if (q.due) {
+    const d = dueWhere(q.due, params.length + 1, today, ctx.config.DUE_SOON_DAYS);
+    params.push(...d.params);
+    where.push(d.sql);
+  }
   const vis = visibleWhere(reach, params.length + 1);
   params.push(...vis.params);
   where.push(vis.sql);
@@ -246,8 +262,8 @@ export async function find(ctx: AppContext, p: Principal, q: FindQuery, r?: Reac
   }
   const limit = Math.min(Math.max(1, q.limit ?? 20), FIND_LIMIT);
   const order = await orderOf(ctx, p, q, params);
-  const rows = await ctx.dbRead.query<{ key: string; title: string; state: string; class: ItemState['class']; holders: string[]; owner_kind: 'user' | 'team' | null; owner_id: string | null; claim_user: string | null; claim_agent: string | null; claim_until: Date | null; labels: Record<string, LabelValue>; updated_at: Date; proof_at: Date | null; span: Span | null }>(
-    `select i.key, i.title, i.state, i.class, i.holders, i.owner_kind, i.owner_id, i.labels, i.updated_at,
+  const rows = await ctx.dbRead.query<{ key: string; title: string; state: string; class: ItemState['class']; holders: string[]; owner_kind: 'user' | 'team' | null; owner_id: string | null; claim_user: string | null; claim_agent: string | null; claim_until: Date | null; labels: Record<string, LabelValue>; updated_at: Date; proof_at: Date | null; span: Span | null; root: string | null }>(
+    `select i.key, i.title, i.state, i.class, i.holders, i.owner_kind, i.owner_id, i.labels, i.updated_at, coalesce(k.definition ->> 'root', k.definition ->> 'base') as root,
             case when i.claim_until > now() then i.claim_user end as claim_user, case when i.claim_until > now() then i.claim_agent end as claim_agent, i.claim_until,
             (select max(c.state_since) from items c where c.parent_id = i.id or c.id in (select l.target from item_links l where l.item_id = i.id and l.rel = 'proof') or c.id in (select l.item_id from item_links l where l.target = i.id and l.rel = 'toward')) as proof_at,
             ${spanSql('i.id')} as span
@@ -262,7 +278,7 @@ export async function find(ctx: AppContext, p: Principal, q: FindQuery, r?: Reac
       const span = spanFrom(x.span);
       const owner = x.owner_kind && x.owner_id ? owners.get(`${x.owner_kind}:${x.owner_id}`) : undefined;
       const run = x.claim_user && x.claim_until ? `${actingText(who.get(x.claim_user) ?? 'a person', x.claim_agent ? agents.get(x.claim_agent) : undefined)} until ${clockOf(x.claim_until)}` : undefined;
-      return { key: x.key, title: x.title, state: x.state, class: x.class, holders: x.holders.map((h) => who.get(h) ?? 'a person'), ...(owner ? { owner } : {}), ...(run ? { run } : {}), labels: x.labels, updated: dayOf(x.updated_at), ...(x.proof_at ? { proofAt: dayOf(x.proof_at) } : {}), ...(span ? { span } : {}) };
+      return { key: x.key, title: x.title, state: x.state, class: x.class, holders: x.holders.map((h) => who.get(h) ?? 'a person'), ...(owner ? { owner } : {}), ...(run ? { run } : {}), labels: x.labels, updated: dayOf(x.updated_at), ...(x.proof_at ? { proofAt: dayOf(x.proof_at) } : {}), ...(span ? { span } : {}), ...withDue(dueOf(x.root ?? undefined, x.labels, x.class, today, ctx.config.DUE_SOON_DAYS)) };
     }),
     total,
   };

@@ -17,6 +17,9 @@ const PILL: Record<Row['class'], string> = { 'not-started': '', 'in-progress': '
 
 export const itemUrl = (ws: string, key: string): string => `/w/${encodeURIComponent(ws)}/work/${encodeURIComponent(key)}`;
 
+/** A pill for an item overdue or due soon, and nothing for one that is neither. */
+export const duePill = (r: Pick<Row, 'due'>): string => (r.due?.overdue ? `<span class="pill bad" title="Due ${escapeHtml(r.due.date)}">Overdue</span>` : r.due?.soon ? `<span class="pill warn" title="Due ${escapeHtml(r.due.date)}">Due soon</span>` : '');
+
 const pill = (r: Row, stateText: ReadonlyMap<string, string>): string => `<span class="pill ${PILL[r.class]}">${escapeHtml(stateText.get(r.state) ?? r.state)}</span>`;
 
 /** The board: one column per horizon, and one for items with none, each in the kind's order. */
@@ -29,7 +32,7 @@ export function board(ws: AccessibleWorkspace, k: KindRow, rows: readonly Row[],
       const moves = author
         ? `<div class="work-card-move"><button class="btn ghost sm" type="button" data-place="up" aria-label="Move ${escapeHtml(r.key)} up"${i === 0 ? ' disabled' : ''}>Up</button><button class="btn ghost sm" type="button" data-place="down" aria-label="Move ${escapeHtml(r.key)} down"${i === mine.length - 1 ? ' disabled' : ''}>Down</button></div>`
         : '';
-      return `<article class="work-card" data-key="${escapeHtml(r.key)}"${author ? ' draggable="true"' : ''}><a href="${escapeHtml(itemUrl(ws.slug, r.key))}"><span class="ref">${escapeHtml(r.key)}</span><b>${escapeHtml(r.title)}</b></a>${pill(r, stateText)}${r.run ? `<span class="pill warn" title="${escapeHtml(`Working now: ${r.run}`)}">Live run</span>` : ''}<span class="sub">${escapeHtml([r.owner ? `owner ${r.owner}` : 'no owner', ...(r.holders.length ? [`held by ${r.holders.join(', ')}`] : []), r.proofAt ? `proof ${r.proofAt}` : 'no proof yet'].join(' · '))}</span>${moves}</article>`;
+      return `<article class="work-card${r.due?.overdue ? ' overdue' : ''}" data-key="${escapeHtml(r.key)}"${author ? ' draggable="true"' : ''}><a href="${escapeHtml(itemUrl(ws.slug, r.key))}"><span class="ref">${escapeHtml(r.key)}</span><b>${escapeHtml(r.title)}</b></a>${pill(r, stateText)}${duePill(r)}${r.run ? `<span class="pill warn" title="${escapeHtml(`Working now: ${r.run}`)}">Live run</span>` : ''}<span class="sub">${escapeHtml([r.owner ? `owner ${r.owner}` : 'no owner', ...(r.holders.length ? [`held by ${r.holders.join(', ')}`] : []), r.proofAt ? `proof ${r.proofAt}` : 'no proof yet'].join(' · '))}</span>${moves}</article>`;
     });
     return `<section class="work-col" data-horizon="${escapeHtml(h)}" aria-label="${escapeHtml(h || 'No horizon')}"><h3>${escapeHtml(h ? h[0]!.toUpperCase() + h.slice(1) : 'No horizon')}<span class="n">${mine.length}</span></h3>${cards.join('') || '<p class="none">Nothing here.</p>'}</section>`;
   });
@@ -138,6 +141,7 @@ export const WORK_VIEWS_CSS = `
 .work-card.dragging{opacity:.5}
 .work-card.drop-to{border-color:var(--accent)}
 .work-card:hover{border-color:var(--line2)}
+.work-card.overdue{border-color:var(--bad-line)}
 .work-card a{display:flex;flex-direction:column;gap:6px;color:inherit;text-decoration:none}
 .work-card .ref{font:600 var(--fs-xs) var(--mono);color:var(--muted)}
 .work-card b{font-weight:600;font-size:13.5px}

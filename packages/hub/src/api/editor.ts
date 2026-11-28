@@ -60,7 +60,7 @@ export function editorRoutes(ctx: AppContext, reg: OpenApiRegistry): Hono<HubEnv
     const { p, workspace, document } = await scopedDocumentById(ctx, c, 'author');
     const input = await body(c, SaveBody);
     const message = input.message?.trim() || DEFAULT_EDIT_MESSAGE;
-    const r = await saveDocument(ctx, { orgId: p.orgId, workspaceId: workspace.id, documentId: document.id, yaml: input.yaml, message, expectedVersionId: input.expectedVersion, authorUserId: p.userId, who: who(p), surface: p.surface });
+    const r = await saveDocument(ctx, { orgId: p.orgId, workspaceId: workspace.id, documentId: document.id, yaml: input.yaml, message, expectedVersionId: input.expectedVersion, authorUserId: p.userId, writer: p, who: who(p), surface: p.surface });
     ctx.log.info('source.saved', { documentId: document.id, status: r.status, merged: r.status === 'saved' && r.merged, expected: input.expectedVersion, by: p.userId });
     if (r.status === 'conflict') return c.json(saveJson(r), 409);
     return c.json({ ...saveJson(r), ...(r.status === 'saved' && r.merged ? { yaml: r.version.yaml } : {}) });

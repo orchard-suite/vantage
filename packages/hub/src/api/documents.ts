@@ -58,7 +58,7 @@ export function documentRoutes(ctx: AppContext, reg: OpenApiRegistry): Hono<HubE
     const input = await body(c, SaveBody);
     const bytes = { ...decodeAssets(input.assets), ...pageFiles(input.pages) };
     const files = incomingFiles(ctx, p.orgId, bytes);
-    const r = await saveDocument(ctx, { orgId: p.orgId, workspaceId: ws.id, name: input.name, yaml: input.yaml, imports: input.imports, pins: input.pins, files, message: input.message, authorUserId: p.userId.startsWith('source:') ? null : p.userId, who: who(p), surface: p.surface });
+    const r = await saveDocument(ctx, { orgId: p.orgId, workspaceId: ws.id, name: input.name, yaml: input.yaml, imports: input.imports, pins: input.pins, files, message: input.message, authorUserId: p.userId.startsWith('source:') ? null : p.userId, writer: p, who: who(p), surface: p.surface });
     return c.json(saveJson(r), 201);
   });
 
@@ -85,7 +85,7 @@ export function documentRoutes(ctx: AppContext, reg: OpenApiRegistry): Hono<HubE
     const input = await body(c, SaveBody);
     const bytes = { ...decodeAssets(input.assets), ...pageFiles(input.pages) };
     const files = incomingFiles(ctx, p.orgId, bytes);
-    const r = await saveDocument(ctx, { orgId: p.orgId, workspaceId: workspace.id, documentId: document.id, yaml: input.yaml, imports: input.imports, pins: input.pins, files, message: input.message, expectedVersionId: input.expectedVersion, authorUserId: p.userId.startsWith('source:') ? null : p.userId, who: who(p), surface: p.surface });
+    const r = await saveDocument(ctx, { orgId: p.orgId, workspaceId: workspace.id, documentId: document.id, yaml: input.yaml, imports: input.imports, pins: input.pins, files, message: input.message, expectedVersionId: input.expectedVersion, authorUserId: p.userId.startsWith('source:') ? null : p.userId, writer: p, who: who(p), surface: p.surface });
     return c.json(saveJson(r), r.status === 'conflict' ? 409 : 200);
   });
 
@@ -93,7 +93,7 @@ export function documentRoutes(ctx: AppContext, reg: OpenApiRegistry): Hono<HubE
   app.post(`${base}/:doc/edits`, async (c) => {
     const { p, workspace, document } = await scopedDocument(ctx, c, 'author');
     const input = await body(c, EditBody);
-    const r = await editDocument(ctx, { orgId: p.orgId, workspaceId: workspace.id, document, operations: input.operations, message: input.message, expectedVersionId: input.expectedVersion, authorUserId: p.userId.startsWith('source:') ? null : p.userId, who: who(p), surface: p.surface });
+    const r = await editDocument(ctx, { orgId: p.orgId, workspaceId: workspace.id, document, operations: input.operations, message: input.message, expectedVersionId: input.expectedVersion, authorUserId: p.userId.startsWith('source:') ? null : p.userId, writer: p, who: who(p), surface: p.surface });
     return c.json(saveJson(r), r.status === 'conflict' ? 409 : 200);
   });
 
@@ -160,7 +160,7 @@ export function documentRoutes(ctx: AppContext, reg: OpenApiRegistry): Hono<HubE
     const head = await headVersion(ctx.db, document);
     if (!head) throw notFound('version');
     const bytes = { ...decodeAssets(input.assets), ...pageFiles(input.pages) };
-    const r = await saveDocument(ctx, { orgId: p.orgId, workspaceId: workspace.id, documentId: document.id, yaml: head.yaml, files: incomingFiles(ctx, p.orgId, bytes), message: input.message, expectedVersionId: input.expectedVersion, authorUserId: p.userId.startsWith('source:') ? null : p.userId, who: who(p), surface: p.surface });
+    const r = await saveDocument(ctx, { orgId: p.orgId, workspaceId: workspace.id, documentId: document.id, yaml: head.yaml, files: incomingFiles(ctx, p.orgId, bytes), message: input.message, expectedVersionId: input.expectedVersion, authorUserId: p.userId.startsWith('source:') ? null : p.userId, writer: p, who: who(p), surface: p.surface });
     return c.json(saveJson(r), r.status === 'conflict' ? 409 : 200);
   });
 

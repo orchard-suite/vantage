@@ -26,7 +26,7 @@ export function transferRoutes(ctx: AppContext, reg: OpenApiRegistry): Hono<HubE
     const p = principal(c);
     const ws = await requireWorkspace(ctx.db, p, c.req.param('workspace'), 'author');
     const type = c.req.header('content-type') ?? '';
-    const actor = { orgId: p.orgId, userId: p.userId, who: who(p), surface: p.surface };
+    const actor = { orgId: p.orgId, userId: p.userId, writer: p, who: who(p), surface: p.surface };
     let out;
     if (type.includes('zip')) out = await importWorkspace(ctx, actor, ws.id, { zip: new Uint8Array(await c.req.arrayBuffer()) });
     else if (type.includes('yaml') || type.includes('text/plain')) out = await importWorkspace(ctx, actor, ws.id, { yaml: await c.req.text(), ...(c.req.query('name') ? { name: c.req.query('name')! } : {}) });

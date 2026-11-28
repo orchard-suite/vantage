@@ -148,7 +148,7 @@ export function shareRoutes(ctx: AppContext, reg: OpenApiRegistry): Hono<HubEnv>
     };
     if (c.req.query('preview') === 'true') return c.json({ report });
     const attachments = await storeAssets(ctx, p.orgId, result.assets);
-    const saved = await saveDocument(ctx, { orgId: p.orgId, workspaceId: ws.id, yaml: result.yaml, attachments, message: `import ${filename}`, authorUserId: p.userId, who: who(p), surface: p.surface });
+    const saved = await saveDocument(ctx, { orgId: p.orgId, workspaceId: ws.id, yaml: result.yaml, attachments, message: `import ${filename}`, authorUserId: p.userId, writer: p, who: who(p), surface: p.surface });
     if (saved.status === 'conflict') throw new HttpError(409, 'import conflicted with an existing document');
     await audit(ctx.db, ctx.log, { orgId: p.orgId, who: who(p), what: 'document.import', surface: p.surface, target: `document:${saved.document.id}`, details: { filename, format: r.format, nodes: r.counts.nodes, relations: r.counts.relations } });
     return c.json({ report, document: { id: saved.document.id, slug: saved.document.slug, name: saved.document.name }, url: `/w/${encodeURIComponent(ws.slug)}/${encodeURIComponent(saved.document.slug)}` }, 201);

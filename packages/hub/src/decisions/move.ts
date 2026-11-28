@@ -170,7 +170,7 @@ async function rewriteDocument(ctx: AppContext, p: Principal, documentId: string
     if (yaml === head.yaml && JSON.stringify(imports) === JSON.stringify(head.imports) && !Object.keys(files).length) return undefined;
     let r: SaveResult;
     try {
-      r = await saveDocument(ctx, { orgId: p.orgId, workspaceId: doc.workspace_id, documentId: doc.id, yaml, imports, files: incomingFiles(ctx, p.orgId, files), message, expectedVersionId: head.id, authorUserId: p.userId, who: whoOf(p), surface: p.surface });
+      r = await saveDocument(ctx, { orgId: p.orgId, workspaceId: doc.workspace_id, documentId: doc.id, yaml, imports, files: incomingFiles(ctx, p.orgId, files), message, expectedVersionId: head.id, authorUserId: p.userId, writer: p, who: whoOf(p), surface: p.surface });
     } catch (err) {
       // A document that already had errors cannot save until someone fixes it; its old citation still resolves meanwhile.
       if (err instanceof HttpError && err.status === 422) return 'the document has errors, so it cannot save until they are fixed; the old citation still resolves';

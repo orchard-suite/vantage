@@ -9,7 +9,7 @@ import { connectPostgres } from './db/postgres.ts';
 import { databasePassword } from './db/auth.ts';
 import { migrate } from './db/migrate.ts';
 import { refreshBindSources } from './documents/save.ts';
-import { relayKinds } from './tracking/kinds.ts';
+import { relayKinds } from './tracking/register.ts';
 import { backfillCitations } from './decisions/citations.ts';
 import { createRenderPool } from './render/pool.ts';
 import { openBlobStore } from './blob/index.ts';

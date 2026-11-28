@@ -87,7 +87,7 @@ async function commitDocument(ctx: AppContext, p: Principal, w: DocumentWork, as
     files: incomingFiles(ctx, p.orgId, { ...(assets ?? {}), ...pageFiles(Object.fromEntries(w.pages)) }),
     message: opts.message,
     expectedVersionId: at?.head ? (w.base ?? at.head.id) : undefined,
-    authorUserId: p.userId,
+    authorUserId: p.userId, writer: p,
     who: whoOf(p),
     surface: opts.surface,
   });
