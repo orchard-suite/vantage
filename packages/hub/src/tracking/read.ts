@@ -59,7 +59,7 @@ export function proofText(p: Proof): string {
   const seen = p.boxes.filter((b) => b.seen === true).length;
   const unread = p.boxes.filter((b) => b.seen === 'unread').length;
   const boxes = p.boxes.length ? `${p.boxes.length} box${p.boxes.length === 1 ? '' : 'es'} (${seen} seen${unread ? `, ${unread} bound to nothing a connector reads` : ''})` : '';
-  return `${[parts, boxes].filter(Boolean).join(', ')}; newest ${p.at ? p.at.slice(0, 10) : 'never'}`;
+  return `${[parts, boxes].filter(Boolean).join(', ')}; newest ${p.at ? dayOf(p.at) : 'never'}`;
 }
 
 async function people(ctx: AppContext, ids: readonly (string | null)[]): Promise<Map<string, string>> {
@@ -84,7 +84,7 @@ export async function cardOf(ctx: AppContext, f: Found): Promise<Card> {
     state: item.state,
     stateText: stateOf(def, item.state)?.text ?? item.state,
     class: item.class,
-    since: item.stateSince.slice(0, 10),
+    since: dayOf(item.stateSince),
     asker: item.askerId ? (who.get(item.askerId) ?? 'a person') : null,
     holders: item.holders.map((h) => who.get(h) ?? 'a person'),
     labels: item.labels,
