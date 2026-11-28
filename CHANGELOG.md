@@ -2,6 +2,16 @@
 
 All notable changes to this project will be documented in this file.
 
+## [4.11.0](https://github.com/orchard-suite/vantage/compare/v4.10.0...v4.11.0) (2026-11-28)
+
+### Features
+
+* **vantage:** show each scope's profile ([df00ece](https://github.com/orchard-suite/vantage/commit/df00ece53beb5038ac2050b7f259e90353e69a8c))
+
+### Bug Fixes
+
+* **vantage:** stamp days in the hub's time zone ([06b8d0d](https://github.com/orchard-suite/vantage/commit/06b8d0d02477706d6d291a424708e0bb6439a3a6))
+
 ## [4.10.0](https://github.com/orchard-suite/vantage/compare/v4.9.0...v4.10.0) (2026-11-28)
 
 ### Features

@@ -1,6 +1,6 @@
 {
   "name": "vantage",
-  "version": "4.10.0",
+  "version": "4.11.0",
   "private": true,
   "description": "Code-first, multi-perspective software and infrastructure diagrams with human-grade layout. Built for agents.",
   "license": "MIT",
