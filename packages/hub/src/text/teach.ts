@@ -25,6 +25,8 @@ export function topicOf(a: Pick<Address, 'kind'> | undefined): Topic {
     case 'standard':
     case 'conflicts':
     case 'conflict':
+    case 'exceptions':
+    case 'exception':
       return 'standards';
     default:
       return 'working-in-a-hub';

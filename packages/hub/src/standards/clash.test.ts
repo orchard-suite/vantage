@@ -54,5 +54,9 @@ describe('the departure gate', () => {
     const setting = StandardSettingSchema.parse({});
     const problems = machineGate(departing, { setting, records: new Set(['pay-1', 'chk-1']), team: new Set(['ws']) });
     expect(problems).toEqual(['CHK-1: departs from PAY-1 with no exception in force (VAN-3020); grant one or change the record']);
+    // An exception in force for that record, or for any record there, lets the edition pass.
+    const pin = { exception: 1, id: 'exception:X', line: 'PAY-1', line_record: 'pay-1', scope: 'checkout', records: ['CHK-1'], things: [], ends: '2099-01-01', granted_by: 'a steward', safeguard: 'A review.' };
+    expect(machineGate({ ...departing, exceptions: [pin] }, { setting, records: new Set(['pay-1', 'chk-1']), team: new Set(['ws']) })).toEqual([]);
+    expect(machineGate({ ...departing, exceptions: [{ ...pin, records: ['OTHER-1'] }] }, { setting, records: new Set(['pay-1', 'chk-1']), team: new Set(['ws']) })).toHaveLength(1);
   });
 });

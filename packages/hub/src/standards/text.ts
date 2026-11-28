@@ -32,7 +32,7 @@ export function pathText(l: StandardLine): string {
   return l.facet !== undefined ? `by facet ${l.facet} from ${chain}` : `from ${chain}`;
 }
 
-export function lineText(l: StandardLine): string {
+export function lineText(l: StandardLine, bent = 0): string {
   const x = l.position;
   const extra = [
     x.reach.below ? '' : 'this scope only',
@@ -41,7 +41,7 @@ export function lineText(l: StandardLine): string {
     x.enforced_by.length ? `enforced by ${x.enforced_by.join(', ')}` : '',
     x.checked_by.length ? `checked by ${x.checked_by.join(', ')}` : '',
   ].filter(Boolean);
-  return `- ${x.binding} (${x.binds.join(', ')}${x.locked ? ', locked' : ''}): ${x.line} ${l.ref}, ${pathText(l)}${extra.length ? `; ${extra.join('; ')}` : ''}${l.held !== undefined ? `; held back by conflicts/${l.held}` : ''}`;
+  return `- ${x.binding} (${x.binds.join(', ')}${x.locked ? ', locked' : ''}): ${x.line} ${l.ref}, ${pathText(l)}${extra.length ? `; ${extra.join('; ')}` : ''}${l.held !== undefined ? `; held back by conflicts/${l.held}` : ''}${bent ? `; bent by ${bent} exception${bent === 1 ? '' : 's'}` : ''}`;
 }
 
 export function packText(p: PackPin): string {
@@ -91,10 +91,12 @@ export function standardText(head: ScopeHead, e: Edition | undefined): string {
   };
   const out = [`---\n${stringify(header, { lineWidth: 0 })}---`];
   const areas = [...new Set(b.lines.map((l) => l.area))];
-  for (const area of areas) out.push('', `## ${area}`, '', ...b.lines.filter((l) => l.area === area).map(lineText));
+  const bent = (l: StandardLine): number => b.exceptions.filter((x) => x.line_record === l.record).length;
+  for (const area of areas) out.push('', `## ${area}`, '', ...b.lines.filter((l) => l.area === area).map((l) => lineText(l, bent(l))));
   if (!areas.length) out.push('', 'No line reaches this scope.');
   if (b.packs.length) out.push('', '## Packs', '', ...b.packs.map(packText));
   if (b.pages.length) out.push('', '## Procedures', '', ...b.pages.map((p) => `- ${p.page} (${p.title}): ${p.cites.join(', ')}`));
+  if (b.exceptions.length) out.push('', '## Exceptions', '', ...b.exceptions.map((x) => `- exceptions/${x.exception} (${x.id}): ${x.line} bends in ${x.scope}${x.records.length ? ` for ${x.records.join(', ')}` : ''}${x.things.length ? `, things ${x.things.join(', ')}` : ''}, until ${x.ends}; granted by ${x.granted_by}; safeguard: ${x.safeguard}`));
   if (b.conflicts?.length) out.push('', '## Conflicts', '', ...b.conflicts.map((c) => `- conflicts/${c.conflict}: ${c.lines.join(' and ')}; ${c.holds === BOTH ? 'both hold, and the work that marks either waits for the ruling' : `${c.holds} holds until the ruling`}`));
   if (e.changes.length) out.push('', `## Changes from edition ${e.version - 1}`, '', ...e.changes.map(changeText));
   if (e.problems.length) out.push('', '## Refused by the machine gate', '', ...e.problems.map((x) => `- ${x}`));

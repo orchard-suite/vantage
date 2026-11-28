@@ -11,3 +11,8 @@ export async function actsFor(db: Db, p: Principal, steward: string | undefined)
   const s = steward.toLowerCase();
   return s === email || s.endsWith(`:${email}`);
 }
+
+/** A person as a steward's record names them: their email, as the tree names stewards, or their id when they have none. */
+export async function personOf(db: Db, p: Principal): Promise<string> {
+  return (await maybe<{ email: string | null }>(db, 'select email from users where id = $1', [p.userId]))?.email?.toLowerCase() ?? p.userId;
+}

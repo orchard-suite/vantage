@@ -12,6 +12,7 @@ import type { Principal } from '../auth/principal.ts';
 import { guardFor, text } from './run.ts';
 import { listRegistries } from '../decisions/read.ts';
 import { createRegistry, peekNextNumber, supersedeDecision, updateRegistry } from '../decisions/write.ts';
+import { importExceptions, type ImportEntry } from '../standards/exception-write.ts';
 import { importDecisions } from '../decisions/import-apply.ts';
 import { moveDecision } from '../decisions/move.ts';
 import { discardDecision } from '../decisions/discard.ts';
@@ -92,6 +93,37 @@ export function registerDecisionTools(server: McpServer, ctx: AppContext, p: Pri
       inputSchema: { scope: z.string().min(1).describe('The scope id, or estate for the whole estate') },
     },
     guarded<{ scope: string }>('vantage_standard_publish', async (a) => text(await publishEdition(ctx, p, a.scope, whoOf(p)))),
+  );
+
+  server.registerTool(
+    'vantage_exceptions_import',
+    {
+      description:
+        "Bring exceptions in from another store: a waiver file, a policy engine's exemptions, a catalog list. Read the store, then send one entry per exception with the store, its own key, the line it bends, the scope it stands at, and what the store knows. One with an owner, a reason, and an end arrives granted by that owner (ended when its end is past); one that lacks any arrives incomplete, as a steward item. One seen before is skipped. Run with dryRun: true first.",
+      inputSchema: {
+        entries: z
+          .array(
+            z
+              .object({
+                store: z.string().min(1).max(60).describe('Where it came from: git, policy, catalog, or the store\'s own name'),
+                ref: z.string().min(1).max(500).describe("The store's own key for it"),
+                line: z.string().min(1).describe('The record whose line it bends: PAY-3001'),
+                scope: z.string().min(1).describe('Where it stands: a scope, owner+program, or estate'),
+                records: z.array(z.string()).optional().describe('The departing records it lets stand'),
+                things: z.array(z.string()).optional().describe('The resources it exempts, as the catalog or the engine names them'),
+                reason: z.string().optional(),
+                safeguard: z.string().optional(),
+                owner: z.string().optional().describe('Who granted it in that store'),
+                ends: z.string().optional().describe('Its last day, YYYY-MM-DD'),
+              })
+              .strict(),
+          )
+          .min(1)
+          .max(500),
+        dryRun: z.boolean().optional().describe('Report what would come in and write nothing'),
+      },
+    },
+    guarded<{ entries: ImportEntry[]; dryRun?: boolean | undefined }>('vantage_exceptions_import', async (a) => text(await importExceptions(ctx, p, a.entries, a.dryRun === true))),
   );
 
   server.registerTool(

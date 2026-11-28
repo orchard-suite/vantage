@@ -985,6 +985,18 @@ by hand, and published in editions (VAN-3018). The code is
   accepted), `stricter`, or `ranked`. An edition lists its open conflicts
   and the line each holds back; its hash covers them only when there are
   any.
+- **Exceptions** (`standard_exceptions`, VAN-3020). A numbered hub object
+  with a lasting id: the line it bends, what it covers (a scope and below,
+  departing records, things an engine exempts), reason, safeguard, end,
+  who asked and granted, state (`requested`, `incomplete`, `granted`,
+  `revoked`, `ended`), and an import's source. The line's steward grants
+  under the setting's rule for the kind of the line's scope (longest,
+  renews, separate, grantors; `locked_by` for locked lines). A job queued
+  at the grant ends it at the start of the day after its end and files
+  its steward an item and a re-check for each departure it covered.
+  Editions carry the ones in force that reach them; each line shows how
+  many bend it. `vantage_exceptions_import` brings other stores' in;
+  `GET /api/v1/exceptions` is what deploy code writes exemptions from.
 - **Checks.** With `checks` naming a kind, the hub files items as itself
   in the write that caused them: a re-check for each record whose map
   marks a line its scope's new edition changed or removed, a check of each
@@ -1312,7 +1324,8 @@ characters stand alone. The first paragraph is that self-contained lead.
   take an item and finish it; answer a plain question across the hub;
   find the standard that binds a repository; read a scope's built
   standard, one area of it, and check the one held is current; read a
-  conflict and list the conflicts. A task's
+  conflict and list the conflicts; read an exception and list the
+  exceptions. A task's
   budget is its disk cost. The check
   gate runs it.
 - **Budgets.** One file holds them (`packages/mcp/src/budget.ts`). The
@@ -1327,7 +1340,7 @@ characters stand alone. The first paragraph is that self-contained lead.
   nothing: `workspace/document` (YAML), `workspace/document/pages/x.md`,
   `SHOP-2001`, `SHOP`, `~` (the person's own workspace), `scopes`,
   `scopes/<id>`, `standard`, `standard/<scope>`, `conflicts`,
-  `conflicts/<n>`, `guide`, `schema` (a workspace never takes
+  `conflicts/<n>`, `exceptions`, `exceptions/<n>`, `guide`, `schema` (a workspace never takes
   one of the hub's own words as its slug); a part after `#` is a heading,
   a YAML path, or a line range. Registry prefixes, kind prefixes, and
   workspace slugs share one namespace (VAN-5002).

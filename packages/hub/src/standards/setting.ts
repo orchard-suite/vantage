@@ -17,6 +17,24 @@ export type ClashRule = (typeof CLASH_RULES)[number];
 
 const Words = z.array(z.string().trim().min(1).max(40)).min(1).max(20);
 
+/** How exceptions to the lines of one kind of scope are granted (VAN-3020). */
+export const ExceptionRuleSchema = z
+  .object({
+    longest_days: z.number().int().min(1).max(3660).default(365).describe('The longest an exception may run, in days from its grant or renewal'),
+    renews: z.boolean().default(true).describe('Whether the steward may move its end later, from today, within the longest'),
+    separate: z.boolean().default(true).describe('Whether the one who grants must not be the one who asked'),
+    grantors: z.array(z.string().trim().min(1).max(200)).max(50).default([]).describe("Who may grant beside the line's steward: an email, or scope:<id> for that scope's steward"),
+  })
+  .strict();
+export type ExceptionRule = z.output<typeof ExceptionRuleSchema>;
+
+export const ExceptionSettingSchema = z
+  .object({
+    rules: z.record(z.string().min(1), ExceptionRuleSchema).default({}).describe("The scope kind of the line's own scope, or default, to how its exceptions are granted"),
+    locked_by: z.string().trim().min(1).optional().describe("The one scope whose steward may grant on a locked line; with none, a locked line takes no exception"),
+  })
+  .strict();
+
 export const StandardSettingSchema = z
   .object({
     bindings: Words.default([...DEFAULT_BINDINGS]).describe('The binding words a line may use'),
@@ -27,10 +45,14 @@ export const StandardSettingSchema = z
     clash: z.enum(CLASH_RULES).default('hold').describe('What holds while a conflict waits for its ruling: hold (both lines, and the work that needs the ruling waits), stricter, or ranked'),
     ranked: z.array(z.string().trim().min(1).max(120)).max(50).default([]).describe('Scope ids in order, first wins, for clash: ranked'),
     checks: z.string().trim().toUpperCase().optional().describe('The kind, by prefix, the hub files its checking items into; with none it files nothing'),
+    exceptions: ExceptionSettingSchema.default({ rules: {} }).describe('How exceptions are granted, per kind of scope'),
   })
   .strict();
 
 export type StandardSetting = z.output<typeof StandardSettingSchema>;
+
+/** The rule for a line whose own scope is of `kind`: its own, else default, else the schema's defaults. */
+export const exceptionRule = (s: StandardSetting, kind: string): ExceptionRule => s.exceptions.rules[kind] ?? s.exceptions.rules['default'] ?? ExceptionRuleSchema.parse({});
 
 const KEY = 'standard';
 

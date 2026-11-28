@@ -16,6 +16,7 @@ import { listScopes, type Scope } from '../scopes/repo.ts';
 import { scopeSetting } from '../scopes/setting.ts';
 import { assemble, byFacet, chainOf, changesOf, hashBody, ownPart, passedDown, withConflicts, type ClashFacts, type OwnLine } from './build.ts';
 import { fileChecks, type Filing } from './checks.ts';
+import { exceptionRefs, inForceExceptions, pinsFor } from './exceptions.ts';
 import { machineGate, type GateFacts } from './gate.ts';
 import { bindingKey, EMPTY_BODY, ESTATE, scopeKey, scopeName, type EditionBody, type EditionState, type Manifest, type PackPin, type ScopeKey, type StandardLine } from './model.ts';
 import { citingPages, clearNext, hasStandards, latestEditions, lockStandards, markingRecords, openConflicts, ownLines, publishPending, teamWorkspaces, workspacePairs, writeEdition } from './repo.ts';
@@ -67,6 +68,9 @@ export async function rebuildStandards(ctx: Pick<AppContext, 'log'>, tx: Db, org
   const open = (await openConflicts(tx, orgId)).map((c) => ({ number: c.number, scope: c.scope, lines: c.lines }));
   const clash: ClashFacts = { clash: setting.clash, ranked: setting.ranked, bindings: setting.bindings, chainOf: (k) => chainOf(k, byId) };
   const marking = setting.checks ? await markingRecords(tx, orgId) : [];
+  const granted = await inForceExceptions(tx, orgId);
+  const grantedRefs = await exceptionRefs(tx, orgId, granted);
+  const excepting = (key: ScopeKey, b: EditionBody): EditionBody => ({ ...b, exceptions: pinsFor(key, b.lines, granted, grantedRefs, byId) });
   const filings: Filing[] = [];
 
   const effective = new Map<ScopeKey, EditionBody>();
@@ -82,7 +86,7 @@ export async function rebuildStandards(ctx: Pick<AppContext, 'log'>, tx: Db, org
     }
     const down = parent === undefined ? { lines: [], packs: [] } : passedDown(parent, effective.get(parent) ?? EMPTY_BODY);
     const facet = byFacet(scope, ancestors, ownInForce);
-    const body = (mine: { lines: readonly StandardLine[]; packs: readonly PackPin[] }): EditionBody => withConflicts(assemble({ own: mine.lines, down: down.lines, facet, packs: [...mine.packs, ...down.packs], pages }), key, ancestors, open, clash);
+    const body = (mine: { lines: readonly StandardLine[]; packs: readonly PackPin[] }): EditionBody => excepting(key, withConflicts(assemble({ own: mine.lines, down: down.lines, facet, packs: [...mine.packs, ...down.packs], pages }), key, ancestors, open, clash));
     const held = body(part(inForce, key));
     const wanted = gate ? body(part(current, key)) : held;
     const last = published.get(key);
@@ -133,7 +137,7 @@ export async function rebuildStandards(ctx: Pick<AppContext, 'log'>, tx: Db, org
     const down = o.lines.map((l) => ({ ...l, path: [owner, ...l.path] }));
     const through = g.lines.filter((l) => !l.path.length || l.facet !== undefined).map((l) => ({ ...l, path: [program.id, ...l.path], program: program.id }));
     const packs = [...o.packs, ...g.packs.filter((x) => x.from === program.id)];
-    const body = withConflicts(assemble({ own: [], down, facet: through, packs, pages }), key, new Set(chainOf(owner, byId)), open, clash);
+    const body = excepting(key, withConflicts(assemble({ own: [], down, facet: through, packs, pages }), key, new Set(chainOf(owner, byId)), open, clash));
     const last = published.get(key);
     const hash = await hashBody(body);
     if (hash === (last?.hash ?? empty)) {

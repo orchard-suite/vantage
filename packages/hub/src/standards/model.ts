@@ -22,6 +22,12 @@ export const PAIR = '+';
 /** The key of the edition that binds a workspace: its owner's, or its owner and program's. */
 export const bindingKey = (owner: ScopeKey, program: string | null): ScopeKey => (program === null ? owner : `${scopeName(owner)}${PAIR}${program}`);
 
+/** The owner and program a binding key joins, or none for a scope's own key. */
+export function splitBinding(key: ScopeKey): { owner: ScopeKey; program: string } | undefined {
+  const at = key.indexOf(PAIR);
+  return at < 0 ? undefined : { owner: scopeKey(key.slice(0, at)), program: key.slice(at + 1) };
+}
+
 /** The same, as an address names it after standard/. */
 export const bindingName = (owner: string | null, program: string | null): string => scopeName(bindingKey(owner ?? '', program));
 
@@ -80,8 +86,24 @@ export interface PagePin {
   readonly cites: readonly string[];
 }
 
-/** An exception in force (VAN-3020). None is granted until exceptions are records. */
-export type ExceptionPin = never;
+/** An exception in force (VAN-3020), as an edition carries it for a judge and the code that writes an engine's exemptions. */
+export interface ExceptionPin {
+  readonly exception: number;
+  /** exception:<ULID>, the name another store gives what it writes from it. */
+  readonly id: string;
+  /** The citation of the record whose line it bends, and that record's id. */
+  readonly line: string;
+  readonly line_record: string;
+  /** Where it stands, with every scope below. */
+  readonly scope: string;
+  /** The departing records it lets stand, by citation; none is any record there. */
+  readonly records: readonly string[];
+  readonly things: readonly string[];
+  /** The last day it is in force. */
+  readonly ends: string;
+  readonly granted_by: string;
+  readonly safeguard: string;
+}
 
 /** An open conflict between two lines of an edition, and which one holds under the clash rule. */
 export interface ConflictPin {

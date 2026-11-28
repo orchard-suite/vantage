@@ -1828,8 +1828,8 @@ local line never overrides a wider one.
   binding word is at least as strict (no later in `bindings`); a weaker
   one is a departure. Both lines stay in force.
 - A record that departs may be proposed. It is accepted only with an
-  exception in force from that line's steward; until then the hub refuses
-  the acceptance and says so. The machine gate refuses an edition whose
+  exception in force from that line's steward (see Exceptions below);
+  until then the hub refuses the acceptance and says so. The machine gate refuses an edition whose
   line departs with no exception.
 - Two lines that reach one scope and cannot both hold are a conflict. Flag
   it with a `vantage_write` to `conflicts`:
@@ -1864,6 +1864,56 @@ local line never overrides a wider one.
   newly accepted, to check against the lines that reach the same scopes
   and facets, and one for each conflict, held by its steward. Take them
   from the queue; close one when the line holds, or flag a conflict.
+
+### Exceptions
+
+An exception lets a line bend in one place, for a while, with a reason and
+a safeguard. Only the line's steward grants it.
+
+- Ask with a `vantage_write` to `exceptions`:
+
+  ```markdown
+  ---
+  line: PAY-3001
+  covers:
+    scope: checkout        # where it stands, and every scope below; owner+program or estate too
+    records: [CHK-2003]    # optional: the departing records it lets stand; none is any record there
+    things: [cloud:/accounts/acme/vaults/build]   # optional: what an engine exempts
+  safeguard: What stands in for the line while the exception holds.
+  ends: 2027-03-31         # the last day it is in force
+  ---
+
+  Why the line cannot hold here, for now.
+  ```
+
+  The answer names who grants it: the steward of the line's own scope.
+  With `checks:` set, the hub files them an item.
+- The steward grants with a `vantage_patch` of its header, `state: granted`,
+  or refuses or withdraws it with `state: revoked`. They renew it by moving
+  `ends` later. `vantage_read exceptions/<n>` shows its `steward:` line, who
+  asked, who granted it, and its lasting `id` (`exception:<ULID>`).
+- The rules are `exceptions` at `standard`, per kind of the line's scope
+  (`rules.<kind>`, or `rules.default`): `longest_days` (365), `renews`
+  (true), `separate` (true: the one who grants did not ask), `grantors`
+  (people, or `scope:<id>` stewards, who may grant beside the steward).
+  A locked line takes one only from the steward of `locked_by`; with none
+  named, it takes no exception.
+- In force means granted and not past its end. Then a record that departs
+  from the line in that scope may be accepted, the edition carries it
+  under `## Exceptions`, and each line says how many bend it. At the start
+  of the day after `ends`, the hub ends it, files its steward an item to
+  renew it or let the line hold, and files a re-check for each record
+  that departed under it. A revoke does the same.
+- `vantage_outline exceptions` lists them, newest first, with how many
+  are in force on each line. Bring in another store's (a waiver file, a
+  policy engine's exemptions, a catalog list) with
+  `vantage_exceptions_import` through `vantage_tool`: read the store, then
+  send one entry per exception. One with an owner, a reason, and an end
+  arrives granted; one without arrives `incomplete`, for its steward.
+- The code that deploys policy reads `GET /api/v1/exceptions?inForce=true`:
+  each with its id, the line with its `enforcedBy` and `checkedBy`, the
+  covered things, and its end. Write an engine's exemption from one, with
+  the same end, named by its id; a judge counts no exemption without one.
 
 ## Voice walkthroughs in a hub
 

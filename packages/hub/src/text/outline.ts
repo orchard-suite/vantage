@@ -27,6 +27,8 @@ import { kindsFor } from '../tracking/read.ts';
 import { scopeLines, scopesOutline } from '../scopes/outline.ts';
 import { standardOutline, standardsOutline } from '../standards/outline.ts';
 import { conflictsOutline, conflictThing } from '../standards/conflicts.ts';
+import { exceptionsOutline } from '../standards/exception-text.ts';
+import { readException } from '../standards/exception-write.ts';
 import { scopeOutline } from '../scopes/profile.ts';
 import { dayOf } from '../day.ts';
 
@@ -79,7 +81,7 @@ async function root(ctx: AppContext, p: Principal): Promise<string> {
   lines.push('', 'kinds of tracked items (outline one for its items):');
   for (const k of kinds) lines.push(`  ${k.prefix}  ${k.name}  (workspace ${workspaces.find((w) => w.id === k.workspace_id)?.slug ?? 'shared'})`);
   if (!kinds.length) lines.push('  none; a kind is a document with a kind block (guide#kinds-and-items)');
-  lines.push('', 'scopes  the owners in the organization, and the workspace each one owns', "standard  the estate's standard settings, and each scope's built standard", 'conflicts  two lines that reach one scope and cannot both hold, and their rulings', 'guide  the language and the rules, by topic', 'schema  the JSON Schema of a document, by part');
+  lines.push('', 'scopes  the owners in the organization, and the workspace each one owns', "standard  the estate's standard settings, and each scope's built standard", 'conflicts  two lines that reach one scope and cannot both hold, and their rulings', 'exceptions  departures from a line its steward granted, with their reasons, safeguards, and ends', 'guide  the language and the rules, by topic', 'schema  the JSON Schema of a document, by part');
   return fit(lines, 'vantage_outline one workspace or registry');
 }
 
@@ -193,6 +195,10 @@ export async function outline(ctx: AppContext, p: Principal, given: Address): Pr
       return fit(await conflictsOutline(ctx, p), 'vantage_read conflicts/<n>');
     case 'conflict':
       return fit((await conflictThing(ctx, p, a.number)).text.split('\n'), `vantage_read conflicts/${a.number}`);
+    case 'exceptions':
+      return fit(await exceptionsOutline(ctx, p), 'vantage_read exceptions/<n>');
+    case 'exception':
+      return fit((await readException(ctx, p, a.number)).text.split('\n'), `vantage_read exceptions/${a.number}`);
     case 'workspace':
       return workspace(ctx, p, a.workspace);
     case 'document':
