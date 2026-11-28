@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file.
 
+## [4.11.1](https://github.com/orchard-suite/vantage/compare/v4.11.0...v4.11.1) (2026-11-28)
+
+### Bug Fixes
+
+* **vantage:** keep scope fields the catalog drops ([b843741](https://github.com/orchard-suite/vantage/commit/b84374124765ff70802e1c9d60f179aa1780751e))
+* **vantage:** show item days in the hub's time zone ([b6af534](https://github.com/orchard-suite/vantage/commit/b6af534d020371bba263047dc5f893cf34005069))
+
 ## [4.11.0](https://github.com/orchard-suite/vantage/compare/v4.10.0...v4.11.0) (2026-11-28)
 
 ### Features
