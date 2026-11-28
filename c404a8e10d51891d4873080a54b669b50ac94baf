@@ -1,0 +1,12 @@
+release-damnit landing proof v1
+tree c4d441d54da998fc806ab34591dc6137f9ac2efd
+check make check
+result pass
+time 2026-11-28T05:50:18Z
+signer SHA256:gErT9ucSfhKBc1sz6L7OG3dqkVGEmtUIwflKcOfylUY
+-----BEGIN SSH SIGNATURE-----
+U1NIU0lHAAAAAQAAADMAAAALc3NoLWVkMjU1MTkAAAAgS4GnL1WDcJityCLp11gQ4NUsAd
+lwuOnfulH5kRWsbpQAAAAWcmVsZWFzZS1kYW1uaXQtbGFuZGluZwAAAAAAAAAGc2hhNTEy
+AAAAUwAAAAtzc2gtZWQyNTUxOQAAAEBL/ghfhte+wjRijfzmCkQuT1ALbHjRHwZunJkMuS
+faoSLtANyXdG5CsAD/d/8rq0wE4/SXFJ80eXxTGEFHnEQJ
+-----END SSH SIGNATURE-----
