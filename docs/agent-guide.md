@@ -1648,7 +1648,9 @@ workspaces:
 
   The connector's containment relations give each scope its parent, and
   each field `profile:` names is read from the scope's entry; an entry
-  without it leaves it empty. Each run of it refills the copy, and a
+  without it leaves it empty. The hub has that connector keep these
+  fields and the facets of each scope kind, whatever its own field list
+  says. Each run of it refills the copy, and a
   change to the copy is refused; change the catalog. Changing `profile:`
   reads the copy again. A scope removed from the tree leaves its workspaces to the
   whole estate. Setting `source: hub` (and dropping `catalog:`) keeps the

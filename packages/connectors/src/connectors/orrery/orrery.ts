@@ -225,6 +225,15 @@ function convert(config: OrreryConfig, web: string, e: OrreryEntity, defs: Recor
 export const orreryConnector: Connector<OrreryConfig> = {
   id: 'orrery',
   configSchema: OrreryConfigSchema,
+  /** A blueprint that lists its facts keeps these fields too; one that lists none keeps every field already. */
+  keepFields(config, fields) {
+    const facts = { ...config.facts };
+    for (const [blueprint, wanted] of Object.entries(fields)) {
+      const kept = facts[blueprint];
+      if (kept) facts[blueprint] = [...new Set([...kept, ...wanted])];
+    }
+    return { ...config, facts };
+  },
   async *discover(ctx: ConnectorContext<OrreryConfig>): AsyncIterable<Batch> {
     const { config, log } = ctx;
     const base = config.url.replace(/\/$/, '');

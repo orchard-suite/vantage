@@ -62,6 +62,24 @@ export function scopesFromCatalog(model: ObservedModel, setting: CatalogSetting,
   });
 }
 
+/** The fields each scope kind's entries must carry for the tree: its facets and its profile. Undefined when `source` does not feed the tree. */
+export async function treeFields(ctx: AppContext, source: SourceRow): Promise<Record<string, string[]> | undefined> {
+  const setting = await scopeSetting(ctx.db, source.org_id);
+  if (setting.source !== 'catalog') return undefined;
+  const feeds = await catalogConnector(ctx, source.org_id, setting.catalog);
+  if (feeds?.id !== source.id) return undefined;
+  return Object.fromEntries(setting.catalog.kinds.map((k) => [k, [setting.catalog.facets, ...setting.profile]]));
+}
+
+/** The config a connector runs with: its own, widened to keep the fields the tree reads when it feeds the tree. */
+export async function servedConfig(ctx: AppContext, source: SourceRow): Promise<unknown> {
+  const connector = ctx.connectors.get(source.connector);
+  const fields = connector?.keepFields ? await treeFields(ctx, source) : undefined;
+  if (!connector?.keepFields || !fields) return source.config;
+  const parsed = connector.configSchema.safeParse(source.config);
+  return parsed.success ? connector.keepFields(parsed.data, fields) : source.config;
+}
+
 /** The connector a catalog setting names, when it is there. */
 export async function catalogConnector(ctx: AppContext, orgId: string, setting: CatalogSetting): Promise<SourceRow | undefined> {
   const [workspace, connector] = setting.connector.split('/') as [string, string];

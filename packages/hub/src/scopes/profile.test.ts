@@ -134,3 +134,25 @@ describe('a profile read from the catalog', () => {
     expect(team).not.toContain('Mission');
   });
 });
+
+describe('the connector that feeds the tree', () => {
+  test('is served a config that keeps each scope kind\'s facets and profile fields; another connector is served its own', async () => {
+    const t = await testApp({ connectors: [orreryConnector] });
+    const me = await t.bearer('ada', { admin: true });
+    const admin = await agent(t, me.headers);
+    await admin.call('vantage_tool', { tool: 'vantage_workspaces', arguments: { action: 'create', name: 'Platform' } });
+    const make = async (slug: string, clientId: string): Promise<string> => {
+      const r = await t.json('/api/v1/workspaces/platform/connectors', { method: 'POST', headers: me.headers, body: JSON.stringify({ name: slug, slug, connector: 'orrery', clientId, config: { url: 'https://catalog.example.com', token: 'catalog-token', blueprints: ['team', 'program'], facts: { program: ['lifecycle'] } } }) });
+      expect(r.status, JSON.stringify(r.body)).toBe(201);
+      return String(r.body['id']);
+    };
+    const home = await make('home', 'client-home');
+    const other = await make('other', 'client-other');
+    await admin.call('vantage_write', { writes: [{ address: 'scopes', text: 'source: catalog\nprofile: [description]\ncatalog:\n  connector: platform/home\n  kinds: [team, program]\n' }] });
+    const served = await t.json(`/api/v1/connector/${home}`, { headers: await t.connector('client-home') });
+    expect((served.body['config'] as { facts: Record<string, string[]> }).facts).toEqual({ program: ['lifecycle', 'facets', 'description'] });
+    const own = await t.json(`/api/v1/connector/${other}`, { headers: await t.connector('client-other') });
+    expect((own.body['config'] as { facts: Record<string, string[]> }).facts).toEqual({ program: ['lifecycle'] });
+    await t.ctx.db.close();
+  }, 30_000);
+});

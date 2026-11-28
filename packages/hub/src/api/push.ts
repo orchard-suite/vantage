@@ -24,6 +24,7 @@ import { recordFailedRun } from '../sources/ingest.ts';
 import { enqueue, jobById } from '../worker/jobs.ts';
 import { pushKey } from '../worker/ingest-run.ts';
 import { randomId } from '../crypto.ts';
+import { servedConfig } from '../scopes/catalog.ts';
 
 export const PUSH_LIMIT = { requests: 60, windowMs: 60_000 };
 export const PUSH_MAX_BYTES = 20_000_000;
@@ -33,8 +34,8 @@ export const KEPT_MAX_BYTES = 20_000_000;
 export const keptKey = (orgId: string, sourceId: string): string => `kept/${orgId}/${sourceId}.bin`;
 
 /** What a connector's client sees of its connector: enough to run it, nothing about its workspace's people or diagrams. */
-function settingsJson(s: SourceRow, blocked: string | undefined): Record<string, unknown> {
-  return { id: s.id, name: s.name, slug: s.slug, connector: s.connector, config: s.config, enabled: s.enabled, approval: s.approval, blocked: blocked ?? null };
+async function settingsJson(ctx: AppContext, s: SourceRow, blocked: string | undefined): Promise<Record<string, unknown>> {
+  return { id: s.id, name: s.name, slug: s.slug, connector: s.connector, config: await servedConfig(ctx, s), enabled: s.enabled, approval: s.approval, blocked: blocked ?? null };
 }
 
 export function pushRoutes(ctx: AppContext, reg: OpenApiRegistry): Hono<HubEnv> {
@@ -61,13 +62,13 @@ export function pushRoutes(ctx: AppContext, reg: OpenApiRegistry): Hono<HubEnv> 
     if (!p) throw unauthorized();
     if (!p.connector || p.connector.pool) throw forbidden("a connector's own client token is required");
     const rows = await connectorsForClient(ctx.db, p.connector.clientId);
-    return c.json({ clientId: p.connector.clientId, connectors: rows.map((s) => settingsJson(s, connectorBlocked(s, required))) });
+    return c.json({ clientId: p.connector.clientId, connectors: await Promise.all(rows.map((s) => settingsJson(ctx, s, connectorBlocked(s, required)))) });
   });
 
   reg.add({ method: 'get', path: '/connector/:connector', summary: "One connector's settings, for its own client", tag: 'push', params: ['connector'], auth: 'source' });
   app.get('/connector/:connector', async (c) => {
     const { source } = await mine(c);
-    return c.json(settingsJson(source, connectorBlocked(source, required)));
+    return c.json(await settingsJson(ctx, source, connectorBlocked(source, required)));
   });
 
   reg.add({ method: 'post', path: '/connector/:connector/batches', summary: 'Push a batch (the push shape, source and observed optional) or a Backstage catalog document; checked, then merged, stored, audited, and bound documents re-rendered by the worker', tag: 'push', params: ['connector'], body: { entities: 'array', relations: 'array', partial: 'true when this is one slice', observed: 'ISO time, default now' }, auth: 'source', responses: { '202': 'checked and queued; the worker merges it, and the connector runs list its counts', '400': 'invalid body', '403': 'not approved, stopped, or paused', '404': 'no such connector for this client', '413': 'body too large', '429': 'rate limited' } });

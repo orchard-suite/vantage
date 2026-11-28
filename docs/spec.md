@@ -300,9 +300,14 @@ the source type, `metadata.name` the id, `metadata.annotations` facts,
 export interface Connector {
   readonly id: string;                       // orrery, azure-resource-graph, kubectl, cloudflare, http
   readonly configSchema: ZodType;            // validated per instance; secrets referenced, not inlined
+  keepFields?(config, fields): config;       // the config that also keeps these fields of these kinds
   discover(ctx: ConnectorContext): AsyncIterable<Batch>;   // pull; push connectors are the HTTP endpoint
 }
 ```
+
+A kind that reads only some fields answers `keepFields`: the connector
+that feeds the scope tree is served a config that also keeps each scope
+kind's facets and profile fields, so its own field list never hides them.
 
 `ConnectorContext` gives the instance config, a secret resolver, a logger, a
 clock, a cancellation signal, and what the connector kept from its last
@@ -484,7 +489,9 @@ diagrams, points an embed at a storage account static site or at the hub.
   its profile: the fields the setting names under `profile:` (by default
   `description`), read from its catalog entry or kept on the hub's scopes,
   each optional; one a scope leaves empty shows its nearest ancestor's,
-  marked as inherited. `scopes/<id>` reads one scope with its profile, and
+  marked as inherited. The connector that feeds the tree is served a
+  config that keeps those fields and the facets of each scope kind.
+  `scopes/<id>` reads one scope with its profile, and
   a workspace's outline and page show its scope's. The tree is text
   at the address `scopes`, read and changed through the five verbs and
   the REST text routes; `GET` and `PUT /api/v1/scopes` and

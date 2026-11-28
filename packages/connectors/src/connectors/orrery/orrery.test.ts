@@ -30,6 +30,13 @@ const config = OrreryConfigSchema.parse({
 });
 
 describe('orrery connector', () => {
+  test('keepFields widens a blueprint that lists its facts, and leaves one that keeps every field alone', () => {
+    const config = OrreryConfigSchema.parse({ url: 'https://catalog.example.com', token: 'catalog-token', blueprints: ['program', 'team'], facts: { program: ['lifecycle'] } });
+    const kept = orreryConnector.keepFields!(config, { program: ['facets', 'description', 'lifecycle'], team: ['description'] });
+    expect(kept.facts).toEqual({ program: ['lifecycle', 'facets', 'description'] });
+    expect(config.facts).toEqual({ program: ['lifecycle'] });
+  });
+
   test('lists blueprints, pages entities, and sends the bearer token', async () => {
     const f = hub();
     const ctx = testContext(config, f.fetch, { 'orrery-token': 'secret-value' });

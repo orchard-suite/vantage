@@ -56,6 +56,13 @@ export interface Connector<C = unknown> {
    * its connector's app, so only a runner of its own runs it; the shared pool never does.
    */
   readonly hostIdentity?: true;
+  /**
+   * The config with these fields of these kinds kept too, for a kind that
+   * reads only some fields: the hub asks it when the connector feeds what
+   * the hub keeps, such as the scope tree. A kind that keeps every field
+   * needs none.
+   */
+  keepFields?(config: C, fields: Readonly<Record<string, readonly string[]>>): C;
   discover(ctx: ConnectorContext<C>): AsyncIterable<Batch>;
 }
 
