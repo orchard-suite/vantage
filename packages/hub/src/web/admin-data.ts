@@ -14,7 +14,8 @@ import type { Db } from '../db/db.ts';
 import type { RevisionsModel } from './admin-revisions.ts';
 import { deleteRule, type DeleteRule } from '../authz.ts';
 import { orgLimits, personLimits } from '../revise/limits.ts';
-import { monthKey, monthlyTotals, monthStart, parseMonth, usageForMonth } from '../revise/usage.ts';
+import { monthlyTotals, usageForMonth } from '../revise/usage.ts';
+import { monthKey, monthStart, parseMonth } from '../day.ts';
 
 export const DISK_PARTS = ['renders', 'history', 'observed', 'audio', 'icons'] as const;
 export type DiskPart = (typeof DISK_PARTS)[number];

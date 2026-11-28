@@ -27,6 +27,7 @@ import { decisionHistory } from '../decisions/read.ts';
 import { parseAddress } from '../text/address.ts';
 import { guardFor, text } from './run.ts';
 import { WORKSPACE_ICONS, type IconFormat } from '@vantage/mcp';
+import { clockOf } from '../day.ts';
 
 
 interface Ref {
@@ -150,7 +151,7 @@ export function registerHubTools(server: McpServer, ctx: AppContext, p: Principa
       if (a.kind !== 'document') return text('history is kept for a document (workspace/document) and for a record (SHOP-2001)', true);
       const { d } = await doc(a.workspace, a.document, 'viewer');
       const versions = await listVersions(ctx.db, d.id, limit ?? 20);
-      return text(versions.map((v) => `${v.id}  ${v.created_at.toISOString()}  ${v.surface}  ${v.author_user_id ?? '-'}  ${v.message || '(no message)'}${v.parent_id ? '' : '  [root]'}`).join('\n') || 'no versions');
+      return text(versions.map((v) => `${v.id}  ${clockOf(v.created_at)}  ${v.surface}  ${v.author_user_id ?? '-'}  ${v.message || '(no message)'}${v.parent_id ? '' : '  [root]'}`).join('\n') || 'no versions');
     }),
   );
 
@@ -194,7 +195,7 @@ export function registerHubTools(server: McpServer, ctx: AppContext, p: Principa
       const { d } = await doc(args.workspace, args.document, 'viewer');
       const rows = await listRecordings(ctx.db, d.id, { view: args.view });
       const len = (ms: number): string => `${Math.floor(ms / 60_000)}:${String(Math.round((ms % 60_000) / 1000)).padStart(2, '0')}`;
-      return text(rows.map((r) => `${r.id}  view=${r.view_id}  ${len(r.duration_ms)}  ${r.timeline.length} steps  by ${r.author_user_id ?? '-'}  ${r.version_id === d.head_version_id ? 'current version' : `older version ${r.version_id}`}  ${r.created_at.toISOString()}`).join('\n') || 'no recordings');
+      return text(rows.map((r) => `${r.id}  view=${r.view_id}  ${len(r.duration_ms)}  ${r.timeline.length} steps  by ${r.author_user_id ?? '-'}  ${r.version_id === d.head_version_id ? 'current version' : `older version ${r.version_id}`}  ${clockOf(r.created_at)}`).join('\n') || 'no recordings');
     }),
   );
 

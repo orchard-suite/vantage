@@ -2,7 +2,7 @@ import { describe, expect, test } from 'bun:test';
 import { allowanceNote, spend } from './allowance.ts';
 import type { Allowance } from './hub.ts';
 
-const A: Allowance = { blocked: false, today: 1000, daily: 10_000, month: 5000, monthly: null, orgMonth: 20_000, orgMonthly: 1_000_000 };
+const A: Allowance = { blocked: false, today: 1000, daily: 10_000, month: 5000, monthly: null, orgMonth: 20_000, orgMonthly: 1_000_000, timeZone: 'UTC' };
 
 describe('allowanceNote', () => {
   test('says what was used, with the limits that apply', () => {
@@ -15,7 +15,7 @@ describe('allowanceNote', () => {
   });
 
   test('a spent limit or a block stops it, the organization first', () => {
-    expect(allowanceNote({ ...A, today: 10_000 }).stop).toBe("You have used today's tokens. The limit resets at midnight UTC.");
+    expect(allowanceNote({ ...A, today: 10_000, timeZone: 'America/Chicago' }).stop).toBe("You have used today's tokens. The limit resets at midnight (America/Chicago).");
     expect(allowanceNote({ ...A, today: 10_000, orgMonth: 1_000_000 }).stop).toContain('The organization has used');
     expect(allowanceNote({ ...A, blocked: true }).stop).toBe('An admin turned the model off for you.');
   });

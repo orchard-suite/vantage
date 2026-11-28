@@ -1,7 +1,8 @@
-import { describe, expect, test } from 'bun:test';
+import { afterEach, describe, expect, test } from 'bun:test';
 import { fakeFetch, testApp, type TestApp } from '../testing.ts';
 import { randomId } from '../crypto.ts';
-import { monthStart } from './usage.ts';
+import { monthStart, setTimeZone } from '../day.ts';
+import { allowance, refusal } from './limits.ts';
 
 const AI_ENV = { AI_BASE_URL: 'https://gateway.test/v1', AI_API_KEY: 'org-key', AI_MODEL: 'claude-test', AI_DAILY_TOKENS: '5000' };
 
@@ -97,7 +98,7 @@ describe('limits', () => {
     await spent(t, [{ user: author.principal.userId, at: new Date(), input: 900 }, { user: admin.principal.userId, at: new Date(), input: 3000 }]);
     const set = await t.json('/api/v1/admin/ai-limits', { method: 'PUT', headers: admin.headers, body: JSON.stringify({ daily: null, monthly: 1000, orgMonthly: 10_000 }) });
     expect(set.body['defaults']).toEqual({ daily: null, monthly: 1000, orgMonthly: 10_000 });
-    expect(await allowance()).toEqual({ blocked: false, today: 900, daily: null, month: 900, monthly: 1000, orgMonth: 3900, orgMonthly: 10_000 });
+    expect(await allowance()).toEqual({ blocked: false, today: 900, daily: null, month: 900, monthly: 1000, orgMonth: 3900, orgMonthly: 10_000, timeZone: 'UTC' });
 
     // A month that is spent stops the person, and a limit of their own lifts it.
     await spent(t, [{ user: author.principal.userId, at: monthStart(new Date()), input: 100 }]);
@@ -140,6 +141,41 @@ describe('limits', () => {
     expect(page).toContain('/api/v1/admin/ai-usage.csv?month=');
     const past = await (await t.app.request('/admin/revisions?month=2024-02', { headers: admin.headers })).text();
     expect(past).toContain('No model use in February 2024.');
+    await t.ctx.db.close();
+  });
+});
+
+describe('limit windows in the estate zone', () => {
+  afterEach(() => setTimeZone('UTC'));
+
+  test('a day resets at midnight in the estate zone, not at midnight UTC', async () => {
+    const { t, author } = await setup();
+    const me = author.principal.userId;
+    // 2 PM and 6:30 PM on November 27 in Chicago; the second is already November 28 in UTC.
+    await spent(t, [{ user: me, at: new Date('2026-11-27T20:00:00Z'), input: 3000 }, { user: me, at: new Date('2026-11-28T00:30:00Z'), input: 2500 }]);
+    const evening = new Date('2026-11-28T01:00:00Z');
+    expect((await allowance(t.ctx.db, t.ctx.config, 'default', me, evening)).today).toBe(2500);
+    setTimeZone('America/Chicago');
+    const a = await allowance(t.ctx.db, t.ctx.config, 'default', me, evening);
+    expect(a.today).toBe(5500);
+    expect(refusal(a)?.message).toBe("you have used today's model tokens; the limit resets at midnight (America/Chicago)");
+    // Midnight in Chicago is 06:00 UTC: the day starts again then.
+    expect((await allowance(t.ctx.db, t.ctx.config, 'default', me, new Date('2026-11-28T06:00:00Z'))).today).toBe(0);
+    await t.ctx.db.close();
+  });
+
+  test('a month starts on the first in the estate zone, and the spend page counts the same months', async () => {
+    const { t, admin, author } = await setup();
+    const me = author.principal.userId;
+    // 9 PM on November 30 in Chicago is December 1 in UTC.
+    await spent(t, [{ user: me, at: new Date('2026-11-15T12:00:00Z'), input: 100 }, { user: me, at: new Date('2026-12-01T03:00:00Z'), input: 40 }]);
+    const late = new Date('2026-12-01T04:00:00Z');
+    expect((await allowance(t.ctx.db, t.ctx.config, 'default', me, late)).month).toBe(40);
+    setTimeZone('America/Chicago');
+    expect((await allowance(t.ctx.db, t.ctx.config, 'default', me, late)).month).toBe(140);
+    const r = await t.json('/api/v1/admin/ai-usage?month=2026-11', { headers: admin.headers });
+    expect((r.body['people'] as { total: number }[])[0]!.total).toBe(140);
+    expect((r.body['months'] as { month: string; tokens: number }[]).at(-1)).toMatchObject({ month: '2026-11', tokens: 140 });
     await t.ctx.db.close();
   });
 });

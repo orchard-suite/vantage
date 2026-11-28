@@ -1,41 +1,16 @@
 /**
  * What the organization's model spent, added up from the revision rows
  * (revisions from comments and diagrams drawn from words): by person, model, and kind for
- * one UTC month, month by month for the trend, and since a moment for the
- * limits. Every token counts toward a limit: fresh input, output, and cached
+ * one month, month by month for the trend, and since a moment for the
+ * limits. Months are the estate's, in TIME_ZONE (day.ts). Every token counts toward a limit: fresh input, output, and cached
  * input read or written.
  */
 import type { Db } from '../db/db.ts';
 import type { RevisionKind } from './repo.ts';
+import { addMonths, monthKey, timeZone } from '../day.ts';
 
 /** The SQL sum of every token on a revision row. */
 const TOTAL = '(r.input_tokens + r.output_tokens + r.cache_read_tokens + r.cache_write_tokens)';
-
-/** The start of the UTC day of `now`. */
-export function dayStart(now: Date): Date {
-  return new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()));
-}
-
-/** The start of the UTC month of `now`. */
-export function monthStart(now: Date): Date {
-  return new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1));
-}
-
-/** A month as YYYY-MM. */
-export function monthKey(d: Date): string {
-  return d.toISOString().slice(0, 7);
-}
-
-/** The start of the month a YYYY-MM names, or undefined when it names none. */
-export function parseMonth(key: string): Date | undefined {
-  const m = /^(\d{4})-(0[1-9]|1[0-2])$/.exec(key);
-  return m ? new Date(Date.UTC(Number(m[1]), Number(m[2]) - 1, 1)) : undefined;
-}
-
-/** The start of the month `n` months after the one `month` starts (negative goes back). */
-export function addMonths(month: Date, n: number): Date {
-  return new Date(Date.UTC(month.getUTCFullYear(), month.getUTCMonth() + n, 1));
-}
 
 /** Tokens spent since `since`, by one person or, with no person, by the whole organization. */
 export async function spentSince(db: Db, orgId: string, userId: string | undefined, since: Date): Promise<number> {
@@ -116,10 +91,10 @@ export interface MonthTotal {
 export async function monthlyTotals(db: Db, orgId: string, last: Date, count: number): Promise<MonthTotal[]> {
   const first = addMonths(last, 1 - count);
   const rows = await db.query<{ month: string; tokens: string; revisions: string; generations: string; people: string }>(
-    `select to_char(date_trunc('month', r.created_at at time zone 'UTC'), 'YYYY-MM') as month, sum(${TOTAL})::text as tokens,
+    `select to_char(date_trunc('month', r.created_at at time zone $4), 'YYYY-MM') as month, sum(${TOTAL})::text as tokens,
             count(*) filter (where r.kind = 'revise')::text as revisions, count(*) filter (where r.kind = 'generate')::text as generations, count(distinct r.requested_by)::text as people
        from revisions r where r.org_id = $1 and r.created_at >= $2 and r.created_at < $3 group by 1`,
-    [orgId, first, addMonths(last, 1)],
+    [orgId, first, addMonths(last, 1), timeZone()],
   );
   const by = new Map(rows.map((r) => [r.month, r]));
   return Array.from({ length: count }, (_, i) => {

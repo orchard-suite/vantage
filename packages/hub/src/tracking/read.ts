@@ -17,7 +17,7 @@ import type { EventData, ItemState, LabelValue, LinkRel } from './state.ts';
 import { spanFrom, spanOf, spanSql, type Span } from './dates.ts';
 import { horizonOf, orderSql } from './rank.ts';
 import { isMilestone, rollupOf, type Rollup } from './milestone.ts';
-import { dayOf } from '../day.ts';
+import { clockOf, dayOf } from '../day.ts';
 
 export interface Card {
   readonly key: string;
@@ -96,7 +96,7 @@ export async function cardOf(ctx: AppContext, f: Found): Promise<Card> {
     version: item.position,
     hasBody: !def.owner,
     ...(isWorked(def) ? { proof: proofText(await readProof(ctx.db, item)) } : {}),
-    ...(item.claim && Date.parse(item.claim.until) > Date.now() ? { claim: `${(await people(ctx, [item.claim.userId])).get(item.claim.userId) ?? 'a person'} until ${item.claim.until.slice(0, 16).replace('T', ' ')} UTC` } : {}),
+    ...(item.claim && Date.parse(item.claim.until) > Date.now() ? { claim: `${(await people(ctx, [item.claim.userId])).get(item.claim.userId) ?? 'a person'} until ${clockOf(item.claim.until)}` } : {}),
     runs: item.runs,
     ...(span ? { span } : {}),
     ...(isMilestone(def) ? { milestone: await rollupOf(ctx.db, item) } : {}),
@@ -296,16 +296,16 @@ export function eventLine(c: Pick<Change, 'type' | 'data' | 'actor' | 'at'>): st
       case 'unlinked':
         return `unlinked ${d.rel}`;
       case 'claimed':
-        return `claimed until ${d.until.slice(11, 16)} UTC`;
+        return `claimed until ${clockOf(d.until)}`;
       case 'renewed':
-        return `renewed the claim until ${d.until.slice(11, 16)} UTC`;
+        return `renewed the claim until ${clockOf(d.until)}`;
       case 'ran':
         return `ran: ${d.run.summary.split('\n')[0]!.slice(0, 160)}`;
       case 'erased':
         return `erased: ${d.reason.split('\n')[0]!.slice(0, 160)}`;
     }
   })();
-  return `${c.at.slice(0, 16).replace('T', ' ')} UTC ${c.actor ?? 'the hub'}: ${what}`;
+  return `${clockOf(c.at)} ${c.actor ?? 'the hub'}: ${what}`;
 }
 
 export const PART_PAGE = 20;
@@ -334,7 +334,7 @@ export async function notes(ctx: AppContext, f: Found, opts: { before?: number; 
   const lines = rows.map((x) => {
     const d = x.data;
     const text = d.type === 'noted' ? d.text : d.type === 'moved' ? `(moving ${d.from} → ${d.to}) ${d.note ?? ''}` : '';
-    return `### ${new Date(x.at).toISOString().slice(0, 16).replace('T', ' ')} UTC ${x.actor_id ? (who.get(x.actor_id) ?? 'a person') : 'the hub'}\n\n${text}`;
+    return `### ${clockOf(x.at)} ${x.actor_id ? (who.get(x.actor_id) ?? 'a person') : 'the hub'}\n\n${text}`;
   });
   const last = rows[rows.length - 1];
   return { lines, total: f.item.notes, ...(rows.length === limit && last ? { next: Number(last.position) } : {}) };

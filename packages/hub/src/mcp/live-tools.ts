@@ -18,12 +18,16 @@ import { driftReport } from '../worker/artifacts.ts';
 import { renderDriftView } from '../api/drift.ts';
 import { ConnectorInput, createConnector, inputOf, PUSH_CONNECTOR, updateConnector } from '../sources/save.ts';
 import { nextRunAt, queueConnectorRun, runRefusal } from '../sources/runs.ts';
+import { clockOf } from '../day.ts';
 
 type Content = { type: 'text'; text: string } | { type: 'image'; data: string; mimeType: string };
 type ToolResult = { content: Content[]; isError?: boolean };
 
 /** How a connector runs, as a tool answer says it. */
-const runsText = (s: { id: string; every_minutes: number | null }): string => (s.every_minutes === null ? 'runs=own-runner' : `runs=pool every=${s.every_minutes}m next=${nextRunAt(s, new Date())?.toISOString()}`);
+function runsText(s: { id: string; every_minutes: number | null }): string {
+  const next = nextRunAt(s, new Date());
+  return next ? `runs=pool every=${s.every_minutes}m next=${clockOf(next)}` : 'runs=own-runner';
+}
 
 const text = (t: string, isError = false): ToolResult => ({ content: [{ type: 'text', text: t }], ...(isError ? { isError } : {}) });
 
@@ -54,7 +58,7 @@ export function registerLiveTools(server: McpServer, ctx: AppContext, p: Princip
         const s = await connectorIn(ctx.db, ws.id, connector);
         if (!s) return text(`connector ${connector} not found in ${workspace}`, true);
         const runs = await listRuns(ctx.db, s.id, 20);
-        return text(`${s.slug} (${s.connector}) client=${s.client_id} ${runsText(s)} approval=${s.approval}${connectorBlocked(s, required) ? ` blocked: ${connectorBlocked(s, required)}` : ''}\nconfig: ${JSON.stringify(s.config)}\n${runs.map((r) => `${r.started_at.toISOString()}  ${r.status}  entities=${r.counts.entities ?? 0} appeared=${r.counts.appeared ?? 0} vanished=${r.counts.vanished ?? 0} overlaid=${r.counts.documentsOverlaid ?? 0}${r.error ? `  error: ${r.error}` : ''}${r.warnings.length ? `  warnings: ${r.warnings.length}` : ''}`).join('\n') || 'no runs yet'}`);
+        return text(`${s.slug} (${s.connector}) client=${s.client_id} ${runsText(s)} approval=${s.approval}${connectorBlocked(s, required) ? ` blocked: ${connectorBlocked(s, required)}` : ''}\nconfig: ${JSON.stringify(s.config)}\n${runs.map((r) => `${clockOf(r.started_at)}  ${r.status}  entities=${r.counts.entities ?? 0} appeared=${r.counts.appeared ?? 0} vanished=${r.counts.vanished ?? 0} overlaid=${r.counts.documentsOverlaid ?? 0}${r.error ? `  error: ${r.error}` : ''}${r.warnings.length ? `  warnings: ${r.warnings.length}` : ''}`).join('\n') || 'no runs yet'}`);
       }
       const rows = await workspaceConnectors(ctx.db, ws.id);
       return text(rows.map((s) => `${s.slug}: ${s.name} (${s.connector}) client=${s.client_id} ${runsText(s)} approval=${s.approval} enabled=${s.enabled} lastRun=${s.last_run ? `${s.last_run.status} at ${s.last_run.at}` : 'never'}`).join('\n') || 'no connectors in this workspace');
@@ -124,7 +128,7 @@ export function registerLiveTools(server: McpServer, ctx: AppContext, p: Princip
       const report = await driftReport(ctx, d.id);
       if (!report) return text('no drift report yet; the document renders first');
       const view = await renderDriftView(ctx, d, head, args.view);
-      const summary = `${report.counts.declaredNotObserved} declared but not observed, ${report.counts.observedNotDeclared} observed but not declared, ${report.counts.factMismatch} fact mismatches (report from ${report.updated_at.toISOString()}, binds ${d.bind_sources.join(', ') || 'nothing'})`;
+      const summary = `${report.counts.declaredNotObserved} declared but not observed, ${report.counts.observedNotDeclared} observed but not declared, ${report.counts.factMismatch} fact mismatches (report from ${clockOf(report.updated_at)}, binds ${d.bind_sources.join(', ') || 'nothing'})`;
       const content: Content[] = [{ type: 'text', text: `${summary}\n${view.sentences.join('\n') || 'The document agrees with everything observed.'}` }];
       if (args.picture !== false) content.push({ type: 'image', data: Buffer.from(await ctx.render.run('png', { svg: view.svg })).toString('base64'), mimeType: 'image/png' });
       return { content };
@@ -140,7 +144,7 @@ export function registerLiveTools(server: McpServer, ctx: AppContext, p: Princip
         const pub = await publicationById(ctx.db, publication);
         if (!pub || pub.workspace_id !== ws.id) return text(`publication ${publication} not found`, true);
         const runs = await listPublicationRuns(ctx.db, pub.id, 20);
-        return text(`${pub.name} -> ${pub.target} [${pub.formats.join(', ')}] trigger=${pub.trigger.kind}\n${runs.map((r) => `${r.started_at.toISOString()}  ${r.trigger}  ${r.status}  written=${r.written.length} skipped=${r.skipped.length}${r.error ? `  error: ${r.error}` : ''}`).join('\n') || 'no runs yet'}`);
+        return text(`${pub.name} -> ${pub.target} [${pub.formats.join(', ')}] trigger=${pub.trigger.kind}\n${runs.map((r) => `${clockOf(r.started_at)}  ${r.trigger}  ${r.status}  written=${r.written.length} skipped=${r.skipped.length}${r.error ? `  error: ${r.error}` : ''}`).join('\n') || 'no runs yet'}`);
       }
       const rows = await listPublications(ctx.db, ws.id);
       return text(rows.map((r) => `${r.id}  ${r.name} -> ${r.target} [${r.formats.join(', ')}] trigger=${r.trigger.kind} enabled=${r.enabled} approval=${r.approval} lastRun=${r.last_run ? `${r.last_run.status} at ${r.last_run.at}` : 'never'}`).join('\n') || 'no publications');

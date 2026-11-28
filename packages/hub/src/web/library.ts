@@ -8,6 +8,7 @@ import { escapeHtml, updatedLabel } from './html.ts';
 import { avatar } from './frame.ts';
 import { MARK } from './look.ts';
 import { ico } from './icons.ts';
+import { clockOf } from '../day.ts';
 
 export type Sort = 'recent' | 'name';
 export type Layout = 'grid' | 'list';
@@ -70,12 +71,12 @@ function card(w: AccessibleWorkspace, d: HomeDocument, userId: string, now: numb
   const views = d.views ? ` / ${plural(d.views, 'view')}` : '';
   return `<li class="doc-card"><a class="cover" href="${url}" aria-label="Open ${escapeHtml(d.name)}"></a>
 <div class="thumb${d.hasThumb ? '' : ' none'}">${thumb}${statusPill(d)}</div><div class="card-acts">${moreMenu(d, o.folders, deletable(w, d, o))}${starButton(d)}</div>
-<div class="body"><span class="name" title="${escapeHtml(d.name)}">${escapeHtml(d.name)}</span><span class="meta">${escapeHtml(spaceName(w, userId))}${views}</span><div class="foot">${d.author ? avatar(d.author) : ''}<span class="when" title="${d.updatedAt.toISOString()}">${when(d.updatedAt, now)}</span></div></div></li>`;
+<div class="body"><span class="name" title="${escapeHtml(d.name)}">${escapeHtml(d.name)}</span><span class="meta">${escapeHtml(spaceName(w, userId))}${views}</span><div class="foot">${d.author ? avatar(d.author) : ''}<span class="when" title="${clockOf(d.updatedAt)}">${when(d.updatedAt, now)}</span></div></div></li>`;
 }
 
 function row(w: AccessibleWorkspace, d: HomeDocument, userId: string, now: number, o: LibraryOptions): string {
   const url = docUrl(w, d);
-  return `<div class="lrow-wrap"><a class="lrow" href="${url}"><span class="nm"><span class="mini">${d.hasThumb ? `<img src="${url}/thumb.svg" alt="" loading="lazy">` : ''}</span><span>${escapeHtml(d.name)}</span></span><span class="sub hide-s">${escapeHtml(spaceName(w, userId))}</span><span class="num hide-s">${d.views || ''}</span><span class="hide-s">${statusPill(d)}</span><span class="num" title="${d.updatedAt.toISOString()}">${when(d.updatedAt, now)}</span></a>${moreMenu(d, o.folders, deletable(w, d, o))}${starButton(d)}</div>`;
+  return `<div class="lrow-wrap"><a class="lrow" href="${url}"><span class="nm"><span class="mini">${d.hasThumb ? `<img src="${url}/thumb.svg" alt="" loading="lazy">` : ''}</span><span>${escapeHtml(d.name)}</span></span><span class="sub hide-s">${escapeHtml(spaceName(w, userId))}</span><span class="num hide-s">${d.views || ''}</span><span class="hide-s">${statusPill(d)}</span><span class="num" title="${clockOf(d.updatedAt)}">${when(d.updatedAt, now)}</span></a>${moreMenu(d, o.folders, deletable(w, d, o))}${starButton(d)}</div>`;
 }
 
 export interface LibraryFolder {

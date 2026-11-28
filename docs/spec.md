@@ -420,7 +420,8 @@ An artifact is a rendered file (HTML, PNG, SVG, PDF, draw.io, VSDX) with its
 view id, version, content type, and freshness stamp. `PublishResult` lists
 what was written and where, for the run log.
 
-Triggers: on save, schedule (cron), on demand from the viewer, MCP tool
+Triggers: on save, schedule (cron, read on the wall clock in the hub's
+`TIME_ZONE`), on demand from the viewer, MCP tool
 `vantage_publish`, CI through the API.
 
 Self-refreshing HTML: the standalone file carries the hub URL, set id, and
@@ -764,15 +765,16 @@ diagrams, points an embed at a storage account static site or at the hub.
   asked, the model, its kind, and its tokens (fresh input, output, cached
   input read, cached input written), and the rows outlive their documents. The admin
   console's AI spend page shows a 12-month trend against the organization's monthly
-  limit and each person's use in a picked UTC month, split by model and
+  limit and each person's use in a picked month, split by model and
   kind (revise or drawn), with a
   CSV of it (`/api/v1/admin/ai-usage`, `/api/v1/admin/ai-usage.csv`).
   Admins set the limits there (`/api/v1/admin/ai-limits`): each person's
   daily and monthly tokens, the organization's monthly tokens, and any
   person's own limits or a block. Until an admin sets them,
   `AI_DAILY_TOKENS` is each person's daily limit and nothing else is
-  capped. A person sees what they have used, a warning past 80% of any
-  limit, and why a spent limit stops them.
+  capped. A day starts at midnight and a month on the first, in the
+  hub's `TIME_ZONE`. A person sees what they have used, a warning past
+  80% of any limit, and why a spent limit stops them.
 - Steer panel: reorder, collapse, expand, hide, pick a gesture, pin or unpin,
   add a note or callout, write the question, bind to an observed entity.
   Each action is a YAML edit saved as a version.
@@ -1115,7 +1117,10 @@ VAN-0001 sets. The code is `packages/hub/src/tracking/`.
 - A publication run that fails is a recorded run and a notification, not a
   retry; the schedule or a person queues the next one.
   `REVIEW_CRON` sets the nightly review minute; `TIME_ZONE` names the
-  estate's zone, in which every day the hub fills in falls; `EMBED_ORIGINS` lists the
+  estate's zone, in which every day the hub fills in falls, every
+  schedule reads its wall clock, every time the hub shows a person is
+  given with the zone's short name, and an AI token limit's day and
+  month reset; `EMBED_ORIGINS` lists the
   organization's allowed origins: the sites that may frame an embed, and
   that a published HTML copy may fetch the live bundle from.
 

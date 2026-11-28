@@ -8,7 +8,8 @@
  */
 import type { Config } from '../config.ts';
 import type { OrgLimits, PersonLimits } from '../revise/limits.ts';
-import { addMonths, parseMonth, type ModelUse, type MonthTotal, type PersonUse } from '../revise/usage.ts';
+import type { ModelUse, MonthTotal, PersonUse } from '../revise/usage.ts';
+import { addMonths, monthKey, parseMonth, timeZone } from '../day.ts';
 import { escapeHtml } from './html.ts';
 import { avatar } from './frame.ts';
 import { plural, when } from './library.ts';
@@ -32,10 +33,11 @@ export function tokens(n: number): string {
 
 const MONTHS = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
 
+/** A YYYY-MM as a person reads it: November 2026, or Nov. */
 function monthName(key: string, short = false): string {
-  const d = parseMonth(key)!;
-  const name = MONTHS[d.getUTCMonth()]!;
-  return short ? name.slice(0, 3) : `${name} ${d.getUTCFullYear()}`;
+  const [year, month] = key.split('-');
+  const name = MONTHS[Number(month) - 1] ?? key;
+  return short ? name.slice(0, 3) : `${name} ${year}`;
 }
 
 /** A number field for a cap: empty is no cap, or the default where `fallback` says what that is. */
@@ -84,10 +86,10 @@ export function adminRevisionsHtml(f: AdminFrame, policy: Pick<Config, 'AI_BASE_
 }
 
 function revisionsBody(policy: Pick<Config, 'AI_BASE_URL'>, r: RevisionsModel | undefined, now: number): string {
-  const intro = `<div class="tab-intro"><h1 id="t-head">AI spend</h1><p>${policy.AI_BASE_URL ? "Authors may ask the organization's model to carry out open comments on a document, or to draw a new diagram from a description. Everyone shares one key, so the hub counts each person's tokens and holds them to the limits below. Months and days are UTC." : 'Revisions from comments and diagrams drawn from words are off on this hub. The deployment turns them on with a model API and a key.'}</p></div>`;
+  const intro = `<div class="tab-intro"><h1 id="t-head">AI spend</h1><p>${policy.AI_BASE_URL ? `Authors may ask the organization's model to carry out open comments on a document, or to draw a new diagram from a description. Everyone shares one key, so the hub counts each person's tokens and holds them to the limits below. A day starts at midnight and a month on the first, in ${escapeHtml(timeZone())}.` : 'Revisions from comments and diagrams drawn from words are off on this hub. The deployment turns them on with a model API and a key.'}</p></div>`;
   if (!r) return `<section aria-labelledby="t-head">${intro}</section>`;
   const month = parseMonth(r.month)!;
-  const link = (d: Date): string => `/admin/revisions?month=${d.toISOString().slice(0, 7)}`;
+  const link = (d: Date): string => `/admin/revisions?month=${monthKey(d)}`;
   const nextMonth = addMonths(month, 1);
   const nav = `<div class="use-nav"><a class="btn sm ghost" href="${link(addMonths(month, -1))}">Earlier</a><b>${monthName(r.month)}</b>${nextMonth.getTime() <= now ? `<a class="btn sm ghost" href="${link(nextMonth)}">Later</a>` : ''}<a class="btn sm" href="/api/v1/admin/ai-usage.csv?month=${r.month}" download>Download CSV</a></div>`;
   const total = r.months.find((m) => m.month === r.month)?.tokens ?? 0;
