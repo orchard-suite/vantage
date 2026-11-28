@@ -147,7 +147,7 @@ export function pageRoutes(ctx: AppContext, apiReference: readonly RouteDoc[]): 
     const kinds = await kindsIn(ctx.db, p.orgId, [workspace.id]);
     const work = tab === 'work' ? await workTabModel(ctx, p, kinds, c.req.query()) : undefined;
     const workCount = kinds.length ? (await findItems(ctx, p, { kinds: kinds.map((k) => k.prefix), limit: 1 })).total : undefined;
-    const scope = await workspaceScope(ctx, p.orgId, workspace.scope);
+    const [scope, program] = await Promise.all([workspaceScope(ctx, p.orgId, workspace.scope), workspaceScope(ctx, p.orgId, workspace.program)]);
     const csrf = c.get('csrf');
     return c.html(workspaceHtml({
       nonce: c.get('nonce'),
@@ -175,6 +175,7 @@ export function pageRoutes(ctx: AppContext, apiReference: readonly RouteDoc[]): 
       ...(workCount !== undefined ? { workCount } : {}),
       ...(work ? { work } : {}),
       ...(scope ? { scope } : {}),
+      ...(program ? { program } : {}),
     }));
   });
 
