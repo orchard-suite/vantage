@@ -2,6 +2,12 @@
 
 All notable changes to this project will be documented in this file.
 
+## [4.10.0](https://github.com/orchard-suite/vantage/compare/v4.9.0...v4.10.0) (2026-11-28)
+
+### Features
+
+* **vantage:** build scope standards in editions ([48959e0](https://github.com/orchard-suite/vantage/commit/48959e0e75c5854cb72fe73d7ba05fc40d8e05f4))
+
 ## [4.9.0](https://github.com/orchard-suite/vantage/compare/v4.8.0...v4.9.0) (2026-11-27)
 
 ### Features
