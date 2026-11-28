@@ -189,11 +189,13 @@ describe.if(Boolean(url))('3006 on a real Postgres', () => {
     let bookmark = 0;
     let writing = true;
     const reader = (async () => {
-      while (writing || seen.length < writers * 26) {
+      for (;;) {
+        // Only an empty read sent after every write has committed shows the feed is drained: one sent before may miss the last.
+        const drained = !writing;
         const r = await changes(ctx, me, { after: bookmark, limit: 7 });
         for (const c of r.changes) seen.push(c.position);
         bookmark = r.next;
-        if (!writing && !r.changes.length) break;
+        if (drained && !r.changes.length) break;
       }
     })();
     await Promise.all(Array.from({ length: writers }, async (_, w) => {
