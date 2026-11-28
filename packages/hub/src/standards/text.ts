@@ -14,7 +14,7 @@ import { badRequest, HttpError } from '../http.ts';
 import { listScopes } from '../scopes/repo.ts';
 import { scopeSetting } from '../scopes/setting.ts';
 import type { Change, Edition, PackPin, StandardLine } from './model.ts';
-import { ESTATE, scopeKey, scopeName } from './model.ts';
+import { BOTH, ESTATE, scopeKey, scopeName } from './model.ts';
 import { editionOf } from './repo.ts';
 import { StandardSettingSchema, standardSetting, type StandardSetting } from './setting.ts';
 import { dayOf } from '../day.ts';
@@ -27,6 +27,7 @@ const day = (d: Date | null): string | undefined => (d ? dayOf(d) : undefined);
 /** How a line reached the scope: its own, down the tree, or by a facet. */
 export function pathText(l: StandardLine): string {
   if (!l.path.length) return 'own';
+  if (l.program !== undefined) return `through program ${l.program}${l.facet !== undefined ? `, by facet ${l.facet} from ${scopeName(l.from)}` : ''}`;
   const chain = l.path.map(scopeName).join(' < ');
   return l.facet !== undefined ? `by facet ${l.facet} from ${chain}` : `from ${chain}`;
 }
@@ -40,7 +41,7 @@ export function lineText(l: StandardLine): string {
     x.enforced_by.length ? `enforced by ${x.enforced_by.join(', ')}` : '',
     x.checked_by.length ? `checked by ${x.checked_by.join(', ')}` : '',
   ].filter(Boolean);
-  return `- ${x.binding} (${x.binds.join(', ')}${x.locked ? ', locked' : ''}): ${x.line} ${l.ref}, ${pathText(l)}${extra.length ? `; ${extra.join('; ')}` : ''}`;
+  return `- ${x.binding} (${x.binds.join(', ')}${x.locked ? ', locked' : ''}): ${x.line} ${l.ref}, ${pathText(l)}${extra.length ? `; ${extra.join('; ')}` : ''}${l.held !== undefined ? `; held back by conflicts/${l.held}` : ''}`;
 }
 
 export function packText(p: PackPin): string {
@@ -86,6 +87,7 @@ export function standardText(head: ScopeHead, e: Edition | undefined): string {
     packs: b.packs.length,
     exceptions: b.exceptions.length,
     pages: b.pages.length,
+    ...(b.conflicts?.length ? { conflicts: b.conflicts.length } : {}),
   };
   const out = [`---\n${stringify(header, { lineWidth: 0 })}---`];
   const areas = [...new Set(b.lines.map((l) => l.area))];
@@ -93,6 +95,7 @@ export function standardText(head: ScopeHead, e: Edition | undefined): string {
   if (!areas.length) out.push('', 'No line reaches this scope.');
   if (b.packs.length) out.push('', '## Packs', '', ...b.packs.map(packText));
   if (b.pages.length) out.push('', '## Procedures', '', ...b.pages.map((p) => `- ${p.page} (${p.title}): ${p.cites.join(', ')}`));
+  if (b.conflicts?.length) out.push('', '## Conflicts', '', ...b.conflicts.map((c) => `- conflicts/${c.conflict}: ${c.lines.join(' and ')}; ${c.holds === BOTH ? 'both hold, and the work that marks either waits for the ruling' : `${c.holds} holds until the ruling`}`));
   if (e.changes.length) out.push('', `## Changes from edition ${e.version - 1}`, '', ...e.changes.map(changeText));
   if (e.problems.length) out.push('', '## Refused by the machine gate', '', ...e.problems.map((x) => `- ${x}`));
   return `${out.join('\n')}\n`;

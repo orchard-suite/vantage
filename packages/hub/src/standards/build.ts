@@ -6,7 +6,8 @@
  */
 import type { Scope } from '../scopes/repo.ts';
 import { sha256 } from '../crypto.ts';
-import type { Change, EditionBody, PackPin, PagePin, ScopeKey, StandardLine } from './model.ts';
+import { BOTH, type Change, type ConflictPin, type EditionBody, type PackPin, type PagePin, type ScopeKey, type StandardLine } from './model.ts';
+import type { ClashRule } from './setting.ts';
 
 /** A record's line as its registry's scope holds it, before it reaches anywhere. */
 export type OwnLine = Omit<StandardLine, 'path' | 'facet'>;
@@ -58,6 +59,67 @@ export function assemble(parts: { own: readonly StandardLine[]; down: readonly S
     .sort((a, b) => a.page.localeCompare(b.page));
   const packs = [...parts.packs].sort((a, b) => a.pack.localeCompare(b.pack) || a.from.localeCompare(b.from));
   return { lines, packs, exceptions: [], pages };
+}
+
+/** An open conflict as a build reads it: the scope it was flagged in and its two lines' records. */
+export interface OpenConflict {
+  readonly number: number;
+  readonly scope: ScopeKey;
+  readonly lines: readonly [string, string];
+}
+
+export interface ClashFacts {
+  readonly clash: ClashRule;
+  readonly ranked: readonly string[];
+  readonly bindings: readonly string[];
+  /** A scope and the scopes above it, nearest first. */
+  readonly chainOf: (key: ScopeKey) => readonly ScopeKey[];
+}
+
+/** Which of two lines holds under the clash rule, or none while the ruling waits. */
+function winner(a: StandardLine, b: StandardLine, f: ClashFacts): StandardLine | undefined {
+  const rank = f.clash === 'stricter' ? (l: StandardLine) => f.bindings.indexOf(l.position.binding) : f.clash === 'ranked' ? (l: StandardLine) => Math.min(...f.chainOf(l.from).map((k) => f.ranked.indexOf(scopeLabel(k))).filter((i) => i >= 0), Infinity) : undefined;
+  if (!rank) return undefined;
+  const ra = rank(a);
+  const rb = rank(b);
+  return ra === rb ? undefined : ra < rb ? a : b;
+}
+
+const scopeLabel = (k: ScopeKey): string => (k === '' ? 'estate' : k);
+
+/**
+ * The open conflicts that act in a scope: each flagged in it or above it,
+ * with both its lines in the body. The line the clash rule holds back is
+ * marked with the conflict; with no winner both stay in force.
+ */
+export function withConflicts(body: EditionBody, key: ScopeKey, ancestors: ReadonlySet<ScopeKey>, open: readonly OpenConflict[], f: ClashFacts): EditionBody {
+  const pins: ConflictPin[] = [];
+  const held = new Map<string, number>();
+  for (const c of open) {
+    if (c.scope !== key && !ancestors.has(c.scope)) continue;
+    const a = body.lines.find((l) => l.record === c.lines[0]);
+    const b = body.lines.find((l) => l.record === c.lines[1]);
+    if (!a || !b) continue;
+    const w = winner(a, b, f);
+    pins.push({ conflict: c.number, lines: [a.ref, b.ref], holds: w?.ref ?? BOTH });
+    if (w) held.set(w === a ? b.record : a.record, c.number);
+  }
+  const lines = body.lines.map(({ held: _, ...l }) => (held.has(l.record) ? { ...l, held: held.get(l.record)! } : l));
+  const { conflicts: _, ...rest } = body;
+  return pins.length ? { ...rest, lines, conflicts: pins } : { ...rest, lines };
+}
+
+/** A scope and every scope above it, nearest first, ending at the whole estate. */
+export function chainOf(key: ScopeKey, byId: ReadonlyMap<string, Scope>): ScopeKey[] {
+  const out: ScopeKey[] = [];
+  for (let at: ScopeKey | undefined = byId.has(key) ? key : ''; at !== undefined && !out.includes(at); at = at === '' ? undefined : (byId.get(at)?.parent ?? '')) out.push(at === '' || byId.has(at) ? at : '');
+  return out;
+}
+
+/** The nearest scope at or above both. */
+export function sharedScope(a: ScopeKey, b: ScopeKey, byId: ReadonlyMap<string, Scope>): ScopeKey {
+  const up = new Set(chainOf(b, byId));
+  return chainOf(a, byId).find((k) => up.has(k)) ?? '';
 }
 
 /** A value with its keys in one order, so the same body always hashes the same. */

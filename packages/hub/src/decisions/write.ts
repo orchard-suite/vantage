@@ -23,6 +23,7 @@ import { ulid } from './ulid.ts';
 import { indexRecord, resolvePending } from './citations.ts';
 import { rebuildNow, rebuildStandards } from '../standards/publish.ts';
 import { standardSetting } from '../standards/setting.ts';
+import { checkStanding, inheritInputs, resolveInherits, bindingOf } from '../standards/inherit.ts';
 import { dayOf } from '../day.ts';
 import {
   DecisionCreateSchema,
@@ -106,11 +107,11 @@ export async function resolveGoverns(ctx: AppContext, p: Principal, registryWork
   return out;
 }
 
-async function relatedIds(db: Db, orgId: string, home: RegistryRow, refs: readonly string[]): Promise<string[]> {
+async function relatedIds(db: Db, orgId: string, home: RegistryRow, refs: readonly string[], what = 'related'): Promise<string[]> {
   const ids: string[] = [];
   for (const ref of refs) {
     const row = await placedByRef(db, orgId, ref, home.id);
-    if (!row) throw badRequest(`related record ${ref} not found`);
+    if (!row) throw badRequest(`${what} record ${ref} not found`);
     if (!ids.includes(row.id)) ids.push(row.id);
   }
   return ids;
@@ -147,6 +148,9 @@ async function prepare(ctx: AppContext, p: Principal, registry: RegistryRow, wor
   const v = parse(DecisionCreateSchema, input);
   await checkPosition(ctx, p, v.position);
   if (categoryName(registry.categories, v.category) === undefined) throw badRequest(`category ${v.category} is not in ${registry.prefix}'s scheme (${schemeText(registry.categories)})`);
+  const scope = await bindingOf(ctx.db, p.orgId, registry.workspace_id);
+  const inherits = await resolveInherits(ctx.db, p.orgId, { registryId: registry.id, scope, position: v.position ?? null }, v.inherits);
+  await checkStanding(ctx.db, p.orgId, { ref: `the new ${registry.prefix} record`, status: v.status, scope, inherits });
   return {
     row: {
       org_id: p.orgId,
@@ -164,6 +168,8 @@ async function prepare(ctx: AppContext, p: Principal, registry: RegistryRow, wor
       related: await relatedIds(ctx.db, p.orgId, registry, v.related),
       position: v.position ?? null,
       supersedes_id: supersedes,
+      amends: await relatedIds(ctx.db, p.orgId, registry, v.amends, 'amends'),
+      inherits,
       created_by: p.userId,
     },
     links: await resolveGoverns(ctx, p, workspace, v.governs),
@@ -200,9 +206,16 @@ export async function updateDecision(ctx: AppContext, p: Principal, ref: string,
   if (v.status && v.status !== row.status && row.status === 'superseded' && row.superseded_by_id) throw badRequest(`${refOf(row)} is superseded; its status stays as it is`);
   const link = await successionOf(ctx.db, p.orgId, row, v);
   const old = link?.old.id === row.id;
+  const position = v.position === undefined ? row.position : v.position;
+  const scope = await bindingOf(ctx.db, p.orgId, row.workspace_id);
+  // A changed position is checked again against the lines it refines.
+  const map = v.inherits ?? (v.position !== undefined && row.inherits.some((i) => i.stance === 'refines') ? await inheritInputs(ctx.db, p.orgId, row.inherits) : undefined);
+  const inherits = map ? await resolveInherits(ctx.db, p.orgId, { id: row.id, registryId: registry.id, scope, position }, map) : row.inherits;
+  const status = old ? 'superseded' : (v.status ?? row.status);
+  if (status !== row.status || v.inherits) await checkStanding(ctx.db, p.orgId, { ref: refOf(row), status, scope, inherits });
   const fields: DecisionFields = {
     title: v.title ?? row.title,
-    status: old ? 'superseded' : (v.status ?? row.status),
+    status,
     decided_on: v.decidedOn ?? row.decided_on,
     updated_on: v.updatedOn ?? (v.minor ? row.updated_on : dayOf()),
     deciders: v.deciders ?? row.deciders,
@@ -211,9 +224,11 @@ export async function updateDecision(ctx: AppContext, p: Principal, ref: string,
     consequences: v.consequences ?? row.consequences,
     alternatives: v.alternatives ?? row.alternatives,
     related: v.related ? await relatedIds(ctx.db, p.orgId, registry, v.related) : row.related,
-    position: v.position === undefined ? row.position : v.position,
+    position,
     supersedes_id: link && !old ? link.old.id : row.supersedes_id,
     superseded_by_id: link && old ? link.next.id : row.superseded_by_id,
+    amends: v.amends ? await relatedIds(ctx.db, p.orgId, registry, v.amends, 'amends') : row.amends,
+    inherits,
   };
   const links = v.governs ? await resolveGoverns(ctx, p, workspace, v.governs) : undefined;
   await ctx.db.transaction(async (tx) => {
@@ -295,6 +310,8 @@ export function fieldsOf(row: PlacedRow): DecisionFields {
     position: row.position,
     supersedes_id: row.supersedes_id,
     superseded_by_id: row.superseded_by_id,
+    amends: row.amends,
+    inherits: row.inherits,
   };
 }
 

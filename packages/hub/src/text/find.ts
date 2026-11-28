@@ -81,6 +81,8 @@ async function haystack(ctx: AppContext, p: Principal, given: Address, query: st
     case 'scope':
     case 'standards':
     case 'standard':
+    case 'conflicts':
+    case 'conflict':
       return { hays: [await thingHay(ctx, p, a)] };
     case 'registry':
       return { hays: await registryHays(ctx, p, a.prefix) };

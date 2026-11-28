@@ -72,6 +72,9 @@ export interface Fixture {
   readonly standardVersion: string;
   /** One scope's text, as the same file would sit on a disk. */
   readonly scope: string;
+  /** One conflict between two lines, and the list of conflicts, as the same files would sit on a disk. */
+  readonly conflict: string;
+  readonly conflicts: string;
   /** A team workspace's records and documents, as the same files would sit on a disk, for the tasks that search across the hub. */
   readonly shared: readonly DiskFile[];
   readonly dir: string;
@@ -209,13 +212,16 @@ export async function fixture(): Promise<Fixture> {
   const scope = /^=== scopes\/shop[^\n]*\n([\s\S]*)$/.exec(await hub.call('vantage_read', { addresses: ['scopes/shop'] }))![1]!;
   await hub.call('vantage_tool', { tool: 'vantage_registries', arguments: { action: 'create', workspace: 'platform', prefix: 'RULE', name: 'Platform rules' } });
   for (const text of RULES) await hub.call('vantage_write', { writes: [{ address: 'RULE', text }] });
+  await hub.call('vantage_write', { writes: [{ address: 'conflicts', text: '---\nlines: [RULE-2001, RULE-2003]\nscope: estate\n---\n\nLane 1 and lane 3 share one release, and the two rules cannot both be checked at it.\n' }] });
+  const conflict = /^=== conflicts\/1[^\n]*\n([\s\S]*)$/.exec(await hub.call('vantage_read', { addresses: ['conflicts/1'] }))![1]!;
+  const conflicts = /^=== conflicts [^\n]*\n([\s\S]*)$/.exec(await hub.call('vantage_read', { addresses: ['conflicts'] }))![1]!;
   const built = /^=== standard\/estate  version (\S+)[^\n]*\n([\s\S]*)$/.exec(await hub.call('vantage_read', { addresses: ['standard/estate'] }))!;
   const shared: DiskFile[] = [{ path: 'shop-standard.vantage.yaml', text: STANDARD }];
   for (let i = 1; i <= SHARED_RECORDS.length; i++) {
     const ref = `PLAT-${2000 + i}`;
     shared.push({ path: `decisions/${ref}.md`, text: new RegExp(`=== ${ref}[^\\n]*\\n([\\s\\S]*)$`).exec(await hub.call('vantage_read', { addresses: [ref] }))![1]! });
   }
-  return { t, hub, hubHeaders: me.headers, laptop: lap, ws, yaml, page, record, item, standard: built[2]!, standardVersion: built[1]!, scope, shared, dir: mkdtempSync(join(tmpdir(), 'vantage-cost-')) };
+  return { t, hub, hubHeaders: me.headers, laptop: lap, ws, yaml, page, record, item, standard: built[2]!, standardVersion: built[1]!, scope, conflict, conflicts, shared, dir: mkdtempSync(join(tmpdir(), 'vantage-cost-')) };
 }
 
 export interface Task {
@@ -347,6 +353,18 @@ export const TASKS: readonly Task[] = [
     kind: 'standard',
     run: (f) => f.hub.call('vantage_read', { addresses: ['standard/estate'], held: { 'standard/estate': f.standardVersion } }),
     disk: (f) => disk.read(`${DISK}/standards/estate.md`, f.standard, 1, 7),
+  },
+  {
+    name: 'read a conflict between two lines and what its steward rules on',
+    kind: 'standard',
+    run: (f) => f.hub.call('vantage_read', { addresses: ['conflicts/1'] }),
+    disk: (f) => disk.read(`${DISK}/conflicts/1.md`, f.conflict, 1, f.conflict.split('\n').length),
+  },
+  {
+    name: 'list the conflicts that wait for a ruling',
+    kind: 'standard',
+    run: (f) => f.hub.call('vantage_read', { addresses: ['conflicts'] }),
+    disk: (f) => disk.read(`${DISK}/conflicts.md`, f.conflicts, 1, f.conflicts.split('\n').length),
   },
   {
     name: "read a scope's profile, inherited fields and all",

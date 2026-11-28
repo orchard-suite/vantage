@@ -2,7 +2,7 @@
  * Discarding a record (VAN-3023): its writer takes back a record nothing
  * points to, and its number is free for the next record in its category.
  * Nothing points to it when no document or other record cites it, no
- * record names it in Related or in a supersede link, no item links it, no
+ * record names it in Related, amends, inherits, or a supersede link, no item links it, no
  * old citation of it still resolves, and every revision of it is the
  * caller's. What it governs, its revisions, and its own citations go with
  * it. A record anything points to is refused with the list, and is retired
@@ -74,13 +74,15 @@ async function pointersTo(ctx: AppContext, db: Db, p: Principal, row: PlacedRow)
     if (c.document_id) add(docs, c.document_id, placeOf(c.place_kind, c.place_id));
     else if (c.source_decision_id) add(records, c.source_decision_id, c.place_id);
   }
-  const linked = await db.query<{ id: string; related: boolean; supersedes: boolean; superseded: boolean }>(
-    `select id, related @> $3::jsonb as related, supersedes_id is not distinct from $2 as supersedes, superseded_by_id is not distinct from $2 as superseded
-       from decisions where org_id = $1 and id <> $2 and (related @> $3::jsonb or supersedes_id = $2 or superseded_by_id = $2)`,
-    [p.orgId, row.id, JSON.stringify([row.id])],
+  const linked = await db.query<{ id: string; related: boolean; amends: boolean; inherits: boolean; supersedes: boolean; superseded: boolean }>(
+    `select id, related @> $3::jsonb as related, amends @> $3::jsonb as amends, inherits @> $4::jsonb as inherits, supersedes_id is not distinct from $2 as supersedes, superseded_by_id is not distinct from $2 as superseded
+       from decisions where org_id = $1 and id <> $2 and (related @> $3::jsonb or amends @> $3::jsonb or inherits @> $4::jsonb or supersedes_id = $2 or superseded_by_id = $2)`,
+    [p.orgId, row.id, JSON.stringify([row.id]), JSON.stringify([{ line: row.id }])],
   );
   for (const l of linked) {
     if (l.related) add(records, l.id, 'related');
+    if (l.amends) add(records, l.id, 'amends it');
+    if (l.inherits) add(records, l.id, 'inherits its line');
     if (l.supersedes) add(records, l.id, 'supersedes it');
     if (l.superseded) add(records, l.id, 'is superseded by it');
   }

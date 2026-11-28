@@ -35,6 +35,10 @@ export function machineGate(body: EditionBody, facts: GateFacts): string[] {
     if (strangers.length) out.push(`${l.ref}: binds ${strangers.join(', ')}, not on the estate's list (${setting.binds.join(', ')})`);
     if (x.line.length > LINE_MAX) out.push(`${l.ref}: its line is ${x.line.length} characters; a line is at most ${LINE_MAX}`);
     for (const rule of x.checked_by) if (!packs.has(packOfRule(rule))) out.push(`${l.ref}: checked by ${rule}, but no pack ${packOfRule(rule)} reaches this scope (standard#packs)`);
+    for (const d of l.departs ?? []) {
+      const from = body.lines.find((x) => x.record === d);
+      if (from) out.push(`${l.ref}: departs from ${from.ref} with no exception in force (VAN-3020); grant one or change the record`);
+    }
   }
   for (const p of body.pages) {
     const ws = p.page.split('/')[0] ?? '';

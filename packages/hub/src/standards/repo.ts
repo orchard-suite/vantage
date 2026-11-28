@@ -23,25 +23,51 @@ interface LineRow {
   readonly categories: Category[];
   readonly workspace: string;
   readonly scope: string | null;
+  readonly inherits: { line: string; stance: string }[];
 }
 
 /** Every accepted record with a position in a team workspace, as its scope's own line. */
 export async function ownLines(db: Db, orgId: string): Promise<OwnLine[]> {
   const rows = await db.query<LineRow>(
-    `select d.id, d.number, d.title, d.category, d.position, r.prefix, r.categories, w.slug as workspace, w.scope
+    `select d.id, d.number, d.title, d.category, d.position, d.inherits, r.prefix, r.categories, w.slug as workspace, w.scope
        from decisions d join decision_registries r on r.id = d.registry_id join workspaces w on w.id = r.workspace_id
       where d.org_id = $1 and d.position is not null and d.status = 'accepted' and w.kind = 'team' and w.disabled_at is null`,
     [orgId],
   );
-  return rows.map((r) => ({
-    record: r.id,
-    ref: qualifiedRef(r.prefix, r.number),
-    title: r.title,
-    area: categoryName(r.categories, r.category) ?? String(r.category),
-    workspace: r.workspace,
-    from: r.scope ?? '',
-    position: PositionSchema.parse(r.position),
-  }));
+  return rows.map((r) => {
+    const departs = r.inherits.filter((i) => i.stance === 'departs').map((i) => i.line);
+    return {
+      record: r.id,
+      ref: qualifiedRef(r.prefix, r.number),
+      title: r.title,
+      area: categoryName(r.categories, r.category) ?? String(r.category),
+      workspace: r.workspace,
+      from: r.scope ?? '',
+      position: PositionSchema.parse(r.position),
+      ...(departs.length ? { departs } : {}),
+    };
+  });
+}
+
+/** A record that marks inherited lines, as the hub files its re-checks. */
+export interface MarkingRow {
+  readonly id: string;
+  readonly ref: string;
+  readonly inherits: { line: string; stance: string; scope: string; version: number }[];
+}
+
+/** Every live record whose map marks a line. */
+export async function markingRecords(db: Db, orgId: string): Promise<MarkingRow[]> {
+  const rows = await db.query<{ id: string; prefix: string; number: number; inherits: MarkingRow['inherits'] }>(
+    "select d.id, r.prefix, d.number, d.inherits from decisions d join decision_registries r on r.id = d.registry_id where d.org_id = $1 and d.inherits <> '[]'::jsonb and d.status in ('proposed', 'accepted')",
+    [orgId],
+  );
+  return rows.map((r) => ({ id: r.id, ref: qualifiedRef(r.prefix, r.number), inherits: r.inherits }));
+}
+
+/** Each owner and program that some team workspace pairs, by key: '' for a workspace with no owner. */
+export async function workspacePairs(db: Db, orgId: string): Promise<{ owner: ScopeKey; program: string }[]> {
+  return db.query<{ owner: ScopeKey; program: string }>("select distinct coalesce(scope, '') as owner, program from workspaces where org_id = $1 and program is not null and kind = 'team' and disabled_at is null order by 1, 2", [orgId]);
 }
 
 /** The team workspaces, by slug. */
@@ -168,6 +194,46 @@ export async function publishPending(db: Db, orgId: string, scope: ScopeKey, by:
 /** Holds the organization's builds to one at a time, until the transaction ends. */
 export async function lockStandards(tx: Db, orgId: string): Promise<void> {
   await tx.query("select pg_advisory_xact_lock(hashtext('standards:' || $1))", [orgId]);
+}
+
+export type Ruling = 'change' | 'narrow' | 'exception';
+
+/** A scope whose steward rules on a conflict; a null steward leaves it to an admin. */
+export interface ConflictSteward {
+  readonly scope: ScopeKey;
+  readonly steward: string | null;
+}
+
+export interface ConflictRow {
+  readonly org_id: string;
+  readonly number: number;
+  readonly scope: ScopeKey;
+  /** The two lines' records, by id. */
+  readonly lines: [string, string];
+  /** Who rules: the nearest shared scope, or each line's own scope when the clash crosses the program axis. */
+  readonly stewards: ConflictSteward[];
+  readonly why: string;
+  readonly state: 'open' | 'ruled';
+  readonly ruling: Ruling | null;
+  readonly note: string | null;
+  readonly exception: string | null;
+  readonly filed_by: string | null;
+  readonly filed_at: Date;
+  readonly ruled_by: string | null;
+  readonly ruled_at: Date | null;
+}
+
+export async function openConflicts(db: Db, orgId: string): Promise<ConflictRow[]> {
+  return db.query<ConflictRow>("select * from standard_conflicts where org_id = $1 and state = 'open' order by number", [orgId]);
+}
+
+export async function conflictOf(db: Db, orgId: string, n: number): Promise<ConflictRow | undefined> {
+  return maybe<ConflictRow>(db, 'select * from standard_conflicts where org_id = $1 and number = $2', [orgId, n]);
+}
+
+/** The newest conflicts, open first. */
+export async function listConflicts(db: Db, orgId: string, limit = 50): Promise<ConflictRow[]> {
+  return db.query<ConflictRow>("select * from standard_conflicts where org_id = $1 order by state = 'open' desc, number desc limit $2", [orgId, limit]);
 }
 
 export interface EditionSummary {

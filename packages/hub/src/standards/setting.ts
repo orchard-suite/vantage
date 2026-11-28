@@ -2,7 +2,8 @@
  * The estate's settings for its standards (VAN-3018), a setting of the
  * organization: the binding words a line may use, who a line may bind,
  * whether a scope's own changes wait for its steward, the words that may
- * not leave the estate, and the packs each scope adopts.
+ * not leave the estate, the packs each scope adopts, the clash rule for
+ * open conflicts, and the kind the hub files its checking into.
  */
 import { z } from 'zod';
 import type { Db } from '../db/db.ts';
@@ -11,6 +12,8 @@ import { PackSchema } from './model.ts';
 
 export const DEFAULT_BINDINGS = ['must', 'should', 'may'] as const;
 export const DEFAULT_BINDS = ['people', 'agents', 'systems'] as const;
+export const CLASH_RULES = ['hold', 'stricter', 'ranked'] as const;
+export type ClashRule = (typeof CLASH_RULES)[number];
 
 const Words = z.array(z.string().trim().min(1).max(40)).min(1).max(20);
 
@@ -21,6 +24,9 @@ export const StandardSettingSchema = z
     steward_gate: z.boolean().default(false).describe("Whether a scope's own changes wait for its steward before they publish"),
     withhold: z.array(z.string().trim().min(2).max(120)).max(200).default([]).describe('Words that may not leave the estate; an edition that holds one is refused'),
     packs: z.record(z.string().min(1), z.array(PackSchema).max(50)).default({}).describe('Scope id, or estate, to the packs it adopts'),
+    clash: z.enum(CLASH_RULES).default('hold').describe('What holds while a conflict waits for its ruling: hold (both lines, and the work that needs the ruling waits), stricter, or ranked'),
+    ranked: z.array(z.string().trim().min(1).max(120)).max(50).default([]).describe('Scope ids in order, first wins, for clash: ranked'),
+    checks: z.string().trim().toUpperCase().optional().describe('The kind, by prefix, the hub files its checking items into; with none it files nothing'),
   })
   .strict();
 

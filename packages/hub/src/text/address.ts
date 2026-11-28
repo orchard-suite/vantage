@@ -1,8 +1,8 @@
 /**
  * An address names one thing in the hub: a workspace, a document, a page,
  * a registry, a decision record, a kind, an item, the scope tree, the
- * estate's standard settings, one scope's built standard, the guide, or
- * the schema.
+ * estate's standard settings, one scope's built standard, the conflicts
+ * between lines and one conflict, the guide, or the schema.
  * A part after `#` names a piece of it. Prefixes are upper case and
  * workspace slugs lower case, so an address needs no type beside it; a
  * prefix is a registry's or a kind's, never both, and placeAddress asks the
@@ -22,6 +22,10 @@ export type Address =
   | { readonly kind: 'standards'; readonly part?: string }
   /** One scope's built standard, `estate` for the whole estate, with `@<n>` for one edition. */
   | { readonly kind: 'standard'; readonly scope: string; readonly part?: string }
+  /** The conflicts between lines, open first; a write here flags one. */
+  | { readonly kind: 'conflicts'; readonly part?: string }
+  /** One conflict, by its number; a patch of its header rules on it. */
+  | { readonly kind: 'conflict'; readonly number: number; readonly part?: string }
   | { readonly kind: 'workspace'; readonly workspace: string }
   | { readonly kind: 'document'; readonly workspace: string; readonly document: string; readonly part?: string }
   | { readonly kind: 'page'; readonly workspace: string; readonly document: string; readonly page: string; readonly part?: string }
@@ -50,6 +54,12 @@ export function parseAddress(text: string | undefined): Address {
   if (head.startsWith('scopes/')) return { kind: 'scope', id: head.slice('scopes/'.length), ...withPart };
   if (head === 'standard') return { kind: 'standards', ...withPart };
   if (head.startsWith('standard/')) return { kind: 'standard', scope: head.slice('standard/'.length), ...withPart };
+  if (head === 'conflicts') return { kind: 'conflicts', ...withPart };
+  if (head.startsWith('conflicts/')) {
+    const n = Number(head.slice('conflicts/'.length));
+    if (!Number.isInteger(n) || n < 1) throw badRequest(`${raw} is not an address; a conflict is conflicts/<number>`);
+    return { kind: 'conflict', number: n, ...withPart };
+  }
   if (head.startsWith('adr:') && isUlid(head.slice(4))) return { kind: 'record', ref: head, ...withPart };
   if (RECORD.test(head)) return { kind: 'record', ref: head, ...withPart };
   if (PREFIX_PATTERN.test(head)) return { kind: 'registry', prefix: head, ...withPart };
@@ -79,6 +89,10 @@ export function thingAddress(a: Address): string {
       return 'standard';
     case 'standard':
       return `standard/${a.scope}`;
+    case 'conflicts':
+      return 'conflicts';
+    case 'conflict':
+      return `conflicts/${a.number}`;
     case 'workspace':
       return a.workspace;
     case 'document':
