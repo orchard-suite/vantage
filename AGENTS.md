@@ -63,7 +63,8 @@ same pass.
 ## Delivery
 
 Agents push to main and land with `make land` (`make land BRANCH=<branch>`
-from a worktree): it runs the full check on this machine, then
-`release-damnit land`. CI runs the same check on GitHub's hosted runners
+from a worktree): it runs `release-damnit land`, which runs the config's
+check (`make check`) on exactly what lands and signs a landing proof that the
+release verifies. CI runs the same check on GitHub's hosted runners
 (`.github/workflows/test.yml`) before every release and on every pull
 request.

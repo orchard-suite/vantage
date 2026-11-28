@@ -2,6 +2,12 @@
 
 All notable changes to this project will be documented in this file.
 
+## [4.13.1](https://github.com/orchard-suite/vantage/compare/v4.13.0...v4.13.1) (2026-11-28)
+
+### Bug Fixes
+
+* **vantage:** file standard checks as the hub actor ([006e5de](https://github.com/orchard-suite/vantage/commit/006e5deacfa0789541aa99dcf2608a78fb71c93a))
+
 ## [4.13.0](https://github.com/orchard-suite/vantage/compare/v4.12.0...v4.13.0) (2026-11-28)
 
 ### Features
