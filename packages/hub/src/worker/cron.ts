@@ -1,8 +1,14 @@
 /**
  * A five-field cron matcher: minute, hour, day of month, month, day of
  * week. Supports `*`, numbers, ranges, lists, and steps, which covers what
- * a source schedule or a publication trigger needs. Times are UTC.
+ * the nightly review or a publication trigger needs. The fields read the
+ * wall clock in the estate's time zone (TIME_ZONE), so `0 3 * * *` is three
+ * at night where the estate is. A minute the clock skips in spring fires in
+ * the first minute after the skip; a minute it shows twice in autumn fires
+ * the first time only.
  */
+import { instantOf, offsetAt, wallOf } from '../day.ts';
+
 export interface CronExpr {
   readonly minute: ReadonlySet<number>;
   readonly hour: ReadonlySet<number>;
@@ -65,10 +71,54 @@ export function parseCron(text: string): CronExpr {
   return { minute: parsed.minute!, hour: parsed.hour!, dayOfMonth: parsed.dayOfMonth!, month: parsed.month!, dayOfWeek: parsed.dayOfWeek!, text: text.trim() };
 }
 
-/** Whether the expression fires in the minute containing `at` (UTC). */
+const MINUTE = 60_000;
+const HOUR = 3_600_000;
+
+/**
+ * The wall-clock minutes, as Dates whose UTC fields read the estate's
+ * clock, that the minute containing `at` stands for: one most of the time,
+ * none when the clock shows that minute a second time, and every skipped
+ * minute with it when the clock has just jumped ahead.
+ */
+export function wallMinutes(at: Date): Date[] {
+  const t = Math.floor(at.getTime() / MINUTE) * MINUTE;
+  const drop = offsetAt(t - HOUR) - offsetAt(t);
+  if (drop > 0 && offsetAt(t - drop) > offsetAt(t)) return [];
+  const now = wallOf(t).getTime();
+  const out: Date[] = [];
+  for (let w = wallOf(t - MINUTE).getTime() + MINUTE; w <= now; w += MINUTE) out.push(new Date(w));
+  return out.length ? out : [new Date(now)];
+}
+
+const fires = (e: CronExpr, w: Date): boolean => e.minute.has(w.getUTCMinutes()) && e.hour.has(w.getUTCHours()) && e.dayOfMonth.has(w.getUTCDate()) && e.month.has(w.getUTCMonth() + 1) && e.dayOfWeek.has(w.getUTCDay());
+
+/** Whether the expression fires in the minute containing `at`, read on the estate's wall clock. */
 export function cronMatches(expr: CronExpr | string, at: Date): boolean {
   const e = typeof expr === 'string' ? parseCron(expr) : expr;
-  return e.minute.has(at.getUTCMinutes()) && e.hour.has(at.getUTCHours()) && e.dayOfMonth.has(at.getUTCDate()) && e.month.has(at.getUTCMonth() + 1) && e.dayOfWeek.has(at.getUTCDay());
+  return wallMinutes(at).some((w) => fires(e, w));
+}
+
+/** The start of the first minute after `after` in which the expression fires; undefined when it fires on no day in the next four years. */
+export function nextFire(expr: CronExpr | string, after: Date): Date | undefined {
+  const e = typeof expr === 'string' ? parseCron(expr) : expr;
+  const start = Math.floor(after.getTime() / MINUTE) * MINUTE + MINUTE;
+  const end = wallOf(start).getTime() + 4 * 366 * 24 * HOUR;
+  let w = wallOf(start).getTime();
+  while (w < end) {
+    const d = new Date(w);
+    if (!e.month.has(d.getUTCMonth() + 1)) w = Date.UTC(d.getUTCFullYear(), d.getUTCMonth() + 1, 1);
+    else if (!e.dayOfMonth.has(d.getUTCDate()) || !e.dayOfWeek.has(d.getUTCDay())) w = Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate() + 1);
+    else if (!e.hour.has(d.getUTCHours())) w = Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate(), d.getUTCHours() + 1);
+    else if (!e.minute.has(d.getUTCMinutes())) w += MINUTE;
+    else {
+      // The reading's instant, or, for a reading the clock skips, the first minute after the skip.
+      let t = Math.max(instantOf(w).getTime(), start);
+      while (wallOf(t - MINUTE).getTime() >= w && t - MINUTE >= start) t -= MINUTE;
+      if (cronMatches(e, new Date(t))) return new Date(t);
+      w += MINUTE;
+    }
+  }
+  return undefined;
 }
 
 /** Returns a problem message, or undefined when the expression is valid. */
@@ -81,7 +131,7 @@ export function cronProblem(text: string): string | undefined {
   }
 }
 
-/** The minute `at` falls in, as the key the scheduler uses to enqueue once per minute. */
+/** The UTC minute `at` falls in, as the key the scheduler uses to enqueue once per minute. */
 export function minuteKey(at: Date): string {
   return at.toISOString().slice(0, 16);
 }

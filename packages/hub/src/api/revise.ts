@@ -24,7 +24,8 @@ import { badRequest, HttpError, notFound } from '../http.ts';
 import { audit } from '../audit.ts';
 import { createRevision, listRevisions, moveRevision, publicRevision, revisionById, type RevisionRow } from '../revise/repo.ts';
 import { allowance, clearPersonLimits, orgLimits, OrgLimitsSchema, personLimits, PersonLimitsSchema, refusal, setOrgLimits, setPersonLimits } from '../revise/limits.ts';
-import { monthKey, monthlyTotals, monthStart, parseMonth, usageCsv, usageForMonth } from '../revise/usage.ts';
+import { monthlyTotals, usageCsv, usageForMonth } from '../revise/usage.ts';
+import { monthKey, monthStart, parseMonth } from '../day.ts';
 
 const DOC = '/documents/:id';
 const REV = `${DOC}/revisions/:revision`;
@@ -126,7 +127,7 @@ export function reviseRoutes(ctx: AppContext, reg: OpenApiRegistry): Hono<HubEnv
     return m;
   };
 
-  reg.add({ method: 'get', path: '/admin/ai-usage', summary: "Each person's revisions and tokens in one UTC month (default this one), split by model, the biggest spender first, with the organization's totals for the 12 months up to it", tag: 'admin', query: ['month'], auth: 'admin' });
+  reg.add({ method: 'get', path: '/admin/ai-usage', summary: "Each person's revisions and tokens in one month of the hub's time zone (default this one), split by model, the biggest spender first, with the organization's totals for the 12 months up to it", tag: 'admin', query: ['month'], auth: 'admin' });
   app.get('/admin/ai-usage', async (c) => {
     const p = requireAdmin(principal(c));
     const month = askedMonth(c.req.query('month'));

@@ -13,6 +13,7 @@ import { HttpError } from '../http.ts';
 import { guardFor } from './run.ts';
 import { documentReaders, listMentions } from '../mentions.ts';
 import { addReaction, listReactions, reactionsText, ReactionKindSchema, removeReaction, type ReactionKind } from '../reactions.ts';
+import { clockOf } from '../day.ts';
 
 type ToolResult = { content: { type: 'text'; text: string }[]; isError?: boolean };
 
@@ -45,7 +46,7 @@ export function registerReviewTools(server: McpServer, ctx: AppContext, p: Princ
     { description: 'Comments that mention the person you act for, newest first, each with its document, view, boxes, and a link that opens it.', inputSchema: { limit: z.number().int().min(1).max(200).optional() } },
     guarded<{ limit?: number | undefined }>('vantage_mentions', async ({ limit }) => {
       const rows = await listMentions(ctx, p, limit ?? 20);
-      return text(rows.map((m) => `${m.commentId}  ${m.resolved ? 'resolved' : 'open'}  ${m.workspace}/${m.document} view=${m.view ?? '-'} boxes=${m.targets.join(',') || '-'}  by ${m.authorLabel ?? '-'}  ${m.createdAt.toISOString()}\n  ${m.text.replace(/\n/g, '\n  ')}\n  ${m.link}`).join('\n') || 'no mentions');
+      return text(rows.map((m) => `${m.commentId}  ${m.resolved ? 'resolved' : 'open'}  ${m.workspace}/${m.document} view=${m.view ?? '-'} boxes=${m.targets.join(',') || '-'}  by ${m.authorLabel ?? '-'}  ${clockOf(m.createdAt)}\n  ${m.text.replace(/\n/g, '\n  ')}\n  ${m.link}`).join('\n') || 'no mentions');
     }),
   );
 

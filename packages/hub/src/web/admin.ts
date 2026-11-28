@@ -16,9 +16,10 @@ import { avatar } from './frame.ts';
 import { plural, when } from './library.ts';
 import { adminPage, bytes, diskBar, diskKey, treemap, type AdminFrame, type MapTile } from './admin-kit.ts';
 import { flows } from './admin-flows.ts';
-import { dayOf } from '../day.ts';
+import { clockOf, dayOf } from '../day.ts';
+import { nextFire } from '../worker/cron.ts';
 
-export type AdminPolicy = Pick<Config, 'TEAM_WORKSPACES' | 'PUBLICATION_APPROVAL' | 'CONNECTOR_APPROVAL' | 'GUEST_LINKS' | 'SIGN_IN_GROUPS' | 'AI_BASE_URL' | 'AI_MODEL'>;
+export type AdminPolicy = Pick<Config, 'TEAM_WORKSPACES' | 'PUBLICATION_APPROVAL' | 'CONNECTOR_APPROVAL' | 'GUEST_LINKS' | 'SIGN_IN_GROUPS' | 'AI_BASE_URL' | 'AI_MODEL' | 'TIME_ZONE' | 'REVIEW_CRON'>;
 
 export interface AdminHomeModel extends AdminFrame {
   readonly policy: AdminPolicy;
@@ -102,9 +103,15 @@ export function peopleList(list: readonly AdminPerson[], granted: boolean): stri
   return `<div class="a-table">${head}<ul class="a-rows">${rows.join('')}</ul></div>`;
 }
 
-function rules(p: AdminPolicy): string {
+/** When the nightly review runs, as the cron reads it in the hub's zone, and its next run. */
+function reviewRule(p: AdminPolicy, now: number): string {
+  const next = nextFire(p.REVIEW_CRON, new Date(now));
+  return `<code>${escapeHtml(p.REVIEW_CRON)}</code>, ${next ? `next ${escapeHtml(clockOf(next))}` : 'never in the next four years'}`;
+}
+
+function rules(p: AdminPolicy, now: number): string {
   const rule = (label: string, value: string): string => `<div><dt>${label}</dt><dd>${value}</dd></div>`;
-  return `<section class="adm-sec" aria-labelledby="s-rules"><h2 class="sec" id="s-rules">How this hub is set</h2><p class="sec-note">The deployment sets these in its settings, not here.</p><dl class="rules">${rule('Team workspaces', p.TEAM_WORKSPACES === 'everyone' ? 'Anyone signed in may make one' : 'Admins and the people you let')}${rule('Publications', p.PUBLICATION_APPROVAL ? 'Run once an admin approves' : 'Run without approval')}${rule('Connectors', p.CONNECTOR_APPROVAL ? 'Send once an admin approves' : 'Send without approval')}${rule('Guest links', p.GUEST_LINKS ? 'Allowed' : 'Off on this hub')}${rule('AI revisions from comments', p.AI_BASE_URL ? `On, with ${escapeHtml(p.AI_MODEL ?? 'the default model')}` : 'Off on this hub')}${rule('Who signs in', p.SIGN_IN_GROUPS.length ? escapeHtml(p.SIGN_IN_GROUPS.join(', ')) : 'Anyone the identity provider signs in')}</dl></section>`;
+  return `<section class="adm-sec" aria-labelledby="s-rules"><h2 class="sec" id="s-rules">How this hub is set</h2><p class="sec-note">The deployment sets these in its settings, not here.</p><dl class="rules">${rule('Team workspaces', p.TEAM_WORKSPACES === 'everyone' ? 'Anyone signed in may make one' : 'Admins and the people you let')}${rule('Publications', p.PUBLICATION_APPROVAL ? 'Run once an admin approves' : 'Run without approval')}${rule('Connectors', p.CONNECTOR_APPROVAL ? 'Send once an admin approves' : 'Send without approval')}${rule('Guest links', p.GUEST_LINKS ? 'Allowed' : 'Off on this hub')}${rule('AI revisions from comments', p.AI_BASE_URL ? `On, with ${escapeHtml(p.AI_MODEL ?? 'the default model')}` : 'Off on this hub')}${rule('Time zone', `${escapeHtml(p.TIME_ZONE)}: days, months, and schedules count in it`)}${rule('Nightly review', reviewRule(p, now))}${rule('Who signs in', p.SIGN_IN_GROUPS.length ? escapeHtml(p.SIGN_IN_GROUPS.join(', ')) : 'Anyone the identity provider signs in')}</dl></section>`;
 }
 
 /** What needs an admin now: approvals, purges on the way, runs that failed. */
@@ -157,6 +164,6 @@ export function adminHomeHtml(m: AdminHomeModel): string {
 <section class="adm-sec" aria-labelledby="s-ws"><h2 class="sec" id="s-ws">Workspaces <span class="tally">${fp.workspaces.length}</span></h2><p class="sec-note">Biggest first. People counts everyone who can open it. Your sidebar holds only what you own or were shared; every workspace is here.</p>${workspaceList(fp.workspaces, now)}</section>
 <section class="adm-sec" aria-labelledby="s-people"><h2 class="sec" id="s-people">People <span class="tally">${fp.people.length}</span></h2><p class="sec-note">Everyone who has signed in. Owns counts their workspaces, Diagrams what those hold, Made what they made anywhere. Also opens counts other people's workspaces a grant lets them into. ${granted ? 'Only admins and the people you let make team workspaces.' : 'Anyone signed in may make team workspaces.'}</p>${peopleList(fp.people, granted)}</section>
 ${flows(m.connectors, m.publications, m.policy, now, true, { in: 'No connectors yet. They show up when an author adds one to a workspace.', out: 'No publications yet. They show up when an author sets one up.' })}
-${rules(m.policy)}`;
+${rules(m.policy, now)}`;
   return adminPage(m, 'Admin', [], body);
 }

@@ -2,6 +2,7 @@
 import type { MentionItem } from '../mentions.ts';
 import { escapeHtml } from './html.ts';
 import { plural, when } from './library.ts';
+import { clockOf } from '../day.ts';
 
 export function mentionsSection(items: readonly MentionItem[], now: number): string {
   const head = `<div class="lib-head"><h2 id="mentions">Mentions</h2><span>${items.length ? plural(items.length, 'comment') : ''}</span></div>`;
@@ -9,7 +10,7 @@ export function mentionsSection(items: readonly MentionItem[], now: number): str
   const rows = items
     .map((m) => {
       const by = `${m.authorLabel ?? 'Someone'}, ${when(m.createdAt, now)}${m.resolved ? ', resolved' : ''}`;
-      return `<li><a href="${escapeHtml(m.link)}"><span class="name">${escapeHtml(m.documentName)}</span><span class="where" title="${escapeHtml(m.createdAt.toISOString())}">${escapeHtml(by)}</span><span class="snip">${escapeHtml(m.text)}</span></a></li>`;
+      return `<li><a href="${escapeHtml(m.link)}"><span class="name">${escapeHtml(m.documentName)}</span><span class="where" title="${escapeHtml(clockOf(m.createdAt))}">${escapeHtml(by)}</span><span class="snip">${escapeHtml(m.text)}</span></a></li>`;
     })
     .join('');
   return `<section class="lib" aria-labelledby="mentions">${head}<ul class="results">${rows}</ul></section>`;

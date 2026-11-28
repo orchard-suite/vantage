@@ -148,6 +148,8 @@ export interface Allowance {
   readonly monthly: number | null;
   readonly orgMonth: number;
   readonly orgMonthly: number | null;
+  /** The hub's time zone, in which a day starts at midnight and a month on the first. */
+  readonly timeZone: string;
 }
 
 /** Whether this hub revises from comments, and what the reader may do with it. */

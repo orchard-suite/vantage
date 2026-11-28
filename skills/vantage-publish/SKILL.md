@@ -45,7 +45,7 @@ copy and its publish date.
    `vantage publish <file> --target fs --to <dir>` locally) and check the run
    log: written, skipped, and why.
 5. Set the trigger: `on-save` for places that should never be stale,
-   `schedule` with a cron for places that rate limit, `manual` for releases.
+   `schedule` with a cron (read in the hub's time zone) for places that rate limit, `manual` for releases.
 6. Tell the operator the destination path or URL and the trigger.
 
 ## SharePoint note

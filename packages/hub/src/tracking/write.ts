@@ -21,6 +21,7 @@ import { requireApp, requirePerson } from './apps.ts';
 import { dependents, rework } from './worked.ts';
 import { placement, type Place, type Placement } from './rank.ts';
 import { checkDates } from './dates.ts';
+import { clockOf } from '../day.ts';
 
 /** What a write answers: one line, and the item as it stands after. */
 export interface WriteAnswer {
@@ -400,7 +401,7 @@ export async function claim(ctx: AppContext, p: Principal, ref: string, minutes:
     const s = before!;
     const named = (x: ItemState): ReturnType<typeof namedBy> => namedBy(f.kind.definition, x, members);
     if (s.class === 'done' || s.class === 'parked') throw new HttpError(409, `${s.key} is ${s.state}; there is no work to claim`);
-    if (live(s.claim) && s.claim!.userId !== p.userId) throw new HttpError(409, `${s.key} is claimed until ${s.claim!.until.slice(0, 16).replace('T', ' ')} UTC; vantage_queue offers it again when the claim runs out`);
+    if (live(s.claim) && s.claim!.userId !== p.userId) throw new HttpError(409, `${s.key} is claimed until ${clockOf(s.claim!.until)}; vantage_queue offers it again when the claim runs out`);
     const events: { id: string; data: EventData }[] = [];
     if (s.claim && !live(s.claim) && s.claim.userId !== p.userId) events.push({ id: s.id, data: { type: 'released', userId: s.claim.userId } });
     events.push({ id: s.id, data: { type: 'claimed', userId: p.userId, until: until(mins) } });

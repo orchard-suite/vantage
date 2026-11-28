@@ -1513,7 +1513,9 @@ views:
 - `{"item": "SW-12", "claim": true}` takes the item for 20 minutes. Any
   call you make on it renews the claim, and on a laptop the bridge renews
   it while your session lives. A claim that runs out puts the item back
-  in the queue.
+  in the queue. A claim's end, and every time in an item's history and
+  notes, is given in the hub's time zone with its short name
+  (`2026-11-27 19:20 CST`).
 - `{"item": "SW-12", "ask": "..."}` moves the item to where it waits for a
   person, carrying the question. It leaves the queue until it is answered.
 - `finish` ends a run in one action: `{"item": "SW-12", "finish": {"move":

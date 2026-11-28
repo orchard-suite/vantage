@@ -57,8 +57,9 @@ governance:
 # chart sets. Any variable in docs/deploy.md.
 config:
   LOG_LEVEL: info
-  # The estate's time zone (IANA): a record's Last updated, when a write
-  # leaves it out, is today in it. Unset is UTC.
+  # The estate's time zone (IANA). Days, months, and times the hub shows,
+  # schedules (REVIEW_CRON, publication crons), and the AI token limits'
+  # day and month all count in it. Unset is UTC.
   # TIME_ZONE: Europe/Berlin
   FRESHNESS_DAYS: "7"
   RETENTION_VERSIONS: "100"

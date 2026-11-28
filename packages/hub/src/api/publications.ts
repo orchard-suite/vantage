@@ -75,7 +75,7 @@ export function publicationRoutes(ctx: AppContext, reg: OpenApiRegistry): Hono<H
     return c.json({ publications: (await listPublications(ctx.db, ws.id, doc?.id)).map((p) => publicationJson(p, docs.get(p.document_id))) });
   });
 
-  reg.add({ method: 'post', path: base, summary: 'Create a publication; config is validated against the target schema', tag: 'publications', params: ['workspace'], body: { name: 'label', document: 'document slug', views: 'view ids; omit for all', formats: 'html, png, svg, pdf, drawio, vsdx', target: 'target id', config: 'target config; secrets by name', trigger: '{kind: manual | on-save | schedule, cron}', audience: 'org | public | external', theme: 'optional', titleBlock: 'default true', enabled: 'default true' }, auth: 'author', responses: { '201': 'created', '400': 'invalid target, config, or schedule' } });
+  reg.add({ method: 'post', path: base, summary: 'Create a publication; config is validated against the target schema', tag: 'publications', params: ['workspace'], body: { name: 'label', document: 'document slug', views: 'view ids; omit for all', formats: 'html, png, svg, pdf, drawio, vsdx', target: 'target id', config: 'target config; secrets by name', trigger: '{kind: manual | on-save | schedule, cron (read in the hub time zone)}', audience: 'org | public | external', theme: 'optional', titleBlock: 'default true', enabled: 'default true' }, auth: 'author', responses: { '201': 'created', '400': 'invalid target, config, or schedule' } });
   app.post(base, async (c) => {
     const p = principal(c);
     const ws = await requireWorkspace(ctx.db, p, c.req.param('workspace'), 'author');

@@ -2,15 +2,16 @@
  * What revisions may spend. An admin sets the defaults for each person (a
  * daily and a monthly cap), a monthly cap for the whole organization, and
  * any person's own caps or a block. Without settings the deployment's
- * AI_DAILY_TOKENS is the daily cap and nothing else is capped. Days and
- * months are UTC.
+ * AI_DAILY_TOKENS is the daily cap and nothing else is capped. A day
+ * starts at midnight and a month on the first, in the estate's TIME_ZONE.
  */
 import { z } from 'zod';
 import type { Config } from '../config.ts';
 import type { Db } from '../db/db.ts';
 import { maybe } from '../db/db.ts';
 import { HttpError } from '../http.ts';
-import { dayStart, monthStart, spentSince } from './usage.ts';
+import { spentSince } from './usage.ts';
+import { dayStart, monthStart, timeZone } from '../day.ts';
 
 /** A cap in tokens; null is no cap. */
 const Cap = z.number().int().positive().max(2_000_000_000).nullable();
@@ -79,6 +80,8 @@ export interface Allowance {
   readonly monthly: number | null;
   readonly orgMonth: number;
   readonly orgMonthly: number | null;
+  /** The estate's time zone, in which `today` and `month` are counted. */
+  readonly timeZone: string;
 }
 
 /** What a person has spent against each cap that applies to them. */
@@ -90,14 +93,14 @@ export async function allowance(db: Db, config: Config, orgId: string, userId: s
     spentSince(db, orgId, userId, monthStart(now)),
     spentSince(db, orgId, undefined, monthStart(now)),
   ]);
-  return { blocked: own?.blocked ?? false, today, daily: own?.daily_tokens ?? org.daily, month, monthly: own?.monthly_tokens ?? org.monthly, orgMonth, orgMonthly: org.orgMonthly };
+  return { blocked: own?.blocked ?? false, today, daily: own?.daily_tokens ?? org.daily, month, monthly: own?.monthly_tokens ?? org.monthly, orgMonth, orgMonthly: org.orgMonthly, timeZone: timeZone() };
 }
 
 /** Why a person may not start a revision now, as the error to answer; undefined when they may. */
 export function refusal(a: Allowance): HttpError | undefined {
   if (a.blocked) return new HttpError(403, 'an admin turned the model off for you');
-  if (a.orgMonthly !== null && a.orgMonth >= a.orgMonthly) return new HttpError(429, "the organization has used this month's model tokens; the limit resets on the first of the month (UTC)");
-  if (a.monthly !== null && a.month >= a.monthly) return new HttpError(429, "you have used this month's model tokens; the limit resets on the first of the month (UTC)");
-  if (a.daily !== null && a.today >= a.daily) return new HttpError(429, "you have used today's model tokens; the limit resets at midnight UTC");
+  if (a.orgMonthly !== null && a.orgMonth >= a.orgMonthly) return new HttpError(429, `the organization has used this month's model tokens; the limit resets on the first of the month (${a.timeZone})`);
+  if (a.monthly !== null && a.month >= a.monthly) return new HttpError(429, `you have used this month's model tokens; the limit resets on the first of the month (${a.timeZone})`);
+  if (a.daily !== null && a.today >= a.daily) return new HttpError(429, `you have used today's model tokens; the limit resets at midnight (${a.timeZone})`);
   return undefined;
 }

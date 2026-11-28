@@ -26,9 +26,9 @@ export function allowanceNote(a: Allowance): AllowanceNote {
   const line = `${tokens(a.today)}${a.daily !== null ? ` of ${tokens(a.daily)}` : ''} tokens used today, ${tokens(a.month)}${a.monthly !== null ? ` of ${tokens(a.monthly)}` : ''} this month.`;
   if (a.blocked) return { stop: 'An admin turned the model off for you.', line };
   const limits = [
-    { used: a.orgMonth, cap: a.orgMonthly, stop: "The organization has used this month's model tokens. The limit resets on the first of the month (UTC).", warn: (p: number) => `The organization has used ${p}% of this month's model tokens.` },
-    { used: a.month, cap: a.monthly, stop: "You have used this month's tokens. The limit resets on the first of the month (UTC).", warn: (p: number) => `You have used ${p}% of this month's tokens.` },
-    { used: a.today, cap: a.daily, stop: "You have used today's tokens. The limit resets at midnight UTC.", warn: (p: number) => `You have used ${p}% of today's tokens.` },
+    { used: a.orgMonth, cap: a.orgMonthly, stop: `The organization has used this month's model tokens. The limit resets on the first of the month (${a.timeZone}).`, warn: (p: number) => `The organization has used ${p}% of this month's model tokens.` },
+    { used: a.month, cap: a.monthly, stop: `You have used this month's tokens. The limit resets on the first of the month (${a.timeZone}).`, warn: (p: number) => `You have used ${p}% of this month's tokens.` },
+    { used: a.today, cap: a.daily, stop: `You have used today's tokens. The limit resets at midnight (${a.timeZone}).`, warn: (p: number) => `You have used ${p}% of today's tokens.` },
   ];
   const spent = limits.find((l) => l.cap !== null && l.used >= l.cap);
   if (spent) return { stop: spent.stop, line };
