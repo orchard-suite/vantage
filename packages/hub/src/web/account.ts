@@ -14,6 +14,7 @@ import { avatar, appPage } from './frame.ts';
 import { frameWorkspaces, type HomeUser } from './home.ts';
 import { escapeHtml } from './html.ts';
 import { ico } from './icons.ts';
+import { dayOf } from '../day.ts';
 
 export interface AccountModel {
   readonly nonce: string;
@@ -31,19 +32,18 @@ export interface AccountModel {
   readonly now?: number;
 }
 
-const day = (d: Date): string => d.toISOString().slice(0, 10);
 
 function tokenRow(t: TokenRow, now: number): string {
   const expired = t.expires_at !== null && t.expires_at.getTime() < now;
-  const ends = t.expires_at ? `${expired ? 'Ended' : 'Ends'} ${day(t.expires_at)}` : 'Never ends';
-  const used = t.last_used_at ? `Last used ${day(t.last_used_at)}` : 'Never used';
+  const ends = t.expires_at ? `${expired ? 'Ended' : 'Ends'} ${dayOf(t.expires_at)}` : 'Never ends';
+  const used = t.last_used_at ? `Last used ${dayOf(t.last_used_at)}` : 'Never used';
   const kind = t.kind === 'automation' ? '<span class="pill">Automation</span>' : '';
-  return `<li data-token="${escapeHtml(t.id)}"><span class="tk-name">${ico('key', 15)}<b>${escapeHtml(t.name)}</b>${kind}${expired ? '<span class="pill warn">Ended</span>' : ''}</span><span class="tk-when">Made ${day(t.created_at)} · ${used} · ${ends}</span><button class="btn ghost sm" type="button" data-revoke="${escapeHtml(t.id)}">Revoke</button></li>`;
+  return `<li data-token="${escapeHtml(t.id)}"><span class="tk-name">${ico('key', 15)}<b>${escapeHtml(t.name)}</b>${kind}${expired ? '<span class="pill warn">Ended</span>' : ''}</span><span class="tk-when">Made ${dayOf(t.created_at)} · ${used} · ${ends}</span><button class="btn ghost sm" type="button" data-revoke="${escapeHtml(t.id)}">Revoke</button></li>`;
 }
 
 function connectionRow(g: GrantRow): string {
-  const used = g.last_used_at ? `Last signed in ${day(g.last_used_at)}` : 'Not used yet';
-  return `<li><span class="tk-name">${ico('link', 15)}<b>${escapeHtml(g.client_name)}</b></span><span class="tk-when">Connected ${day(g.created_at)} · ${used}</span><button class="btn ghost sm" type="button" data-revoke="${escapeHtml(g.id)}" data-what="connections">Disconnect</button></li>`;
+  const used = g.last_used_at ? `Last signed in ${dayOf(g.last_used_at)}` : 'Not used yet';
+  return `<li><span class="tk-name">${ico('link', 15)}<b>${escapeHtml(g.client_name)}</b></span><span class="tk-when">Connected ${dayOf(g.created_at)} · ${used}</span><button class="btn ghost sm" type="button" data-revoke="${escapeHtml(g.id)}" data-what="connections">Disconnect</button></li>`;
 }
 
 /** Makes a token and shows it once; revokes one after a second click. Both go through the API with the session. */

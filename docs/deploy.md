@@ -36,6 +36,7 @@ malformed value stops the process with the variable named.
 | `WORKER_EMBEDDED` | `true` runs the worker inside the web process. A render holds the process for as long as it takes, so only use it where nobody reads while it runs (local development) |
 | `PORT` | Default 4848 |
 | `LOG_LEVEL` | `debug`, `info`, `warn`, `error`; JSON lines on stdout |
+| `TIME_ZONE` | The estate's time zone, an IANA name (`Europe/Berlin`); default `UTC`. Every day the hub works out for itself is the day in this zone: a record's Last updated when a write leaves it out, an imported record's date, a published copy's date, and the dates on pages and outlines. A day a person gives is kept as given. The hub refuses to start on a name that is not a zone. Schedules (`REVIEW_CRON`) and the AI token windows stay in UTC |
 | `FRESHNESS_DAYS` | Default 7; boxes observed longer ago are dimmed |
 | `RETENTION_VERSIONS` | Versions kept per document; older ones and their artifacts are collected |
 | `PURGE_GRACE_DAYS` | Days a disabled workspace waits before purge |

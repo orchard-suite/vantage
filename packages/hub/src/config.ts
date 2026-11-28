@@ -6,6 +6,7 @@ import { readFileSync } from 'node:fs';
 import { z } from 'zod';
 import { cronProblem } from './worker/cron.ts';
 import { AgentSetupSchema } from './agents.ts';
+import { zoneProblem } from './day.ts';
 
 const bool = z
   .enum(['true', 'false', '1', '0'])
@@ -98,6 +99,8 @@ export const ConfigSchema = z
     PURGE_GRACE_DAYS: int(0, 30),
     /** Seconds between worker polls when no job is queued. */
     WORKER_POLL_SECONDS: int(1, 2),
+    /** The estate's time zone, an IANA name (America/Chicago). Every day the hub works out for itself is today in it: a record's Last updated when a write leaves it out, an import's dates, a published copy's date, the dates on pages. */
+    TIME_ZONE: z.string().min(1).default('UTC'),
     /** Five-field cron (UTC) for the nightly review of every workspace. */
     REVIEW_CRON: z.string().min(9).default('0 3 * * *'),
     /** Jobs one worker runs at once. Rendering runs on the render threads, so this can exceed them. */
@@ -167,6 +170,7 @@ export const ConfigSchema = z
     if (Boolean(c.DISPATCH_URL) !== Boolean(c.DISPATCH_TOKEN)) {
       ctx.addIssue({ code: 'custom', path: ['DISPATCH_TOKEN'], message: 'DISPATCH_URL and DISPATCH_TOKEN go together' });
     }
+    if (zoneProblem(c.TIME_ZONE)) ctx.addIssue({ code: 'custom', path: ['TIME_ZONE'], message: `TIME_ZONE: ${zoneProblem(c.TIME_ZONE)}` });
     if (cronProblem(c.REVIEW_CRON)) ctx.addIssue({ code: 'custom', path: ['REVIEW_CRON'], message: `REVIEW_CRON: ${cronProblem(c.REVIEW_CRON)}` });
     if (c.BLOB_DRIVER === 'azure' && !c.AZURE_BLOB_URL) {
       ctx.addIssue({ code: 'custom', path: ['AZURE_BLOB_URL'], message: 'AZURE_BLOB_URL is required when BLOB_DRIVER=azure' });

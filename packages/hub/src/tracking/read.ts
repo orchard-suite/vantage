@@ -17,6 +17,7 @@ import type { EventData, ItemState, LabelValue, LinkRel } from './state.ts';
 import { spanFrom, spanOf, spanSql, type Span } from './dates.ts';
 import { horizonOf, orderSql } from './rank.ts';
 import { isMilestone, rollupOf, type Rollup } from './milestone.ts';
+import { dayOf } from '../day.ts';
 
 export interface Card {
   readonly key: string;
@@ -212,7 +213,7 @@ export async function find(ctx: AppContext, p: Principal, q: FindQuery, r?: Reac
   return {
     rows: rows.map((x) => {
       const span = spanFrom(x.span);
-      return { key: x.key, title: x.title, state: x.state, class: x.class, holders: x.holders.map((h) => who.get(h) ?? 'a person'), labels: x.labels, updated: new Date(x.updated_at).toISOString().slice(0, 10), ...(x.proof_at ? { proofAt: new Date(x.proof_at).toISOString().slice(0, 10) } : {}), ...(span ? { span } : {}) };
+      return { key: x.key, title: x.title, state: x.state, class: x.class, holders: x.holders.map((h) => who.get(h) ?? 'a person'), labels: x.labels, updated: dayOf(x.updated_at), ...(x.proof_at ? { proofAt: dayOf(x.proof_at) } : {}), ...(span ? { span } : {}) };
     }),
     total,
   };

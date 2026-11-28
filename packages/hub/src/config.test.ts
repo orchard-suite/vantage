@@ -34,6 +34,12 @@ describe('config', () => {
     expect(() => loadConfig({ ...base, BLOB_DRIVER: 'azure' })).toThrow(/AZURE_BLOB_URL/);
     expect(() => loadConfig({ ...base, DATABASE_AUTH: 'kerberos' })).toThrow(/DATABASE_AUTH/);
   });
+
+  test('the time zone is UTC until the estate names one, and must be a real zone', () => {
+    expect(loadConfig(base).TIME_ZONE).toBe('UTC');
+    expect(loadConfig({ ...base, TIME_ZONE: 'America/Chicago' }).TIME_ZONE).toBe('America/Chicago');
+    expect(() => loadConfig({ ...base, TIME_ZONE: 'Central/Nowhere' })).toThrow(/TIME_ZONE/);
+  });
 });
 
 describe('available cores', () => {

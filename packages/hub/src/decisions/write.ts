@@ -23,6 +23,7 @@ import { ulid } from './ulid.ts';
 import { indexRecord, resolvePending } from './citations.ts';
 import { rebuildNow, rebuildStandards } from '../standards/publish.ts';
 import { standardSetting } from '../standards/setting.ts';
+import { dayOf } from '../day.ts';
 import {
   DecisionCreateSchema,
   DecisionPatchSchema,
@@ -38,8 +39,6 @@ import {
   type RegistryInput,
   type RegistryPatch,
 } from './types.ts';
-
-export const today = (): string => new Date().toISOString().slice(0, 10);
 
 function parse<S extends z.ZodType>(schema: S, input: unknown): z.output<S> {
   const r = schema.safeParse(input);
@@ -156,7 +155,7 @@ async function prepare(ctx: AppContext, p: Principal, registry: RegistryRow, wor
       title: v.title,
       status: v.status,
       decided_on: v.decidedOn,
-      updated_on: v.updatedOn ?? today(),
+      updated_on: v.updatedOn ?? dayOf(),
       deciders: v.deciders,
       context: v.context,
       decision: v.decision,
@@ -203,7 +202,7 @@ export async function updateDecision(ctx: AppContext, p: Principal, ref: string,
     title: v.title ?? row.title,
     status: v.status ?? row.status,
     decided_on: v.decidedOn ?? row.decided_on,
-    updated_on: v.updatedOn ?? (v.minor ? row.updated_on : today()),
+    updated_on: v.updatedOn ?? (v.minor ? row.updated_on : dayOf()),
     deciders: v.deciders ?? row.deciders,
     context: v.context ?? row.context,
     decision: v.decision ?? row.decision,

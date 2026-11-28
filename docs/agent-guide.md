@@ -1308,7 +1308,8 @@ machine form (`adr:<ULID>`). Both are read-only: a write ignores them. The
 - Read one section: `vantage_read SHOP-2001#decision`. The record's
   outline lists its sections, what it governs, and what cites it.
 - A refinement while the decision stands is a `vantage_patch`: one
-  sentence swapped in place. Last updated moves to today; `minor: true`
+  sentence swapped in place. Last updated moves to today in the hub's
+  time zone; `minor: true`
   keeps it for a date or wording fix. The header is text too: swap
   `status: proposed` for `status: accepted`. Every revision is kept.
 - A new record is a `vantage_write` to the registry (`SHOP`) with the text

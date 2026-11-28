@@ -12,6 +12,7 @@ import type { DocumentRow, VersionRow } from '../documents/repo.ts';
 import { resourceInputs } from '../documents/assets.ts';
 import { bundleUrl, freshnessDays, observedForDocument } from '../worker/artifacts.ts';
 import { storedArtifact } from '../documents/derived.ts';
+import { dayOf } from '../day.ts';
 
 export interface ProducerInput {
   readonly document: DocumentRow;
@@ -54,6 +55,7 @@ export function hubProducer(ctx: AppContext, input: ProducerInput): Producer {
       theme: publication.theme,
       titleBlock: Boolean(publication.titleBlock),
       stamp,
+      publishedOn: dayOf(stamp.publishedAt),
       refreshUrl: bundleUrl(ctx, document.id),
       stored,
     });

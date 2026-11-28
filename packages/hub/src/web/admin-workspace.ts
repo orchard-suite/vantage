@@ -14,6 +14,7 @@ import { plural, when } from './library.ts';
 import { act, adminPage, bytes, diskBar, diskKey, treemap, type AdminFrame } from './admin-kit.ts';
 import { flows } from './admin-flows.ts';
 import { personHref, purgeNote, wsTone } from './admin.ts';
+import { dayOf } from '../day.ts';
 
 export interface AdminWorkspaceModel extends AdminFrame {
   readonly policy: FlowPolicy & { readonly GUEST_LINKS: boolean };
@@ -92,7 +93,7 @@ export function adminWorkspaceHtml(m: AdminWorkspaceModel): string {
     w.disabledAt ? '' : `<a class="btn sm" href="/w/${encodeURIComponent(w.slug)}">Open</a><a class="btn sm" href="/w/${encodeURIComponent(w.slug)}?tab=members">Members</a>`,
     w.disabledAt ? act('Enable', 'POST', `${api}/enable`, undefined, 'primary') : act('Disable', 'POST', `${api}/disable`, undefined, 'ghost', `Disable ${w.name}? Nobody can open it, and it is purged after the grace period unless you enable it again.`),
   ].join('');
-  const head = `<header class="adm-head"><div><h1><i class="a-dot tone-${wsTone(w)}" aria-hidden="true"></i>${escapeHtml(w.name)} ${purgeNote(w)}</h1><p class="adm-meta">${escapeHtml(owner)} · made ${w.createdAt.toISOString().slice(0, 10)} · ${w.changedAt ? `changed ${when(w.changedAt, now).toLowerCase()}` : 'nothing saved yet'}</p></div><div class="adm-tools">${tools}</div></header>`;
+  const head = `<header class="adm-head"><div><h1><i class="a-dot tone-${wsTone(w)}" aria-hidden="true"></i>${escapeHtml(w.name)} ${purgeNote(w)}</h1><p class="adm-meta">${escapeHtml(owner)} · made ${dayOf(w.createdAt)} · ${w.changedAt ? `changed ${when(w.changedAt, now).toLowerCase()}` : 'nothing saved yet'}</p></div><div class="adm-tools">${tools}</div></header>`;
   const sum = `<p class="adm-sum">Holds <b class="a-num">${bytes(w.bytes)}</b>${share ? `, ${share}% of the deployment,` : ''} in ${plural(w.diagrams, 'diagram')} with ${plural(w.views, 'view')} and ${plural(w.versions, 'version')}. ${plural(w.reach, 'person', 'people')} can open it through ${plural(w.grants, 'grant')}.</p>`;
   const disk = `<div class="adm-disk">${diskBar(w.disk, w.bytes, `${bytes(w.bytes)} on disk by kind`)}${diskKey(w.disk)}</div>`;
   const ws = encodeURIComponent(w.slug);

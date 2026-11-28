@@ -8,8 +8,9 @@ import { ESTATE, scopeKey, scopeName, type Edition } from './model.ts';
 import { editionOf, editionsOf, latestEditions } from './repo.ts';
 import { standardSetting } from './setting.ts';
 import { editionVersion, scopeHead, settingsThing, STANDARD } from './text.ts';
+import { dayOf } from '../day.ts';
 
-const day = (d: Date | null): string => (d ? d.toISOString().slice(0, 10) : 'not yet');
+const day = (d: Date | null): string => (d ? dayOf(d) : 'not yet');
 const plural = (n: number, one: string, many = `${one}s`): string => `${n} ${n === 1 ? one : many}`;
 
 function nextLine(name: string, e: Edition | undefined): string | undefined {

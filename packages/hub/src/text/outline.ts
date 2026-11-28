@@ -27,9 +27,9 @@ import { kindsFor } from '../tracking/read.ts';
 import { scopeLines, scopesOutline } from '../scopes/outline.ts';
 import { standardOutline, standardsOutline } from '../standards/outline.ts';
 import { scopeOutline } from '../scopes/profile.ts';
+import { dayOf } from '../day.ts';
 
 const n = (x: number): string => x.toLocaleString('en-US');
-const day = (d: Date): string => d.toISOString().slice(0, 10);
 const plural = (count: number, word: string): string => `${n(count)} ${word}${count === 1 ? '' : 's'}`;
 
 /** Fits lines to the outline budget; what does not fit is counted, with the call that narrows. */
@@ -88,7 +88,7 @@ async function workspace(ctx: AppContext, p: Principal, slug: string): Promise<s
   const registries = await listRegistries(ctx, p, ws.slug);
   const scope = await scopeLines(ctx, p.orgId, ws.scope);
   const lines = [`${ws.slug}: ${ws.name} (${ws.kind}, you are ${ws.role}), ${n(docs.length)} document${docs.length === 1 ? '' : 's'}`, ...(scope.length ? scope : ['scope: none, so the whole estate (vantage_outline scopes)'])];
-  for (const d of docs) lines.push(`  ${ws.slug}/${d.slug}  ${d.name}  ${d.chars === null ? 'no version yet' : `${n(d.chars)} chars`}${d.pages ? `, ${d.pages} page${d.pages === 1 ? '' : 's'}` : ''}  updated ${day(d.updated_at)}`);
+  for (const d of docs) lines.push(`  ${ws.slug}/${d.slug}  ${d.name}  ${d.chars === null ? 'no version yet' : `${n(d.chars)} chars`}${d.pages ? `, ${d.pages} page${d.pages === 1 ? '' : 's'}` : ''}  updated ${dayOf(d.updated_at)}`);
   for (const r of registries) lines.push(`  registry ${r.prefix}  ${r.name}  ${n(await countDecisions(ctx.db, [r.id]))} records`);
   for (const k of (await kindsFor(ctx, p)).filter((x) => x.workspace_id === ws.id)) lines.push(`  kind ${k.prefix}  ${k.name}  (outline ${k.prefix} for its items)`);
   return fit(lines, `vantage_find with in: ${ws.slug}`);

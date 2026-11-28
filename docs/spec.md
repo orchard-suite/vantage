@@ -837,7 +837,8 @@ the systems they decide about (VAN-3001).
   a per-registry lock. No number is handed out twice, except one freed by
   a discard (VAN-3023). A title; a status (Proposed,
   Accepted, Deprecated, Superseded) with supersedes and superseded-by
-  links; the decision date, Last updated, and the decision makers by name;
+  links; the decision date, Last updated (today in the hub's `TIME_ZONE`
+  when a write leaves it out), and the decision makers by name;
   Context, Decision, Consequences, and Alternatives considered (each with
   why it was rejected) as Markdown; related records; an optional position,
   the line it sets for its scope's standard (VAN-3018); and links to the
@@ -1106,7 +1107,8 @@ VAN-0001 sets. The code is `packages/hub/src/tracking/`.
   the sealed store by name (`PUT /api/v1/secrets/:name`).
 - A publication run that fails is a recorded run and a notification, not a
   retry; the schedule or a person queues the next one.
-  `REVIEW_CRON` sets the nightly review minute; `EMBED_ORIGINS` lists the
+  `REVIEW_CRON` sets the nightly review minute; `TIME_ZONE` names the
+  estate's zone, in which every day the hub fills in falls; `EMBED_ORIGINS` lists the
   organization's allowed origins: the sites that may frame an embed, and
   that a published HTML copy may fetch the live bundle from.
 
