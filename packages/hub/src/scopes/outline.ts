@@ -1,9 +1,8 @@
 /** The scope tree as names, indented by depth, with each scope's workspaces: what `vantage_outline scopes` answers. */
 import type { AppContext } from '../context.ts';
 import type { Principal } from '../auth/principal.ts';
-import { memberWorkspaces } from '../authz.ts';
+import { memberWorkspaces, type WorkspaceRow } from '../authz.ts';
 import { lineage } from './repo.ts';
-import { maybe } from '../db/db.ts';
 import { bindingName } from '../standards/model.ts';
 import { FACET_MAX } from '../decisions/types.ts';
 import { scopeSetting } from './setting.ts';
@@ -43,8 +42,7 @@ export async function scopesOutline(ctx: AppContext, p: Principal): Promise<stri
  * outline; then the program it serves and that program's profile, and the
  * edition that binds it. Empty when it names neither.
  */
-export async function scopeLines(ctx: AppContext, orgId: string, workspaceId: string, scope: string | null): Promise<string[]> {
-  const program = (await maybe<{ program: string | null }>(ctx.db, 'select program from workspaces where id = $1', [workspaceId]))?.program ?? null;
+export async function scopeLines(ctx: AppContext, orgId: string, { scope, program }: Pick<WorkspaceRow, 'scope' | 'program'>): Promise<string[]> {
   if (scope === null && program === null) return [];
   const fields = (await scopeSetting(ctx.db, orgId)).profile;
   const out: string[] = [];
@@ -62,7 +60,7 @@ export async function scopeLines(ctx: AppContext, orgId: string, workspaceId: st
   return out;
 }
 
-/** A workspace's scope as its page shows it: the scope, the scopes above, and the profile. */
+/** A scope as a workspace's page shows it, its owner's or its program's: the scope, the scopes above, and the profile. */
 export interface WorkspaceScope {
   readonly id: string;
   readonly name: string;

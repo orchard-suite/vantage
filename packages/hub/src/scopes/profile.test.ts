@@ -26,8 +26,19 @@ scopes:
     name: Checkout
     kind: team
     parent: payments
+  - id: program:ledger
+    name: Ledger program
+    kind: program
+    parent: acme
+    profile:
+      mission: The books always balance.
+  - id: program:quiet
+    name: Quiet program
+    kind: program
 workspaces:
   beacon: checkout
+  ledger: { owner: checkout, program: "program:ledger" }
+  quiet: { owner: checkout, program: "program:quiet" }
 `;
 
 describe('a profile kept in the hub', () => {
@@ -41,7 +52,7 @@ describe('a profile kept in the hub', () => {
     headers = me.headers;
     admin = await agent(t, me.headers);
     author = await agent(t, (await t.bearer('bob')).headers);
-    await admin.call('vantage_tool', { tool: 'vantage_workspaces', arguments: { action: 'create', name: 'Beacon' } });
+    for (const name of ['Beacon', 'Ledger', 'Quiet']) await admin.call('vantage_tool', { tool: 'vantage_workspaces', arguments: { action: 'create', name } });
     expect(await admin.call('vantage_write', { writes: [{ address: 'scopes', text: TREE }] })).toContain('profile fields: description, mission');
   }, 30_000);
   afterAll(async () => {
@@ -66,6 +77,21 @@ describe('a profile kept in the hub', () => {
     const html = await page.text();
     expect(html).toContain('Belongs to <b>Checkout</b>, a team in Payments, in Acme');
     expect(html).toContain('<dt>Mission</dt><dd>Every tool works the first time.<span class="inherited">Inherited from Acme</span></dd>');
+    expect(html).not.toContain('<div class="ws-scopes">');
+    expect(html).not.toContain('aria-label="Program"');
+  });
+
+  test("a workspace that serves a program shows the program's profile beside its owner's, each labeled", async () => {
+    expect(await admin.call('vantage_outline', { address: 'ledger' })).toContain('program profile: description (from acme, 17 chars), mission (own, 25 chars); vantage_read scopes/program:ledger');
+    const html = await (await t.app.request('/w/ledger', { headers })).text();
+    expect(html).toContain('<div class="ws-scopes"><section class="ws-scope" aria-label="Scope"><p>Belongs to <b>Checkout</b>, a team in Payments, in Acme</p>');
+    expect(html).toContain('<section class="ws-scope" aria-label="Program"><p>Serves <b>Ledger program</b>, a program in Acme</p><dl class="ws-profile"><div><dt>Description</dt><dd>Acme sells tools.<span class="inherited">Inherited from Acme</span></dd></div><div><dt>Mission</dt><dd>The books always balance.</dd></div></dl></section></div>');
+  });
+
+  test('a program with no profile here or above shows its name and no fields', async () => {
+    const html = await (await t.app.request('/w/quiet', { headers })).text();
+    expect(html).toContain('<dt>Mission</dt><dd>Every tool works the first time.<span class="inherited">Inherited from Acme</span></dd>');
+    expect(html).toContain('<section class="ws-scope" aria-label="Program"><p>Serves <b>Quiet program</b>, a program</p></section></div>');
   });
 
   test('a field the estate does not name is refused, only an admin names the fields, and a scope address is read-only', async () => {

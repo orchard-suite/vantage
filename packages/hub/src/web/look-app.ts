@@ -124,6 +124,7 @@ export const APP_CSS = `
 .ws-title h1{margin:0;font-size:var(--fs-2xl);line-height:26px;font-weight:600;letter-spacing:var(--tight)}
 .ws-mark{width:52px;height:52px;flex:none;border-radius:var(--r-l);display:inline-flex;align-items:center;justify-content:center;background:var(--f-fill);color:var(--f-text);border:1px solid var(--line);font:700 22px var(--display)}
 .ws-meta{display:flex;align-items:center;gap:10px;margin-top:4px;font-size:12.5px;color:var(--muted)}
+.ws-scopes{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,320px),1fr));gap:12px}
 .ws-scope{display:flex;flex-direction:column;gap:10px;padding:14px 16px;border:1px solid var(--line);border-radius:var(--r-l);background:var(--panel)}
 .ws-scope>p{margin:0;font-size:var(--fs-s);color:var(--muted)}
 .ws-scope>p b{color:var(--ink);font-weight:600}

@@ -24,6 +24,8 @@ export interface WorkspaceRow {
   readonly settings: Record<string, unknown>;
   /** The owner scope it belongs to; null is the whole estate (VAN-3017). */
   readonly scope: string | null;
+  /** The program it serves, a second axis beside its owner; null when it serves none (VAN-3017). */
+  readonly program: string | null;
   readonly disabled_at: Date | null;
   readonly purge_after: Date | null;
   readonly created_at: Date;

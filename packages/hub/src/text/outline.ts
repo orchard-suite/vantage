@@ -89,7 +89,7 @@ async function workspace(ctx: AppContext, p: Principal, slug: string): Promise<s
   const ws = await workspaceAt(ctx, p, slug, 'viewer');
   const docs = await documentLines(ctx, ws.id);
   const registries = await listRegistries(ctx, p, ws.slug);
-  const scope = await scopeLines(ctx, p.orgId, ws.id, ws.scope);
+  const scope = await scopeLines(ctx, p.orgId, ws);
   const lines = [`${ws.slug}: ${ws.name} (${ws.kind}, you are ${ws.role}), ${n(docs.length)} document${docs.length === 1 ? '' : 's'}`, ...(scope.length ? scope : ['scope: none, so the whole estate (vantage_outline scopes)'])];
   for (const d of docs) lines.push(`  ${ws.slug}/${d.slug}  ${d.name}  ${d.chars === null ? 'no version yet' : `${n(d.chars)} chars`}${d.pages ? `, ${d.pages} page${d.pages === 1 ? '' : 's'}` : ''}  updated ${dayOf(d.updated_at)}`);
   for (const r of registries) lines.push(`  registry ${r.prefix}  ${r.name}  ${n(await countDecisions(ctx.db, [r.id]))} records`);
