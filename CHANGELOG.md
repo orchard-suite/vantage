@@ -2,6 +2,12 @@
 
 All notable changes to this project will be documented in this file.
 
+## [4.17.1](https://github.com/orchard-suite/vantage/compare/v4.17.0...v4.17.1) (2026-11-28)
+
+### Bug Fixes
+
+* **vantage:** end the feed proof on a drained read ([de9ef8d](https://github.com/orchard-suite/vantage/commit/de9ef8dfafaabea072b3f7f912db9cb8fd48baea))
+
 ## [4.17.0](https://github.com/orchard-suite/vantage/compare/v4.16.0...v4.17.0) (2026-11-28)
 
 ### Features
