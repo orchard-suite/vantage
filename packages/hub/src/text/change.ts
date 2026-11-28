@@ -27,6 +27,7 @@ import { documentLink, recordLink } from './links.ts';
 import { writeScopes } from '../scopes/write.ts';
 import { SCOPES } from '../scopes/text.ts';
 import { refuseStandardWrite, writeStandardSettings } from '../standards/write.ts';
+import { refuseScopeWrite } from '../scopes/profile.ts';
 import { STANDARD } from '../standards/text.ts';
 
 export interface ChangeResult {
@@ -175,6 +176,7 @@ export async function write(ctx: AppContext, p: Principal, writes: readonly Writ
       else if (a.kind === 'scopes') scopes = x.text;
       else if (a.kind === 'standards') standard = x.text;
       else if (a.kind === 'standard') refuseStandardWrite(x.address);
+      else if (a.kind === 'scope') refuseScopeWrite(x.address);
       else throw badRequest(`${x.address} is not a thing a write can make`);
     } catch (err) {
       refused.push({ address: x.address, status: 'refused', message: `${x.address} was not saved: ${taught(err, 'working-in-a-hub')}` });
@@ -246,6 +248,7 @@ export async function patch(ctx: AppContext, p: Principal, edits: readonly Edit[
   const order: string[] = [];
   const thing = async (a: Address): Promise<Open> => {
     if (a.kind === 'standard') refuseStandardWrite(thingAddress(a));
+    if (a.kind === 'scope') refuseScopeWrite(thingAddress(a));
     if (a.kind !== 'document' && a.kind !== 'page' && a.kind !== 'record' && a.kind !== 'item' && a.kind !== 'scopes' && a.kind !== 'standards') throw badRequest('a patch changes a document, a page, a record, an item, the scope tree, or the standard settings; a new thing is a vantage_write');
     const key = a.kind === 'record' ? a.ref : a.kind === 'item' ? a.key : a.kind === 'scopes' ? SCOPES : a.kind === 'standards' ? STANDARD : `${a.workspace}/${a.document}`;
     let o = open.get(key);

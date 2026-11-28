@@ -1601,6 +1601,7 @@ team, a program. The tree is text at the address `scopes`:
 
 ```yaml
 source: hub              # or catalog: read from a catalog connector, edits refused
+profile: [description, mission]   # the fields a scope's profile has; description by default
 scopes:
   - id: acme
     name: Acme
@@ -1611,13 +1612,23 @@ scopes:
     parent: acme         # one parent; never a second
     steward: ada@example.com
     facets: [moves-money]
+    profile:
+      description: Payments moves money in and out.   # optional; one left out is inherited
 workspaces:
   shop: payments         # a workspace not listed belongs to the whole estate
 ```
 
 - `vantage_outline scopes` answers the tree indented by depth, with each
-  scope's workspaces. A workspace's outline names its scope and the scopes
-  above it.
+  scope's workspaces. A workspace's outline names its scope, the scopes
+  above it, and its profile fields.
+- `vantage_read scopes/<id>` reads one scope: its place in the tree, its
+  steward, facets, and workspaces, then a section per profile field
+  (`scopes/<id>#mission`). A field the scope leaves empty shows its
+  nearest ancestor's value and says `Inherited from <scope>.` The address
+  is read-only; change a field in the tree, or in the catalog.
+- A profile field is optional, and only an admin names the fields under
+  `profile:`. A tree kept in the hub refuses a field the list does not
+  name.
 - A workspace's owner sets its scope with one line under `workspaces`:
   `vantage_patch` with `op: set, path: workspaces.shop, value: payments`.
   Remove the line and the workspace belongs to the whole estate again.
@@ -1634,9 +1645,11 @@ workspaces:
     facets: facets                # the field that holds facets
   ```
 
-  The connector's containment relations give each scope its parent. Each
-  run of it refills the copy, and a change to the copy is refused; change
-  the catalog. A scope removed from the tree leaves its workspaces to the
+  The connector's containment relations give each scope its parent, and
+  each field `profile:` names is read from the scope's entry; an entry
+  without it leaves it empty. Each run of it refills the copy, and a
+  change to the copy is refused; change the catalog. Changing `profile:`
+  reads the copy again. A scope removed from the tree leaves its workspaces to the
   whole estate. Setting `source: hub` (and dropping `catalog:`) keeps the
   copy for authors to keep.
 

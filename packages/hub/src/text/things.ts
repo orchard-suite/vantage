@@ -21,6 +21,7 @@ import { itemThing, placeAddress } from './items.ts';
 import { documentLink, recordLink } from './links.ts';
 import { scopesState, scopesText, scopesVersion } from '../scopes/text.ts';
 import { settingsThing, standardThing } from '../standards/text.ts';
+import { scopeThing } from '../scopes/profile.ts';
 
 export type Role = 'viewer' | 'author';
 
@@ -99,6 +100,8 @@ export async function readThing(ctx: AppContext, p: Principal, given: Address): 
       const text = scopesText(await scopesState(ctx, p));
       return { address: 'scopes', version: await scopesVersion(text), text, kind: 'yaml' };
     }
+    case 'scope':
+      return { ...(await scopeThing(ctx, p, a.id)), kind: 'markdown' };
     case 'standards':
       return { ...(await settingsThing(ctx, p)), kind: 'yaml' };
     case 'standard':

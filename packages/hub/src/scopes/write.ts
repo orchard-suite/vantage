@@ -14,7 +14,7 @@ import { badRequest, forbidden } from '../http.ts';
 import { workspaceAt } from '../text/things.ts';
 import { fillFromCatalog } from './catalog.ts';
 import { adoptScopes, listScopes, replaceScopes, setWorkspaceScope, type Scope } from './repo.ts';
-import { sameSetting, setScopeSetting } from './setting.ts';
+import { setScopeSetting } from './setting.ts';
 import { checkTree, parseScopesText, scopesState, scopesText, scopesVersion, SCOPES } from './text.ts';
 import { rebuildNow } from '../standards/publish.ts';
 import { builtText } from '../standards/write.ts';
@@ -26,7 +26,7 @@ export interface ScopesWrite {
 }
 
 const sameTree = (a: readonly Scope[], b: readonly Scope[]): boolean => {
-  const key = (xs: readonly Scope[]): string => JSON.stringify([...xs].sort((x, y) => x.id.localeCompare(y.id)).map((s) => [s.id, s.name, s.kind, s.parent ?? null, s.steward ?? null, [...s.facets], s.url ?? null]));
+  const key = (xs: readonly Scope[]): string => JSON.stringify([...xs].sort((x, y) => x.id.localeCompare(y.id)).map((s) => [s.id, s.name, s.kind, s.parent ?? null, s.steward ?? null, [...s.facets], s.url ?? null, Object.entries(s.profile).sort(([a], [b]) => a.localeCompare(b))]));
   return key(a) === key(b);
 };
 
@@ -38,23 +38,29 @@ export async function writeScopes(ctx: AppContext, p: Principal, text: string, s
   const next = parseScopesText(text);
   const now = await scopesState(ctx, p);
   const said: string[] = [];
-  const settingMoved = !sameSetting(now.setting, next.setting);
-  if (settingMoved) requireAdmin(p, 'where the scope tree comes from');
+  const { profile: wasFields, ...wasSource } = now.setting;
+  const { profile: fields, ...source } = next.setting;
+  const sourceMoved = JSON.stringify(wasSource) !== JSON.stringify(source);
+  const profileMoved = JSON.stringify(wasFields) !== JSON.stringify(fields);
+  if (sourceMoved) requireAdmin(p, 'where the scope tree comes from');
+  if (profileMoved) requireAdmin(p, 'the profile fields a scope carries');
+  if (sourceMoved || profileMoved) await setScopeSetting(ctx.db, p.orgId, next.setting);
+  if (profileMoved) said.push(`profile fields: ${fields.join(', ') || 'none'}`);
   if (next.setting.source === 'catalog') {
     // Moving to the catalog replaces the tree with the catalog's; staying there, the copy is not the author's to change.
-    if (!settingMoved && !sameTree(now.scopes, next.scopes)) throw forbidden(`the scope tree comes from the catalog (${next.setting.catalog.connector}); the hub refuses edits to its copy. Change it in the catalog, or set source: hub to keep it here`);
-    if (settingMoved) {
-      await setScopeSetting(ctx.db, p.orgId, next.setting);
+    if (!sourceMoved && !sameTree(now.scopes, next.scopes)) throw forbidden(`the scope tree comes from the catalog (${next.setting.catalog.connector}); the hub refuses edits to its copy. Change it in the catalog, or set source: hub to keep it here`);
+    if (sourceMoved || profileMoved) {
+      // The copy is read again, so new profile fields come in with it.
       const filled = await fillFromCatalog(ctx, p.orgId);
-      said.push(filled ? `the tree now comes from ${next.setting.catalog.connector}: ${filled.scopes} scopes` : `the tree now comes from ${next.setting.catalog.connector}, which is not there yet; it fills when that connector is made and runs`);
+      if (sourceMoved) said.push(filled ? `the tree now comes from ${next.setting.catalog.connector}: ${filled.scopes} scopes` : `the tree now comes from ${next.setting.catalog.connector}, which is not there yet; it fills when that connector is made and runs`);
+      else if (filled) said.push(`read again from ${next.setting.catalog.connector}: ${filled.scopes} scopes`);
     }
   } else {
-    if (settingMoved) {
+    if (sourceMoved) {
       await adoptScopes(ctx.db, p.orgId, 'hub');
-      await setScopeSetting(ctx.db, p.orgId, next.setting);
       said.push('the tree is kept in the hub now, starting from the catalog copy');
     }
-    const held = settingMoved ? await listScopes(ctx.db, p.orgId, 'hub') : now.scopes;
+    const held = sourceMoved ? await listScopes(ctx.db, p.orgId, 'hub') : now.scopes;
     if (!sameTree(held, next.scopes)) {
       requireAdmin(p, 'the scope tree');
       checkTree(next.scopes);

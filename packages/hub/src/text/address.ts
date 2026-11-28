@@ -16,6 +16,8 @@ export type Address =
   | { readonly kind: 'guide' | 'schema'; readonly part?: string }
   /** The organization's tree of owner scopes, and the workspace each one owns. */
   | { readonly kind: 'scopes'; readonly part?: string }
+  /** One scope: its place in the tree and its profile. */
+  | { readonly kind: 'scope'; readonly id: string; readonly part?: string }
   /** The estate's standard settings, and the root of every scope's standard. */
   | { readonly kind: 'standards'; readonly part?: string }
   /** One scope's built standard, `estate` for the whole estate, with `@<n>` for one edition. */
@@ -45,6 +47,7 @@ export function parseAddress(text: string | undefined): Address {
   const withPart = part === undefined ? {} : { part };
   if (head === 'guide' || head === 'schema') return { kind: head, ...withPart };
   if (head === 'scopes') return { kind: 'scopes', ...withPart };
+  if (head.startsWith('scopes/')) return { kind: 'scope', id: head.slice('scopes/'.length), ...withPart };
   if (head === 'standard') return { kind: 'standards', ...withPart };
   if (head.startsWith('standard/')) return { kind: 'standard', scope: head.slice('standard/'.length), ...withPart };
   if (head.startsWith('adr:') && isUlid(head.slice(4))) return { kind: 'record', ref: head, ...withPart };
@@ -70,6 +73,8 @@ export function thingAddress(a: Address): string {
     case 'schema':
     case 'scopes':
       return a.kind;
+    case 'scope':
+      return `scopes/${a.id}`;
     case 'standards':
       return 'standard';
     case 'standard':

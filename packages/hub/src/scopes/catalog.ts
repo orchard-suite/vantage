@@ -25,8 +25,16 @@ function facetsOf(value: unknown): string[] {
   return [];
 }
 
-/** The scopes an observed model holds, by the setting: present entities of its kinds only. */
-export function scopesFromCatalog(model: ObservedModel, setting: CatalogSetting): Scope[] {
+/** A profile field's value as text: a string, a number or a yes or no, or a list of strings; anything else says nothing. */
+function profileText(value: unknown): string | undefined {
+  if (typeof value === 'string') return value.trim() || undefined;
+  if (typeof value === 'number' || typeof value === 'boolean') return String(value);
+  if (Array.isArray(value) && value.every((v) => typeof v === 'string')) return value.map((v) => v.trim()).filter(Boolean).join(', ') || undefined;
+  return undefined;
+}
+
+/** The scopes an observed model holds, by the setting: present entities of its kinds only, each with the profile fields its entry has. */
+export function scopesFromCatalog(model: ObservedModel, setting: CatalogSetting, fields: readonly string[]): Scope[] {
   const present = Object.values(model.entities).filter((e) => e.missingSince === undefined);
   const picked = present.flatMap((e) => {
     const kind = kindOf(e.tags, e.type, setting.kinds);
@@ -37,6 +45,10 @@ export function scopesFromCatalog(model: ObservedModel, setting: CatalogSetting)
   return picked.map(({ e, kind }): Scope => {
     const via = setting.steward[kind];
     const steward = via === undefined ? undefined : relations.find((r) => r.from === e.id && r.label === via)?.to;
+    const profile = Object.fromEntries([...fields].sort().flatMap((f) => {
+      const v = profileText(e.facts[f]);
+      return v === undefined ? [] : [[f, v]];
+    }));
     return {
       id: e.id,
       name: e.name,
@@ -45,6 +57,7 @@ export function scopesFromCatalog(model: ObservedModel, setting: CatalogSetting)
       ...(steward !== undefined ? { steward } : {}),
       facets: facetsOf(e.facts[setting.facets]),
       ...(e.url !== undefined ? { url: e.url } : {}),
+      profile,
     };
   });
 }
@@ -62,7 +75,7 @@ export async function fillFromCatalog(ctx: AppContext, orgId: string, only?: Sou
   if (setting.source !== 'catalog') return undefined;
   const source = await catalogConnector(ctx, orgId, setting.catalog);
   if (!source || (only && only.id !== source.id)) return undefined;
-  const scopes = scopesFromCatalog((await observedModel(ctx.db, source.id)).model, setting.catalog);
+  const scopes = scopesFromCatalog((await observedModel(ctx.db, source.id)).model, setting.catalog, setting.profile);
   const counts = await replaceScopes(ctx.db, orgId, 'catalog', scopes);
   ctx.log.info('scopes.catalog.filled', { orgId, source: setting.catalog.connector, scopes: scopes.length, ...counts });
   if (counts.added || counts.changed || counts.removed) await rebuildNow(ctx, orgId, `connector:${source.id}`);

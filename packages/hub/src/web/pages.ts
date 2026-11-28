@@ -3,6 +3,7 @@
  * (the event stream and presence are live-routes.ts), the embed route, guest link entry, the kit page, and
  * the font and brand files the pages load.
  */
+import { workspaceScope } from '../scopes/outline.ts';
 import { Hono, type Context } from 'hono';
 import { brandAsset, editorScript, engineScript, fontAsset, viewerScript } from '@vantage/render';
 import type { AppContext } from '../context.ts';
@@ -145,6 +146,7 @@ export function pageRoutes(ctx: AppContext, apiReference: readonly RouteDoc[]): 
     const kinds = await kindsIn(ctx.db, p.orgId, [workspace.id]);
     const work = tab === 'work' ? await workTabModel(ctx, p, kinds, c.req.query()) : undefined;
     const workCount = kinds.length ? (await findItems(ctx, p, { kinds: kinds.map((k) => k.prefix), limit: 1 })).total : undefined;
+    const scope = await workspaceScope(ctx, p.orgId, workspace.scope);
     const csrf = c.get('csrf');
     return c.html(workspaceHtml({
       nonce: c.get('nonce'),
@@ -171,6 +173,7 @@ export function pageRoutes(ctx: AppContext, apiReference: readonly RouteDoc[]): 
       ...(decisions ? { decisions } : {}),
       ...(workCount !== undefined ? { workCount } : {}),
       ...(work ? { work } : {}),
+      ...(scope ? { scope } : {}),
     }));
   });
 

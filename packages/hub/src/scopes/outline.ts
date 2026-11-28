@@ -3,6 +3,8 @@ import type { AppContext } from '../context.ts';
 import type { Principal } from '../auth/principal.ts';
 import { memberWorkspaces } from '../authz.ts';
 import { lineage } from './repo.ts';
+import { scopeSetting } from './setting.ts';
+import { profileLine, resolveProfile, type ProfileField } from './profile.ts';
 import { scopesState, scopesText, scopesVersion, SCOPES } from './text.ts';
 
 export async function scopesOutline(ctx: AppContext, p: Principal): Promise<string[]> {
@@ -25,9 +27,27 @@ export async function scopesOutline(ctx: AppContext, p: Principal): Promise<stri
   return lines;
 }
 
-/** One workspace's scope and the scopes above it, for its outline; undefined when it names none. */
-export async function scopeLine(ctx: AppContext, orgId: string, scope: string | null): Promise<string | undefined> {
+/** One workspace's scope and the scopes above it, then its profile, for its outline; empty when it names none. */
+export async function scopeLines(ctx: AppContext, orgId: string, scope: string | null): Promise<string[]> {
+  if (scope === null) return [];
+  const up = await lineage(ctx.db, orgId, scope);
+  const profile = resolveProfile(up, (await scopeSetting(ctx.db, orgId)).profile);
+  return [`scope: ${up.map((s) => `${s.id} (${s.kind})`).join(' < ') || scope}`, ...(profile.length ? [`profile: ${profileLine(profile)}; vantage_read scopes/${scope}`] : [])];
+}
+
+/** A workspace's scope as its page shows it: the scope, the scopes above, and the profile. */
+export interface WorkspaceScope {
+  readonly id: string;
+  readonly name: string;
+  readonly kind: string;
+  readonly above: readonly { readonly id: string; readonly name: string }[];
+  readonly profile: readonly ProfileField[];
+}
+
+export async function workspaceScope(ctx: Pick<AppContext, 'db'>, orgId: string, scope: string | null): Promise<WorkspaceScope | undefined> {
   if (scope === null) return undefined;
   const up = await lineage(ctx.db, orgId, scope);
-  return `scope: ${up.map((s) => `${s.id} (${s.kind})`).join(' < ') || scope}`;
+  if (!up.length) return undefined;
+  const names = new Map(up.map((s) => [s.id, s.name]));
+  return { id: up[0]!.id, name: up[0]!.name, kind: up[0]!.kind, above: up.slice(1).map((s) => ({ id: s.id, name: s.name })), profile: resolveProfile(up, (await scopeSetting(ctx.db, orgId)).profile).map((f) => (f.from ? { ...f, from: names.get(f.from) ?? f.from } : f)) };
 }

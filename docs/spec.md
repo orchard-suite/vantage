@@ -480,7 +480,12 @@ diagrams, points an embed at a storage account static site or at the hub.
   containment relation, its steward by the relation the setting names per
   kind, and its facets from one field. Each run that stores what the
   connector read refills the hub's copy, and the hub refuses edits to it.
-  Leaving the catalog keeps the copy for authors to keep. The tree is text
+  Leaving the catalog keeps the copy for authors to keep. A scope carries
+  its profile: the fields the setting names under `profile:` (by default
+  `description`), read from its catalog entry or kept on the hub's scopes,
+  each optional; one a scope leaves empty shows its nearest ancestor's,
+  marked as inherited. `scopes/<id>` reads one scope with its profile, and
+  a workspace's outline and page show its scope's. The tree is text
   at the address `scopes`, read and changed through the five verbs and
   the REST text routes; `GET` and `PUT /api/v1/scopes` and
   `PUT /api/v1/workspaces/:workspace/scope` answer and take the same. The
@@ -1233,7 +1238,7 @@ characters stand alone. The first paragraph is that self-contained lead.
 - **Text space.** Every thing has an address and one text form that loses
   nothing: `workspace/document` (YAML), `workspace/document/pages/x.md`,
   `SHOP-2001`, `SHOP`, `~` (the person's own workspace), `scopes`,
-  `standard`, `standard/<scope>`, `guide`, `schema` (a workspace never takes
+  `scopes/<id>`, `standard`, `standard/<scope>`, `guide`, `schema` (a workspace never takes
   one of the hub's own words as its slug); a part after `#` is a heading,
   a YAML path, or a line range. Registry prefixes, kind prefixes, and
   workspace slugs share one namespace (VAN-5002).

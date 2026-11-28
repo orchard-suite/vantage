@@ -27,7 +27,7 @@ export interface Built {
 }
 
 /** The whole estate as a scope: the root every scope with no parent hangs from. */
-const ESTATE_SCOPE: Scope = { id: '', name: 'The whole estate', kind: ESTATE, facets: [] };
+const ESTATE_SCOPE: Scope = { id: '', name: 'The whole estate', kind: ESTATE, facets: [], profile: {} };
 
 const asLine = (l: OwnLine): StandardLine => ({ ...l, path: [] });
 

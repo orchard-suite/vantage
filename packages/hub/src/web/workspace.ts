@@ -4,6 +4,8 @@
  * and recent activity. Tabs are links (?tab=); every write goes through the
  * same API routes and checks as any client.
  */
+import type { WorkspaceScope } from '../scopes/outline.ts';
+import { fieldTitle } from '../scopes/profile.ts';
 import { DELETE_RULES, deleteRule, isWorkspaceOwner, type AccessibleWorkspace, type DeleteRule } from '../authz.ts';
 import type { AgentSetup } from '../agents.ts';
 import type { HomeDocument } from './home-data.ts';
@@ -52,6 +54,8 @@ export interface WorkspaceModel {
   /** How many tracked items the workspace's kinds hold; the Work tab shows when it holds a kind. */
   readonly workCount?: number;
   readonly work?: WorkTabModel;
+  /** The scope the workspace belongs to, with its profile; absent when it belongs to the whole estate. */
+  readonly scope?: WorkspaceScope;
   readonly now?: number;
 }
 
@@ -224,6 +228,13 @@ fetch(s.getAttribute('data-api'),{method:'PATCH',headers:h,credentials:'same-ori
 document.addEventListener('click',function(e){var b=e.target.closest('[data-run]');if(!b||b.disabled)return;b.disabled=true;var t=document.getElementById('toast'),m=document.querySelector('meta[name=csrf]'),h={};if(m)h['x-csrf-token']=m.content;
 fetch(b.getAttribute('data-run'),{method:'POST',headers:h,credentials:'same-origin'}).then(function(r){return r.json().then(function(j){return{ok:r.ok,j:j}})}).then(function(x){t.querySelector('span').textContent=x.ok?'Queued. It runs in the background; refresh to see the result.':(x.j.error||'That did not work.');t.hidden=false;setTimeout(function(){t.hidden=true},4000)}).catch(function(){t.querySelector('span').textContent='The hub did not answer. Try again.';t.hidden=false}).finally(function(){b.disabled=false})});`;
 
+/** The scope a workspace belongs to and its profile; a field the scope leaves empty shows the nearest ancestor's, marked. */
+function scopeHtml(s: WorkspaceScope): string {
+  const above = s.above.length ? ` in ${s.above.map((a) => escapeHtml(a.name)).join(', in ')}` : '';
+  const fields = s.profile.map((f) => `<div><dt>${escapeHtml(fieldTitle(f.field))}</dt><dd>${escapeHtml(f.value)}${f.from ? `<span class="inherited">Inherited from ${escapeHtml(f.from)}</span>` : ''}</dd></div>`).join('');
+  return `<section class="ws-scope" aria-label="Scope"><p>Belongs to <b>${escapeHtml(s.name)}</b>, a ${escapeHtml(s.kind)}${above}</p>${fields ? `<dl class="ws-profile">${fields}</dl>` : ''}</section>`;
+}
+
 export function workspaceHtml(m: WorkspaceModel): string {
   const now = m.now ?? Date.now();
   const ws = m.workspace;
@@ -243,7 +254,7 @@ export function workspaceHtml(m: WorkspaceModel): string {
   const visit = m.visiting ? `<div class="banner"><span>You see this ${ws.kind === 'personal' ? 'personal space' : 'workspace'} as an org admin. It is not shared with you, so it stays out of your sidebar. Find it again in Admin, under Workspaces.</span></div>` : '';
   const head = `<header class="ws-head"><nav class="crumbs" aria-label="Breadcrumb">${crumbs}<span aria-current="page">${escapeHtml(name)}</span></nav>${visit}
 <div class="ws-title"><span class="ws-mark fam-${familyFor(ws.slug)}" aria-hidden="true">${escapeHtml(initials(ws.name).slice(0, 1))}</span><div><h1>${escapeHtml(name)}</h1><div class="ws-meta"><span>${ws.kind === 'team' ? 'Team workspace' : 'Personal workspace'}</span><span class="pill ${ws.role === 'author' ? 'info' : ''}">${ws.role === 'author' ? 'You can edit' : 'You can view'}</span></div></div>
-<div class="ws-acts"><a class="btn" href="/api/v1/workspaces/${encodeURIComponent(ws.slug)}/export" download>${ico('export')}Download all</a>${ws.role === 'author' ? `<a class="btn" href="/import/${encodeURIComponent(ws.slug)}">${ico('import')}Import</a><a class="btn primary" href="/new?in=${encodeURIComponent(ws.slug)}">${ico('plus')}New diagram</a>` : ''}</div></div>${tabBar}</header>`;
+<div class="ws-acts"><a class="btn" href="/api/v1/workspaces/${encodeURIComponent(ws.slug)}/export" download>${ico('export')}Download all</a>${ws.role === 'author' ? `<a class="btn" href="/import/${encodeURIComponent(ws.slug)}">${ico('import')}Import</a><a class="btn primary" href="/new?in=${encodeURIComponent(ws.slug)}">${ico('plus')}New diagram</a>` : ''}</div></div>${m.scope ? scopeHtml(m.scope) : ''}${tabBar}</header>`;
   const body = m.tab === 'decisions' && m.decisions ? decisionsTab(ws, m.decisions) : m.tab === 'work' && m.work ? workTab(ws, m.work) : m.tab === 'connectors' ? connectors(m, now) : m.tab === 'publications' ? publications(m, now) : m.tab === 'members' && ws.role === 'author' ? members(m) : m.tab === 'activity' ? activity(m, now) : diagrams(m, mine, now);
   const toast = '<div class="toast toast-float" id="toast" role="status" hidden><span></span></div>';
   const { spaces, shared, starred } = frameWorkspaces(m.workspaces, m.documents, m.user.id);

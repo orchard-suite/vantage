@@ -19,6 +19,8 @@ export interface Scope {
   readonly facets: readonly string[];
   /** The scope's page in the catalog. */
   readonly url?: string;
+  /** The profile fields it states, by the names the estate's setting gives; an empty one is left out. */
+  readonly profile: Readonly<Record<string, string>>;
 }
 
 interface ScopeRow {
@@ -29,6 +31,7 @@ interface ScopeRow {
   readonly steward: string | null;
   readonly facets: string[];
   readonly url: string | null;
+  readonly profile: Record<string, string>;
 }
 
 const fromRow = (r: ScopeRow): Scope => ({
@@ -39,11 +42,13 @@ const fromRow = (r: ScopeRow): Scope => ({
   ...(r.steward ? { steward: r.steward } : {}),
   facets: r.facets,
   ...(r.url ? { url: r.url } : {}),
+  // Keys in one order, so a copy read back compares equal to the one written.
+  profile: Object.fromEntries(Object.entries(r.profile ?? {}).sort(([a], [b]) => a.localeCompare(b))),
 });
 
 /** The tree of one origin, parents before children, then by name. */
 export async function listScopes(db: Db, orgId: string, origin: ScopeOrigin): Promise<Scope[]> {
-  const rows = await db.query<ScopeRow>('select id, name, kind, parent, steward, facets, url from scopes where org_id = $1 and origin = $2 order by name, id', [orgId, origin]);
+  const rows = await db.query<ScopeRow>('select id, name, kind, parent, steward, facets, url, profile from scopes where org_id = $1 and origin = $2 order by name, id', [orgId, origin]);
   return depthFirst(rows.map(fromRow));
 }
 
@@ -74,7 +79,7 @@ export function depthFirst(scopes: readonly Scope[]): Scope[] {
 /** Replaces one origin's tree with `next`, in one transaction. */
 export async function replaceScopes(db: Db, orgId: string, origin: ScopeOrigin, next: readonly Scope[]): Promise<{ added: number; changed: number; removed: number }> {
   return db.transaction(async (tx) => {
-    const before = new Map((await tx.query<ScopeRow>('select id, name, kind, parent, steward, facets, url from scopes where org_id = $1 and origin = $2', [orgId, origin])).map((r) => [r.id, JSON.stringify(fromRow(r))]));
+    const before = new Map((await tx.query<ScopeRow>('select id, name, kind, parent, steward, facets, url, profile from scopes where org_id = $1 and origin = $2', [orgId, origin])).map((r) => [r.id, JSON.stringify(fromRow(r))]));
     // Another origin's rows give way: the tree has one source at a time.
     await tx.query('delete from scopes where org_id = $1 and origin <> $2', [orgId, origin]);
     let added = 0;
@@ -86,9 +91,9 @@ export async function replaceScopes(db: Db, orgId: string, origin: ScopeOrigin, 
       if (was === undefined) added += 1;
       else changed += 1;
       await tx.query(
-        `insert into scopes (org_id, id, name, kind, parent, steward, facets, origin, url) values ($1, $2, $3, $4, $5, $6, $7, $8, $9)
-         on conflict (org_id, id) do update set name = excluded.name, kind = excluded.kind, parent = excluded.parent, steward = excluded.steward, facets = excluded.facets, origin = excluded.origin, url = excluded.url, updated_at = now()`,
-        [orgId, s.id, s.name, s.kind, s.parent ?? null, s.steward ?? null, [...s.facets], origin, s.url ?? null],
+        `insert into scopes (org_id, id, name, kind, parent, steward, facets, origin, url, profile) values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+         on conflict (org_id, id) do update set name = excluded.name, kind = excluded.kind, parent = excluded.parent, steward = excluded.steward, facets = excluded.facets, origin = excluded.origin, url = excluded.url, profile = excluded.profile, updated_at = now()`,
+        [orgId, s.id, s.name, s.kind, s.parent ?? null, s.steward ?? null, [...s.facets], origin, s.url ?? null, JSON.stringify(s.profile)],
       );
     }
     const gone = [...before.keys()];
@@ -102,7 +107,7 @@ export async function adoptScopes(db: Db, orgId: string, origin: ScopeOrigin): P
   await db.query('update scopes set origin = $2, updated_at = now() where org_id = $1', [orgId, origin]);
 }
 
-const toRow = (s: Scope): ScopeRow => ({ id: s.id, name: s.name, kind: s.kind, parent: s.parent ?? null, steward: s.steward ?? null, facets: [...s.facets], url: s.url ?? null });
+const toRow = (s: Scope): ScopeRow => ({ id: s.id, name: s.name, kind: s.kind, parent: s.parent ?? null, steward: s.steward ?? null, facets: [...s.facets], url: s.url ?? null, profile: { ...s.profile } });
 
 /** Each workspace that names a scope, by slug. */
 export async function workspaceScopes(db: Db, orgId: string): Promise<Map<string, string>> {
@@ -116,7 +121,7 @@ export async function setWorkspaceScope(db: Db, orgId: string, workspaceId: stri
 
 /** A scope and the scopes above it, nearest first: what a workspace in it inherits from. */
 export async function lineage(db: Db, orgId: string, id: string): Promise<Scope[]> {
-  const all = new Map((await db.query<ScopeRow>('select id, name, kind, parent, steward, facets, url from scopes where org_id = $1', [orgId])).map((r) => [r.id, fromRow(r)]));
+  const all = new Map((await db.query<ScopeRow>('select id, name, kind, parent, steward, facets, url, profile from scopes where org_id = $1', [orgId])).map((r) => [r.id, fromRow(r)]));
   const out: Scope[] = [];
   for (let at = all.get(id); at && !out.some((s) => s.id === at!.id); at = at.parent ? all.get(at.parent) : undefined) out.push(at);
   return out;

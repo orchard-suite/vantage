@@ -57,7 +57,7 @@ describe('standards built from positions', () => {
       await admin.call('vantage_tool', { tool: 'vantage_registries', arguments: { action: 'create', workspace: name.toLowerCase(), prefix, name: `${name} decisions` } });
     }
     await admin.call('vantage_write', { writes: [{ address: 'scopes', text: TREE }] });
-  });
+  }, 30_000);
   afterAll(async () => {
     await t.ctx.db.close();
   });

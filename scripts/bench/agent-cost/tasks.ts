@@ -70,6 +70,8 @@ export interface Fixture {
   readonly standard: string;
   /** The version of it the agent read. */
   readonly standardVersion: string;
+  /** One scope's text, as the same file would sit on a disk. */
+  readonly scope: string;
   /** A team workspace's records and documents, as the same files would sit on a disk, for the tasks that search across the hub. */
   readonly shared: readonly DiskFile[];
   readonly dir: string;
@@ -148,6 +150,25 @@ const RULES = Array.from({ length: 12 }, (_, i) => {
   return `---\ntitle: Rule ${i + 1} holds for every service\nstatus: accepted\ncategory: ${category}\ndecided: 2026-11-01\ndeciders: [The maintainers]\nposition:\n  line: Every service keeps rule ${i + 1} for lane ${i + 1}, checked at each release.\n  binding: ${i % 2 ? 'should' : 'must'}\n  binds: [systems, agents]\n---\n\n## Context\n\nLane ${i + 1} drifted.\n\n## Decision\n\nRule ${i + 1} holds.\n\n## Consequences\n\nOne rule to keep.\n`;
 });
 
+/** A small tree kept in the hub, whose team leaves its mission to the organization above it. */
+const SCOPES = `source: hub
+profile: [description, mission, north_star]
+scopes:
+  - id: acme
+    name: Acme
+    kind: organization
+    profile:
+      mission: Every order arrives whole and on time, whatever the lane it travels.
+      north_star: Orders that need no second touch.
+  - id: shop
+    name: Shop
+    kind: team
+    parent: acme
+    profile:
+      description: The shop takes orders from the storefront and hands them to the warehouse lanes.
+workspaces: {}
+`;
+
 /** A person's scratch notes, full of the question's words: a search across the hub never answers from them. */
 const SCRATCH = `title: Scratch\nnodes:\n${Array.from({ length: 20 }, (_, i) => `  - name: Idea ${i}\n    type: service\n    description: maybe apps sign in some other way, idea ${i}`).join('\n')}\nviews: []\n`;
 
@@ -184,6 +205,8 @@ export async function fixture(): Promise<Fixture> {
   await hub.call('vantage_tool', { tool: 'vantage_registries', arguments: { action: 'create', workspace: 'platform', prefix: 'PLAT', name: 'Platform decisions' } });
   for (const text of SHARED_RECORDS) await hub.call('vantage_write', { writes: [{ address: 'PLAT', text }] });
   await hub.call('vantage_write', { writes: [{ address: 'platform/shop-standard', text: STANDARD }, { address: '~/scratch', text: SCRATCH }] });
+  await hub.call('vantage_write', { writes: [{ address: 'scopes', text: SCOPES }] });
+  const scope = /^=== scopes\/shop[^\n]*\n([\s\S]*)$/.exec(await hub.call('vantage_read', { addresses: ['scopes/shop'] }))![1]!;
   await hub.call('vantage_tool', { tool: 'vantage_registries', arguments: { action: 'create', workspace: 'platform', prefix: 'RULE', name: 'Platform rules' } });
   for (const text of RULES) await hub.call('vantage_write', { writes: [{ address: 'RULE', text }] });
   const built = /^=== standard\/estate  version (\S+)[^\n]*\n([\s\S]*)$/.exec(await hub.call('vantage_read', { addresses: ['standard/estate'] }))!;
@@ -192,12 +215,12 @@ export async function fixture(): Promise<Fixture> {
     const ref = `PLAT-${2000 + i}`;
     shared.push({ path: `decisions/${ref}.md`, text: new RegExp(`=== ${ref}[^\\n]*\\n([\\s\\S]*)$`).exec(await hub.call('vantage_read', { addresses: [ref] }))![1]! });
   }
-  return { t, hub, hubHeaders: me.headers, laptop: lap, ws, yaml, page, record, item, standard: built[2]!, standardVersion: built[1]!, shared, dir: mkdtempSync(join(tmpdir(), 'vantage-cost-')) };
+  return { t, hub, hubHeaders: me.headers, laptop: lap, ws, yaml, page, record, item, standard: built[2]!, standardVersion: built[1]!, scope, shared, dir: mkdtempSync(join(tmpdir(), 'vantage-cost-')) };
 }
 
 export interface Task {
   readonly name: string;
-  readonly kind: 'box' | 'view' | 'page' | 'record' | 'item' | 'roadmap' | 'search' | 'standard';
+  readonly kind: 'box' | 'view' | 'page' | 'record' | 'item' | 'roadmap' | 'search' | 'standard' | 'scope';
   /** Does the task through the hub's door. */
   run(f: Fixture): Promise<unknown>;
   /** What the same task costs on a disk. */
@@ -324,6 +347,12 @@ export const TASKS: readonly Task[] = [
     kind: 'standard',
     run: (f) => f.hub.call('vantage_read', { addresses: ['standard/estate'], held: { 'standard/estate': f.standardVersion } }),
     disk: (f) => disk.read(`${DISK}/standards/estate.md`, f.standard, 1, 7),
+  },
+  {
+    name: "read a scope's profile, inherited fields and all",
+    kind: 'scope',
+    run: (f) => f.hub.call('vantage_read', { addresses: ['scopes/shop'] }),
+    disk: (f) => disk.read(`${DISK}/scopes/shop.md`, f.scope, 1, f.scope.split('\n').length),
   },
   {
     name: "move one roadmap item's horizon",

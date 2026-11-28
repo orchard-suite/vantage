@@ -24,8 +24,9 @@ import { documentLink, recordLink } from './links.ts';
 import { RECORD_TEMPLATE } from './record-text.ts';
 import { itemOutline, kindOutline, placeAddress } from './items.ts';
 import { kindsFor } from '../tracking/read.ts';
-import { scopeLine, scopesOutline } from '../scopes/outline.ts';
+import { scopeLines, scopesOutline } from '../scopes/outline.ts';
 import { standardOutline, standardsOutline } from '../standards/outline.ts';
+import { scopeOutline } from '../scopes/profile.ts';
 
 const n = (x: number): string => x.toLocaleString('en-US');
 const day = (d: Date): string => d.toISOString().slice(0, 10);
@@ -85,8 +86,8 @@ async function workspace(ctx: AppContext, p: Principal, slug: string): Promise<s
   const ws = await workspaceAt(ctx, p, slug, 'viewer');
   const docs = await documentLines(ctx, ws.id);
   const registries = await listRegistries(ctx, p, ws.slug);
-  const scope = await scopeLine(ctx, p.orgId, ws.scope);
-  const lines = [`${ws.slug}: ${ws.name} (${ws.kind}, you are ${ws.role}), ${n(docs.length)} document${docs.length === 1 ? '' : 's'}`, scope ?? 'scope: none, so the whole estate (vantage_outline scopes)'];
+  const scope = await scopeLines(ctx, p.orgId, ws.scope);
+  const lines = [`${ws.slug}: ${ws.name} (${ws.kind}, you are ${ws.role}), ${n(docs.length)} document${docs.length === 1 ? '' : 's'}`, ...(scope.length ? scope : ['scope: none, so the whole estate (vantage_outline scopes)'])];
   for (const d of docs) lines.push(`  ${ws.slug}/${d.slug}  ${d.name}  ${d.chars === null ? 'no version yet' : `${n(d.chars)} chars`}${d.pages ? `, ${d.pages} page${d.pages === 1 ? '' : 's'}` : ''}  updated ${day(d.updated_at)}`);
   for (const r of registries) lines.push(`  registry ${r.prefix}  ${r.name}  ${n(await countDecisions(ctx.db, [r.id]))} records`);
   for (const k of (await kindsFor(ctx, p)).filter((x) => x.workspace_id === ws.id)) lines.push(`  kind ${k.prefix}  ${k.name}  (outline ${k.prefix} for its items)`);
@@ -181,6 +182,8 @@ export async function outline(ctx: AppContext, p: Principal, given: Address): Pr
       return schemaOutline();
     case 'scopes':
       return fit(await scopesOutline(ctx, p), 'vantage_read scopes#scopes.<id>');
+    case 'scope':
+      return fit(await scopeOutline(ctx, p, a.id), `vantage_read scopes/${a.id}#<field>`);
     case 'standards':
       return fit(await standardsOutline(ctx, p), 'vantage_outline standard/<scope>');
     case 'standard':

@@ -124,6 +124,13 @@ export const APP_CSS = `
 .ws-title h1{margin:0;font-size:var(--fs-2xl);line-height:26px;font-weight:600;letter-spacing:var(--tight)}
 .ws-mark{width:52px;height:52px;flex:none;border-radius:var(--r-l);display:inline-flex;align-items:center;justify-content:center;background:var(--f-fill);color:var(--f-text);border:1px solid var(--line);font:700 22px var(--display)}
 .ws-meta{display:flex;align-items:center;gap:10px;margin-top:4px;font-size:12.5px;color:var(--muted)}
+.ws-scope{display:flex;flex-direction:column;gap:10px;padding:14px 16px;border:1px solid var(--line);border-radius:var(--r-l);background:var(--panel)}
+.ws-scope>p{margin:0;font-size:var(--fs-s);color:var(--muted)}
+.ws-scope>p b{color:var(--ink);font-weight:600}
+.ws-profile{display:grid;grid-template-columns:minmax(96px,max-content) minmax(0,1fr);gap:6px 16px;margin:0}
+.ws-profile dt{font:var(--caps);letter-spacing:var(--caps-track);text-transform:uppercase;color:var(--faint);padding-top:2px}
+.ws-profile dd{margin:0;overflow-wrap:anywhere}
+.ws-profile .inherited{display:block;font-size:var(--fs-s);color:var(--faint)}
 .ws-acts{margin-left:auto;display:flex;gap:8px;flex-wrap:wrap}
 .tabs .tally{margin-left:2px}
 .tab-intro{display:flex;flex-direction:column;gap:4px;max-width:680px;margin-bottom:16px}

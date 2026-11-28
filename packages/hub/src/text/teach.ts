@@ -19,6 +19,7 @@ export function topicOf(a: Pick<Address, 'kind'> | undefined): Topic {
     case 'kind':
       return 'working-with-items';
     case 'scopes':
+    case 'scope':
       return 'scopes-and-owners';
     case 'standards':
     case 'standard':

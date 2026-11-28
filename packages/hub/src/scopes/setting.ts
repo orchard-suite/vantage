@@ -22,9 +22,19 @@ export const CatalogSettingSchema = z
 
 export type CatalogSetting = z.output<typeof CatalogSettingSchema>;
 
-export type ScopeSetting = { readonly source: 'hub' } | { readonly source: 'catalog'; readonly catalog: CatalogSetting };
+/** The profile fields a scope carries when the estate names none. */
+export const DEFAULT_PROFILE = ['description'] as const;
 
-const StoredSchema = z.union([z.object({ source: z.literal('hub') }).strict(), z.object({ source: z.literal('catalog'), catalog: CatalogSettingSchema }).strict()]);
+export const ProfileFieldsSchema = z
+  .array(z.string().regex(/^[a-z][a-z0-9_]*$/, 'a profile field is lower case: letters, digits, underscore, such as north_star'))
+  .max(20)
+  .refine((xs) => new Set(xs).size === xs.length, 'each profile field is named once')
+  .describe("The fields of a scope's catalog entry that are its profile");
+
+export type ScopeSetting = ({ readonly source: 'hub' } | { readonly source: 'catalog'; readonly catalog: CatalogSetting }) & { readonly profile: readonly string[] };
+
+const profile = ProfileFieldsSchema.default([...DEFAULT_PROFILE]);
+const StoredSchema = z.union([z.object({ source: z.literal('hub'), profile }).strict(), z.object({ source: z.literal('catalog'), catalog: CatalogSettingSchema, profile }).strict()]);
 
 const KEY = 'scopes';
 
@@ -32,11 +42,9 @@ const KEY = 'scopes';
 export async function scopeSetting(db: Db, orgId: string): Promise<ScopeSetting> {
   const row = await maybe<{ settings: Record<string, unknown> }>(db, 'select settings from orgs where id = $1', [orgId]);
   const parsed = StoredSchema.safeParse(row?.settings[KEY]);
-  return parsed.success ? parsed.data : { source: 'hub' };
+  return parsed.success ? parsed.data : { source: 'hub', profile: [...DEFAULT_PROFILE] };
 }
 
 export async function setScopeSetting(db: Db, orgId: string, setting: ScopeSetting): Promise<void> {
   await db.query('update orgs set settings = jsonb_set(settings, $2, $3::jsonb) where id = $1', [orgId, `{${KEY}}`, JSON.stringify(setting)]);
 }
-
-export const sameSetting = (a: ScopeSetting, b: ScopeSetting): boolean => JSON.stringify(a) === JSON.stringify(b);

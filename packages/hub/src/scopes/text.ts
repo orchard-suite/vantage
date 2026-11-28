@@ -13,7 +13,7 @@ import { memberWorkspaces } from '../authz.ts';
 import { sha256 } from '../crypto.ts';
 import { badRequest } from '../http.ts';
 import { listScopes, workspaceScopes, type Scope } from './repo.ts';
-import { CatalogSettingSchema, scopeSetting, type ScopeSetting } from './setting.ts';
+import { CatalogSettingSchema, DEFAULT_PROFILE, ProfileFieldsSchema, scopeSetting, type ScopeSetting } from './setting.ts';
 import { ESTATE } from '../standards/model.ts';
 
 /** The address of the tree. */
@@ -37,7 +37,10 @@ export async function scopesState(ctx: AppContext, p: Principal): Promise<Scopes
 export function scopesText(s: ScopesState): string {
   const doc: Record<string, unknown> = { source: s.setting.source };
   if (s.setting.source === 'catalog') doc['catalog'] = s.setting.catalog;
-  doc['scopes'] = s.scopes.map((x) => ({ id: x.id, name: x.name, kind: x.kind, ...(x.parent ? { parent: x.parent } : {}), ...(x.steward ? { steward: x.steward } : {}), ...(x.facets.length ? { facets: [...x.facets] } : {}), ...(x.url ? { url: x.url } : {}) }));
+  doc['profile'] = [...s.setting.profile];
+  const fields = s.setting.profile;
+  const profileOf = (x: Scope): Record<string, string> => Object.fromEntries([...fields.filter((f) => x.profile[f] !== undefined), ...Object.keys(x.profile).filter((f) => !fields.includes(f)).sort()].map((f) => [f, x.profile[f]!]));
+  doc['scopes'] = s.scopes.map((x) => ({ id: x.id, name: x.name, kind: x.kind, ...(x.parent ? { parent: x.parent } : {}), ...(x.steward ? { steward: x.steward } : {}), ...(x.facets.length ? { facets: [...x.facets] } : {}), ...(x.url ? { url: x.url } : {}), ...(Object.keys(x.profile).length ? { profile: profileOf(x) } : {}) }));
   doc['workspaces'] = Object.fromEntries(s.workspaces);
   return stringify(doc, { lineWidth: 0 });
 }
@@ -55,6 +58,7 @@ const ScopeSchema = z
     steward: z.string().min(1).optional(),
     facets: z.array(z.string().min(1)).default([]),
     url: z.string().optional(),
+    profile: z.record(z.string(), z.string().nullish()).default({}).describe('The profile fields it states; one left out shows its nearest ancestor'),
   })
   .strict();
 
@@ -62,6 +66,7 @@ const TextSchema = z
   .object({
     source: z.enum(['hub', 'catalog']),
     catalog: CatalogSettingSchema.optional(),
+    profile: ProfileFieldsSchema.default([...DEFAULT_PROFILE]),
     scopes: z.array(ScopeSchema).nullish(),
     workspaces: z.record(z.string(), z.string().min(1)).nullish(),
   })
@@ -79,8 +84,14 @@ export function parseScopesText(text: string): ScopesState {
   const t = r.data;
   if (t.source === 'catalog' && !t.catalog) throw badRequest('source: catalog needs catalog: { connector: workspace/connector }');
   if (t.source === 'hub' && t.catalog) throw badRequest('catalog: is for source: catalog; a tree kept in the hub names no connector');
-  const setting: ScopeSetting = t.source === 'catalog' ? { source: 'catalog', catalog: t.catalog! } : { source: 'hub' };
-  const scopes = (t.scopes ?? []).map((x): Scope => ({ id: x.id, name: x.name, kind: x.kind, ...(x.parent ? { parent: x.parent } : {}), ...(x.steward ? { steward: x.steward } : {}), facets: x.facets, ...(x.url ? { url: x.url } : {}) }));
+  const setting: ScopeSetting = t.source === 'catalog' ? { source: 'catalog', catalog: t.catalog!, profile: t.profile } : { source: 'hub', profile: t.profile };
+  const scopes = (t.scopes ?? []).map((x): Scope => {
+    const stated = Object.entries(x.profile).flatMap(([k, v]) => (typeof v === 'string' && v.trim() ? [[k, v.trim()] as const] : []));
+    const stranger = stated.find(([k]) => !t.profile.includes(k));
+    // A catalog's copy is read again when the fields change, so only a tree kept here must hold to them.
+    if (stranger && t.source === 'hub') throw badRequest(`scope ${x.id} states profile field ${stranger[0]}, which the estate does not name; add it to profile: (${t.profile.join(', ') || 'none'})`);
+    return { id: x.id, name: x.name, kind: x.kind, ...(x.parent ? { parent: x.parent } : {}), ...(x.steward ? { steward: x.steward } : {}), facets: x.facets, ...(x.url ? { url: x.url } : {}), profile: Object.fromEntries(stated.sort(([a], [b]) => a.localeCompare(b))) };
+  });
   return { setting, scopes, workspaces: new Map(Object.entries(t.workspaces ?? {})) };
 }
 
