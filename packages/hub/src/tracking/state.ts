@@ -31,6 +31,14 @@ export interface ItemState {
   readonly links: readonly { readonly rel: LinkRel; readonly target: string }[];
   /** Who claims the item and until when; a claim past its end holds nothing. */
   readonly claim: Claim | null;
+  /** Who answers for it (VAN-3024): a person or a team, set by assigning it. */
+  readonly owner: Owner | null;
+  /** Who the owner handed it to: the owner's agents, or one named agent. */
+  readonly delegate: Delegation | null;
+  /** The scope it serves, from the scope tree; null serves its workspace's. */
+  readonly scope: string | null;
+  /** Everyone who held or claimed it, in the order they first did; a review is never theirs. */
+  readonly workedBy: readonly string[];
   /** Its place among the items of its kind: a fractional rank, compared byte by byte; null sorts after every ranked item. */
   readonly rank: string | null;
   readonly position: number;
@@ -55,9 +63,26 @@ export interface Claim {
   readonly until: string;
 }
 
+/** Who answers for an item: a person by id, or a team by id. */
+export interface Owner {
+  readonly kind: 'user' | 'team';
+  readonly id: string;
+}
+
+/**
+ * An item handed to agents (VAN-3024): with no agent named, any agent
+ * acting for its owner; with one, that agent alone, and the person it
+ * acts for. `by` is the person who delegated it.
+ */
+export interface Delegation {
+  readonly agentId: string | null;
+  readonly userId: string | null;
+  readonly by: string;
+}
+
 /** What each kind of event sets. An event holds the values it set and never a body's text. */
 export type EventData =
-  | { readonly type: 'created'; readonly key: string; readonly number: number; readonly kindId: string; readonly workspaceId: string; readonly ref: string | null; readonly title: string; readonly state: string; readonly class: StateClass; readonly askerId: string | null; readonly labels: Readonly<Record<string, LabelValue>>; readonly revision: string | null; readonly bodyId: string | null }
+  | { readonly type: 'created'; readonly key: string; readonly number: number; readonly kindId: string; readonly workspaceId: string; readonly ref: string | null; readonly title: string; readonly state: string; readonly class: StateClass; readonly askerId: string | null; readonly labels: Readonly<Record<string, LabelValue>>; readonly revision: string | null; readonly bodyId: string | null; readonly owner?: Owner | null; readonly scope?: string | null }
   | { readonly type: 'changed'; readonly title?: string; readonly labels?: Readonly<Record<string, LabelValue | null>>; readonly revision?: string; readonly bodyId?: string }
   | { readonly type: 'moved'; readonly from: string; readonly to: string; readonly class: StateClass; readonly note?: string; readonly revision?: string; readonly question?: true }
   | { readonly type: 'claimed'; readonly userId: string; readonly until: string; readonly agentId?: string | null; readonly run?: string }
@@ -70,7 +95,10 @@ export type EventData =
   | { readonly type: 'attached'; readonly fileId: string; readonly name: string; readonly size: number; readonly contentType: string }
   | { readonly type: 'placed'; readonly rank: string | null }
   | { readonly type: 'linked'; readonly rel: LinkRel; readonly target: string }
-  | { readonly type: 'unlinked'; readonly rel: LinkRel; readonly target: string };
+  | { readonly type: 'unlinked'; readonly rel: LinkRel; readonly target: string }
+  | { readonly type: 'assigned'; readonly owner: Owner | null }
+  | { readonly type: 'delegated'; readonly to: Delegation | null }
+  | { readonly type: 'scoped'; readonly scope: string | null };
 
 export type EventType = EventData['type'];
 
@@ -124,6 +152,10 @@ export function fold(before: ItemState | undefined, e: ItemEvent, orgId: string)
       askerId: d.askerId,
       holders: [],
       claim: null,
+      owner: d.owner ?? null,
+      delegate: null,
+      scope: d.scope ?? null,
+      workedBy: [],
       rank: null,
       labels: d.labels,
       revision: d.revision,
@@ -141,6 +173,7 @@ export function fold(before: ItemState | undefined, e: ItemEvent, orgId: string)
   }
   if (!before) throw new Error(`event ${e.id} comes before item ${e.itemId} was created`);
   const s = { ...before, position: e.position, events: before.events + 1, updatedAt: e.at };
+  const worked = (userId: string): readonly string[] => (before.workedBy.includes(userId) ? before.workedBy : [...before.workedBy, userId]);
   switch (d.type) {
     case 'changed': {
       const labels: Record<string, LabelValue> = { ...before.labels };
@@ -153,11 +186,11 @@ export function fold(before: ItemState | undefined, e: ItemEvent, orgId: string)
     case 'moved':
       return { ...s, state: d.to, class: d.class, stateSince: e.at, ...(d.revision !== undefined ? { revision: d.revision } : {}), notes: before.notes + (d.note ? 1 : 0) };
     case 'held':
-      return before.holders.includes(d.userId) ? s : { ...s, holders: [...before.holders, d.userId] };
+      return before.holders.includes(d.userId) ? s : { ...s, holders: [...before.holders, d.userId], workedBy: worked(d.userId) };
     case 'released':
       return { ...s, holders: before.holders.filter((h) => h !== d.userId), claim: before.claim?.userId === d.userId ? null : before.claim };
     case 'claimed':
-      return { ...s, holders: before.holders.includes(d.userId) ? before.holders : [...before.holders, d.userId], claim: { userId: d.userId, agentId: d.agentId ?? null, run: d.run ?? `user:${d.userId}`, until: d.until } };
+      return { ...s, holders: before.holders.includes(d.userId) ? before.holders : [...before.holders, d.userId], workedBy: worked(d.userId), claim: { userId: d.userId, agentId: d.agentId ?? null, run: d.run ?? `user:${d.userId}`, until: d.until } };
     case 'renewed':
       return { ...s, claim: before.claim ? { ...before.claim, until: d.until } : null };
     case 'ran':
@@ -174,6 +207,12 @@ export function fold(before: ItemState | undefined, e: ItemEvent, orgId: string)
       return before.links.some((l) => l.rel === d.rel && l.target === d.target) ? s : { ...s, links: [...before.links, { rel: d.rel, target: d.target }] };
     case 'unlinked':
       return { ...s, links: before.links.filter((l) => !(l.rel === d.rel && l.target === d.target)) };
+    case 'assigned':
+      return { ...s, owner: d.owner };
+    case 'delegated':
+      return { ...s, delegate: d.to };
+    case 'scoped':
+      return { ...s, scope: d.scope };
   }
 }
 

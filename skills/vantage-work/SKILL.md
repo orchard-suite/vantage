@@ -12,8 +12,11 @@ lifecycle moves it through, and the people and runs that hold it. Read
 ## Take one
 
 1. `vantage_queue` (through `vantage_tool`, group work) lists what you may
-   pick up, oldest first. Each card names what to read first, with sizes,
-   and the last run's handoff note. Read the handoff before anything else.
+   pick up, oldest first: what an item's owner delegated to agents acting
+   for your person or to you, and what a role you hold waits on. Each card
+   names what to read first, with sizes, and the last run's handoff note.
+   Read the handoff before anything else. An item nobody delegated is not
+   offered; take one only when your person asks you to.
 2. Claim the item and start it in one call:
 
    ```json
@@ -41,7 +44,10 @@ tracked before its first change, not after it lands.
    to another run. Tell that run, or the person, before you start.
 2. **Find or file the item.** `vantage_find` the kind for the work. With
    none, write one (`vantage_write` to the kind), under its roadmap item
-   (`part-of`), linked to the record that decided it (`decision`). A
+   (`part-of`), linked to the record that decided it (`decision`), with
+   your person as its `owner` unless its scope's steward answers for it.
+   Your person delegates it to you, or you delegate it for them when they
+   ask: `{"item": "SW-12", "delegate": true}`. A
    decision made in this conversation is recorded first, with `decide`.
 3. **Claim it and start it**, in one call, as in "Take one".
 4. **Name it in every commit.** Where `vantage.yaml` names a `work` kind,

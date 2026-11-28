@@ -2,7 +2,7 @@
  * Kinds and items in the text space. A kind's prefix outlines its items as
  * rows; an item reads as its card and body, and its notes, history, links,
  * and files are parts read a page at a time. Write makes an item at a
- * kind's prefix; patch and write change its title, labels, parent, and body
+ * kind's prefix; patch and write change its title, labels, parent, owner, scope, and body
  * through the same put every other door calls.
  */
 import type { AppContext } from '../context.ts';
@@ -69,7 +69,7 @@ export async function itemPart(ctx: AppContext, p: Principal, key: string, part:
   }
 }
 
-const rowLine = (r: Row): string => `  ${r.key}  ${r.state}  ${r.title}${r.holders.length ? `  held by ${r.holders.join(', ')}` : ''}${r.proofAt ? `  proof ${r.proofAt}` : ''}${Object.keys(r.labels).length ? `  ${Object.entries(r.labels).map(([k, v]) => `${k}=${v}`).join(' ')}` : ''}${r.span ? `  span ${r.span.start ?? '?'}..${r.span.end ?? '?'}` : ''}`;
+const rowLine = (r: Row): string => `  ${r.key}  ${r.state}  ${r.title}${r.owner ? `  owner ${r.owner}` : ''}${r.holders.length ? `  held by ${r.holders.join(', ')}` : ''}${r.run ? `  working: ${r.run}` : ''}${r.proofAt ? `  proof ${r.proofAt}` : ''}${Object.keys(r.labels).length ? `  ${Object.entries(r.labels).map(([k, v]) => `${k}=${v}`).join(' ')}` : ''}${r.span ? `  span ${r.span.start ?? '?'}..${r.span.end ?? '?'}` : ''}`;
 
 /** The order a kind's rows come in, in words, as `find` sorts one kind. */
 function orderWords(def: KindDef): string {
@@ -115,7 +115,9 @@ export async function itemOutline(ctx: AppContext, p: Principal, key: string): P
   const hs = c.hasBody ? headingOutline(body) : [];
   return [
     `${c.key}: ${c.title}  version ${c.version}  ${c.kind} ${c.kindName}`,
-    `${c.state} (${c.stateText}) since ${c.since}; asked by ${c.asker ?? 'nobody'}; held by ${c.holders.join(', ') || 'nobody'}`,
+    `${c.state} (${c.stateText}) since ${c.since}; asked by ${c.asker ?? 'nobody'}; owner ${c.owner ?? 'none'}; held by ${c.holders.join(', ') || 'nobody'}`,
+    ...(c.delegated ? [`delegated ${c.delegated}`] : []),
+    ...(c.claim ? [`working now: ${c.claim}`] : []),
     `moves open to you: ${c.moves.join('; ') || 'none'}`,
     ...(c.span ? [`span: ${spanText(c.span)}`] : []),
     ...(c.milestone ? [`milestone: ${rollupText(c.milestone)}`] : []),
@@ -152,7 +154,7 @@ export async function commitItem(ctx: AppContext, p: Principal, target: { create
   if (target.create) {
     const kind = await kindByPrefix(ctx.db, p.orgId, target.prefix);
     if (!kind) throw new HttpError(404, `no kind ${target.prefix}`);
-    const r = await put(ctx, p, { kind: kind.prefix, ...(next.title !== undefined ? { title: next.title } : {}), labels: next.labels, ...(next.parent ? { parent: next.parent } : {}), ...(kind.definition.owner ? {} : { body: next.body }) }, key);
+    const r = await put(ctx, p, { kind: kind.prefix, ...(next.title !== undefined ? { title: next.title } : {}), labels: next.labels, ...(next.parent ? { parent: next.parent } : {}), ...(next.owner && next.owner !== 'none' ? { owner: next.owner } : {}), ...(next.scope ? { scope: next.scope } : {}), ...(kind.definition.owner ? {} : { body: next.body }) }, key);
     const v = await itemThing(ctx, p, r.key);
     return { address: r.key, status: 'created', version: v.version, message: `${r.line}. ${v.link ?? ''}` };
   }
@@ -172,6 +174,8 @@ export async function commitItem(ctx: AppContext, p: Principal, target: { create
       ...(next.title !== undefined && next.title !== before.title ? { title: next.title } : {}),
       labels,
       ...(next.parent !== undefined && next.parent !== before.parent ? { parent: next.parent } : {}),
+      ...(next.owner !== before.owner ? { owner: next.owner === undefined || next.owner === 'none' ? null : next.owner } : {}),
+      ...(next.scope !== before.scope ? { scope: next.scope ?? null } : {}),
       ...(!f.kind.definition.owner && next.body !== before.body ? { body: next.body } : {}),
     },
     key,

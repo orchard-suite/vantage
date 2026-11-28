@@ -39,7 +39,10 @@
       "body",
       "edits",
       "parent",
-      "place"
+      "place",
+      "owner",
+      "scope",
+      "delegate"
     ]
   },
   {
@@ -194,6 +197,9 @@
       "class",
       "holder",
       "asker",
+      "owner",
+      "scope",
+      "delegated",
       "parent",
       "q",
       "label.<name>",

@@ -24,10 +24,10 @@ views:
     moves:
       - { from: open, to: doing, label: start, who: [author] }
       - { from: doing, to: review, label: ask for review, who: [holder], needs: [note] }
-      - { from: review, to: done, label: approve, who: [author], approval: true }
+      - { from: review, to: done, label: approve, who: [author, owner], approval: true, independent: true }
       - { from: review, to: doing, label: send back, who: [author], needs: [note] }
       - { from: doing, to: done, label: finish, who: [holder] }
       - { from: doing, to: waiting, label: ask, who: [holder], needs: [note] }
-      - { from: waiting, to: doing, label: answer, who: [author, asker], needs: [note] }
+      - { from: waiting, to: doing, label: answer, who: [author, asker, owner], needs: [note] }
       - { from: open, to: dropped, label: drop, who: [author], needs: [note] }
       - { from: done, to: doing, label: reopen, who: [author], needs: [note] }

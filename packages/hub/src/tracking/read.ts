@@ -19,6 +19,7 @@ import { horizonOf, orderSql } from './rank.ts';
 import { isMilestone, rollupOf, type Rollup } from './milestone.ts';
 import { clockOf, dayOf } from '../day.ts';
 import { agentLabels } from '../auth/agents.ts';
+import { checkScope, delegationText, ownerKey, ownerLabels, ownerOf, scopeSql } from './owner.ts';
 
 export interface Card {
   readonly key: string;
@@ -30,6 +31,12 @@ export interface Card {
   readonly class: ItemState['class'];
   readonly since: string;
   readonly asker: string | null;
+  /** Who answers for it: a person's email, or team:<slug> (VAN-3024). */
+  readonly owner: string | null;
+  /** The scope it serves; its workspace's when it names none. */
+  readonly scope: string | null;
+  /** Who it is delegated to, and by whom. */
+  readonly delegated?: string;
   readonly holders: readonly string[];
   readonly labels: Readonly<Record<string, LabelValue>>;
   readonly ref: string | null;
@@ -87,6 +94,9 @@ export async function cardOf(ctx: AppContext, f: Found): Promise<Card> {
   const parentId = item.links.find((l) => l.rel === 'part-of')?.target;
   const members = await membersOf(ctx.db, item.orgId, def);
   const span = await spanOf(ctx.db, item.id);
+  const owner = item.owner ? ((await ownerLabels(ctx.db, [item.owner])).get(ownerKey(item.owner)) ?? 'a person') : null;
+  const delegated = await delegationText(ctx.db, item);
+  const scope = item.scope ?? (await maybe<{ scope: string | null }>(ctx.db, 'select scope from workspaces where id = $1', [item.workspaceId]))?.scope ?? null;
   return {
     key: item.key,
     kind: kind.prefix,
@@ -97,6 +107,9 @@ export async function cardOf(ctx: AppContext, f: Found): Promise<Card> {
     class: item.class,
     since: dayOf(item.stateSince),
     asker: item.askerId ? (who.get(item.askerId) ?? 'a person') : null,
+    owner,
+    scope,
+    ...(delegated ? { delegated } : {}),
     holders: item.holders.map((h) => who.get(h) ?? 'a person'),
     labels: item.labels,
     ref: item.ref,
@@ -143,6 +156,12 @@ export interface FindQuery {
   /** `me`, or a person's email. */
   readonly holder?: string;
   readonly asker?: string;
+  /** `me`, a person's email, or team:<slug>. */
+  readonly owner?: string;
+  /** A scope's id: the items in it and in every scope under it. */
+  readonly scope?: string;
+  /** Only items delegated to agents, or only items nobody delegated. */
+  readonly delegated?: boolean;
   readonly labels?: Readonly<Record<string, string>>;
   readonly parent?: string;
   /** Words in the title, the labels, or the body. */
@@ -159,6 +178,10 @@ export interface Row {
   readonly state: string;
   readonly class: ItemState['class'];
   readonly holders: readonly string[];
+  /** Who answers for it. */
+  readonly owner?: string;
+  /** The live run, while a claim holds: which agent works it, for whom, until when. */
+  readonly run?: string;
   readonly labels: Readonly<Record<string, LabelValue>>;
   readonly updated: string;
   /** When the newest of its parts and the items it names as proof last moved; absent when it has none. */
@@ -187,6 +210,16 @@ export async function find(ctx: AppContext, p: Principal, q: FindQuery, r?: Reac
     if (field === 'holders') add((n) => `i.holders ? $${n}`, id);
     else add((n) => `i.asker_id = $${n}`, id);
   }
+  if (q.owner) {
+    const o = await ownerOf(ctx.db, p, q.owner).catch(() => undefined);
+    add((n) => `i.owner_kind = $${n}`, o?.kind ?? '-');
+    add((n) => `i.owner_id = $${n}`, o?.id ?? '-');
+  }
+  if (q.scope) {
+    params.push(await checkScope(ctx.db, p.orgId, q.scope));
+    where.push(scopeSql(1, params.length));
+  }
+  if (q.delegated !== undefined) where.push(q.delegated ? 'i.delegated_by is not null' : 'i.delegated_by is null');
   for (const [name, value] of Object.entries(q.labels ?? {})) {
     if (!/^[a-z][a-z0-9_]*$/.test(name)) throw badRequest(`${name} is not a label name`);
     add((n) => `i.labels ->> '${name}' = $${n}`, value);
@@ -213,18 +246,23 @@ export async function find(ctx: AppContext, p: Principal, q: FindQuery, r?: Reac
   }
   const limit = Math.min(Math.max(1, q.limit ?? 20), FIND_LIMIT);
   const order = await orderOf(ctx, p, q, params);
-  const rows = await ctx.dbRead.query<{ key: string; title: string; state: string; class: ItemState['class']; holders: string[]; labels: Record<string, LabelValue>; updated_at: Date; proof_at: Date | null; span: Span | null }>(
-    `select i.key, i.title, i.state, i.class, i.holders, i.labels, i.updated_at,
+  const rows = await ctx.dbRead.query<{ key: string; title: string; state: string; class: ItemState['class']; holders: string[]; owner_kind: 'user' | 'team' | null; owner_id: string | null; claim_user: string | null; claim_agent: string | null; claim_until: Date | null; labels: Record<string, LabelValue>; updated_at: Date; proof_at: Date | null; span: Span | null }>(
+    `select i.key, i.title, i.state, i.class, i.holders, i.owner_kind, i.owner_id, i.labels, i.updated_at,
+            case when i.claim_until > now() then i.claim_user end as claim_user, case when i.claim_until > now() then i.claim_agent end as claim_agent, i.claim_until,
             (select max(c.state_since) from items c where c.parent_id = i.id or c.id in (select l.target from item_links l where l.item_id = i.id and l.rel = 'proof') or c.id in (select l.item_id from item_links l where l.target = i.id and l.rel = 'toward')) as proof_at,
             ${spanSql('i.id')} as span
        ${from} order by ${order} limit ${limit} offset ${Math.max(0, q.offset ?? 0)}`,
     params,
   );
-  const who = await people(ctx, rows.flatMap((x) => x.holders));
+  const who = await people(ctx, [...rows.flatMap((x) => x.holders), ...rows.map((x) => x.claim_user)]);
+  const owners = await ownerLabels(ctx.dbRead, rows.map((x) => (x.owner_kind && x.owner_id ? { kind: x.owner_kind, id: x.owner_id } : null)));
+  const agents = await agentLabels(ctx.dbRead, rows.map((x) => x.claim_agent));
   return {
     rows: rows.map((x) => {
       const span = spanFrom(x.span);
-      return { key: x.key, title: x.title, state: x.state, class: x.class, holders: x.holders.map((h) => who.get(h) ?? 'a person'), labels: x.labels, updated: dayOf(x.updated_at), ...(x.proof_at ? { proofAt: dayOf(x.proof_at) } : {}), ...(span ? { span } : {}) };
+      const owner = x.owner_kind && x.owner_id ? owners.get(`${x.owner_kind}:${x.owner_id}`) : undefined;
+      const run = x.claim_user && x.claim_until ? `${actingText(who.get(x.claim_user) ?? 'a person', x.claim_agent ? agents.get(x.claim_agent) : undefined)} until ${clockOf(x.claim_until)}` : undefined;
+      return { key: x.key, title: x.title, state: x.state, class: x.class, holders: x.holders.map((h) => who.get(h) ?? 'a person'), ...(owner ? { owner } : {}), ...(run ? { run } : {}), labels: x.labels, updated: dayOf(x.updated_at), ...(x.proof_at ? { proofAt: dayOf(x.proof_at) } : {}), ...(span ? { span } : {}) };
     }),
     total,
   };
@@ -317,6 +355,12 @@ export function eventLine(c: Pick<Change, 'type' | 'data' | 'actor' | 'agent' | 
         return `ran: ${d.run.summary.split('\n')[0]!.slice(0, 160)}`;
       case 'erased':
         return `erased: ${d.reason.split('\n')[0]!.slice(0, 160)}`;
+      case 'assigned':
+        return d.owner ? 'assigned an owner' : 'left it with no owner';
+      case 'delegated':
+        return d.to ? (d.to.agentId ? 'delegated it to one agent' : "delegated it to the owner's agents") : 'took the delegation back';
+      case 'scoped':
+        return d.scope ? `put it in scope ${d.scope}` : "put it back in its workspace's scope";
     }
   })();
   return `${clockOf(c.at)} ${c.actor ? actingText(c.actor, c.agent) : 'the hub'}: ${what}`;

@@ -22,7 +22,7 @@ views:
 
 const item = (over: Partial<ItemState> = {}): ItemState => ({
   id: 'i1', orgId: 'o', kindId: 'k', workspaceId: 'w', number: 1, key: 'PAY-1', ref: null, title: 'Pay the vendor', state: 'asked', class: 'not-started',
-  askerId: 'someone', holders: [], labels: {}, revision: null, bodyId: null, links: [], claim: null, rank: null, position: 1, events: 1, notes: 0, files: 0, runs: 0,
+  askerId: 'someone', holders: [], labels: {}, revision: null, bodyId: null, links: [], claim: null, owner: null, delegate: null, scope: null, workedBy: [], rank: null, position: 1, events: 1, notes: 0, files: 0, runs: 0,
   stateSince: '2026-01-01T00:00:00.000Z', createdAt: '2026-01-01T00:00:00.000Z', updatedAt: '2026-01-01T00:00:00.000Z', ...over,
 });
 

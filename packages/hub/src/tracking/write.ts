@@ -22,6 +22,7 @@ import { requireApp, requirePerson } from './apps.ts';
 import { dependents, rework } from './worked.ts';
 import { placement, type Place, type Placement } from './rank.ts';
 import { checkDates } from './dates.ts';
+import { checkScope, defaultsFor, delegationOf, isOwner, ownerOf } from './owner.ts';
 
 /** What a write answers: one line, and the item as it stands after. */
 export interface WriteAnswer {
@@ -137,7 +138,16 @@ export interface PutInput {
   readonly parent?: string | undefined;
   /** Where it goes among the items of its kind in its horizon. */
   readonly place?: Place | undefined;
+  /** Who answers for it (VAN-3024): me, a person by email, or team:<slug>; null leaves it with nobody. A new item with none takes its scope's steward. */
+  readonly owner?: string | null | undefined;
+  /** The scope it serves, from the scope tree; null serves its workspace's. A new item with none serves its workspace's. */
+  readonly scope?: string | null | undefined;
+  /** The owner hands it to agents: true for any agent acting for the owner, an agent by id or name for that one, false to take it back. */
+  readonly delegate?: boolean | string | undefined;
 }
+
+/** A put that only delegates: the owner may send it without writing the workspace. */
+const onlyDelegates = (input: PutInput): boolean => input.delegate !== undefined && Object.entries(input).every(([k, v]) => v === undefined || ['item', 'kind', 'ref', 'delegate'].includes(k));
 
 /** Makes an item or changes the fields it names. Fields it does not name stay as they are. */
 export async function put(ctx: AppContext, p: Principal, input: PutInput, key: string | undefined): Promise<WriteAnswer> {
@@ -166,6 +176,10 @@ export async function put(ctx: AppContext, p: Principal, input: PutInput, key: s
   checkDates(def, labels);
   const parent = input.parent ? await parentLink(ctx, p, kind, input.parent) : undefined;
   const members = await membersOf(ctx.db, p.orgId, def);
+  // An item serves the scope it names, or its workspace's; with no owner named it takes that scope's steward.
+  const at = await defaultsFor(ctx.db, p.orgId, kind.workspace_id, input.scope ? await checkScope(ctx.db, p.orgId, input.scope) : null);
+  const owner = input.owner ? await ownerOf(ctx.db, p, input.owner) : input.owner === null ? null : at.steward;
+  const delegation = input.delegate !== undefined && input.delegate !== false ? await delegationOf(ctx.db, p, { key: `a new ${kind.prefix} item`, owner }, input.delegate) : null;
   const id = randomId();
   return commit({ ctx, p, key }, undefined, async (tx) => {
     const n = await tx.query<{ number: number }>('update item_kinds set next_number = next_number + 1 where id = $1 returning next_number - 1 as number', [kind.id]);
@@ -175,7 +189,8 @@ export async function put(ctx: AppContext, p: Principal, input: PutInput, key: s
     const start = startState(def);
     const placed = input.place ? await placement(tx, kind, { id, key: itemKey }, labels, input.place) : undefined;
     const events: { id: string; data: EventData }[] = [
-      { id, data: { type: 'created', key: itemKey, number, kindId: kind.id, workspaceId: kind.workspace_id, ref: input.ref ?? null, title: input.title!.trim(), state: start.id, class: start.class, askerId: p.module ? null : p.userId, labels, revision: input.revision ?? null, bodyId } },
+      { id, data: { type: 'created', key: itemKey, number, kindId: kind.id, workspaceId: kind.workspace_id, ref: input.ref ?? null, title: input.title!.trim(), state: start.id, class: start.class, askerId: p.module ? null : p.userId, labels, revision: input.revision ?? null, bodyId, owner, scope: at.scope } },
+      ...(delegation ? [{ id, data: { type: 'delegated' as const, to: delegation } }] : []),
       ...(parent ? [{ id, data: { type: 'linked' as const, rel: 'part-of' as const, target: parent } }] : []),
       ...(placed ? placedEvents(id, placed) : []),
     ];
@@ -184,13 +199,16 @@ export async function put(ctx: AppContext, p: Principal, input: PutInput, key: s
 }
 
 async function change(ctx: AppContext, p: Principal, f: Found, input: PutInput, key: string | undefined): Promise<WriteAnswer> {
-  requireAuthor(f);
+  // The owner delegates what they answer for, whether or not they write its workspace.
+  if (!(onlyDelegates(input) && isOwner(f.item.owner, p))) requireAuthor(f);
   const def = f.kind.definition;
   if ((input.body !== undefined || input.edits) && def.owner) throw badRequest(`${f.item.key} is kept by ${def.owner}; the hub holds no body for it`);
   if (input.body !== undefined && input.edits) throw badRequest('send the body or edits to it, not both');
   const labels = checkLabels(def, input.labels ?? {});
   const parent = input.parent !== undefined ? await parentLink(ctx, p, f.kind, input.parent) : undefined;
   const members = await membersOf(ctx.db, p.orgId, def);
+  const owner = input.owner === undefined ? undefined : input.owner === null ? null : await ownerOf(ctx.db, p, input.owner);
+  const scope = input.scope === undefined ? undefined : input.scope === null ? null : await checkScope(ctx.db, p.orgId, input.scope);
   return commit({ ctx, p, key }, f.item.id, async (tx, before) => {
     const s = before!;
     const set: { title?: string; labels?: Record<string, LabelValue | null>; revision?: string; bodyId?: string } = {};
@@ -205,6 +223,8 @@ async function change(ctx: AppContext, p: Principal, f: Found, input: PutInput, 
     }
     const events: { id: string; data: EventData }[] = [];
     if (Object.keys(set).length) events.push({ id: s.id, data: { type: 'changed', ...set } });
+    const who = ownership(s, owner, scope, input.delegate === undefined ? undefined : await delegationOf(tx, p, { key: s.key, owner: owner === undefined ? s.owner : owner }, input.delegate));
+    events.push(...who.events);
     const oldParent = s.links.find((l) => l.rel === 'part-of')?.target;
     if (parent !== undefined && parent !== oldParent) {
       if (oldParent) events.push({ id: s.id, data: { type: 'unlinked', rel: 'part-of', target: oldParent } });
@@ -217,9 +237,30 @@ async function change(ctx: AppContext, p: Principal, f: Found, input: PutInput, 
     const moved = set.labels && 'horizon' in set.labels && s.rank !== null;
     if (placed) events.push(...placedEvents(s.id, placed));
     else if (moved) events.push({ id: s.id, data: { type: 'placed', rank: null } });
-    const what = [...Object.keys(set).map((k) => (k === 'bodyId' ? 'body' : k)), ...(parent !== undefined && parent !== oldParent ? ['parent'] : []), ...(placed ? [`placed ${placed.words}`] : [])];
+    const what = [...Object.keys(set).map((k) => (k === 'bodyId' ? 'body' : k)), ...who.what, ...(parent !== undefined && parent !== oldParent ? ['parent'] : []), ...(placed ? [`placed ${placed.words}`] : [])];
     return { events, line: what.length ? `saved ${s.key} (${what.join(', ')})` : `unchanged: ${s.key}`, key: s.key, named: (x) => namedBy(def, x, members) };
   });
+}
+
+/** The events a change to who answers for an item, who it is delegated to, and its scope makes; a new owner ends the old owner's delegation. */
+function ownership(s: ItemState, owner: ItemState['owner'] | undefined, scope: string | null | undefined, delegation: ItemState['delegate'] | undefined): { events: { id: string; data: EventData }[]; what: string[] } {
+  const events: { id: string; data: EventData }[] = [];
+  const what: string[] = [];
+  const same = <T,>(a: T, b: T): boolean => JSON.stringify(a) === JSON.stringify(b);
+  if (owner !== undefined && !same(owner, s.owner)) {
+    events.push({ id: s.id, data: { type: 'assigned', owner } });
+    what.push('owner');
+  }
+  const next = delegation !== undefined ? delegation : owner !== undefined && !same(owner, s.owner) ? null : s.delegate;
+  if (!same(next, s.delegate) && !(next && s.delegate && next.agentId === s.delegate.agentId && next.userId === s.delegate.userId)) {
+    events.push({ id: s.id, data: { type: 'delegated', to: next } });
+    what.push(next ? 'delegated' : 'delegation taken back');
+  }
+  if (scope !== undefined && scope !== s.scope) {
+    events.push({ id: s.id, data: { type: 'scoped', scope } });
+    what.push('scope');
+  }
+  return { events, what };
 }
 
 /** Labels as they stand once a change lands: a null takes one away. */

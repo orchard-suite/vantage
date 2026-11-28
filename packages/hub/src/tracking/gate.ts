@@ -10,6 +10,7 @@ import type { Role } from '../auth/principal.ts';
 import { stateOf, type KindDef } from './kinds.ts';
 import type { ItemState } from './state.ts';
 import type { Named } from './store.ts';
+import { isOwner } from './owner.ts';
 
 /** What the gate knows of the caller. */
 export interface Caller {
@@ -31,6 +32,7 @@ export interface MoveOption {
   readonly needs: readonly string[];
   readonly approval: boolean;
   readonly people: boolean;
+  readonly independent: boolean;
 }
 
 export interface Given {
@@ -64,6 +66,8 @@ function holds(who: string, item: ItemState, caller: Caller, members: Members): 
       return item.holders.includes(caller.userId);
     case 'asker':
       return item.askerId === caller.userId;
+    case 'owner':
+      return isOwner(item.owner, caller);
   }
   const m = members.get(who);
   return !!m && (m.users.has(caller.userId) || caller.teamIds.some((t) => m.teams.has(t)));
@@ -73,15 +77,17 @@ function holds(who: string, item: ItemState, caller: Caller, members: Members): 
 export function mayMake(move: LifecycleMove, item: ItemState, caller: Caller, members: Members): boolean {
   if (move.approval && item.askerId === caller.userId) return false;
   if (move.people && caller.agent) return false;
+  if (move.independent && item.workedBy.includes(caller.userId)) return false;
   return (move.who ?? ['author']).some((w) => holds(w, item, caller, members));
 }
 
-/** Whether a role the kind declares, on a move out of the item's state, names the caller: the roles the queue offers an item to. */
+/** Whether the caller may work the item though it names them only: its owner, the person whose agent it is delegated to, or a role the kind declares on a move out of its state. */
 export function worksBy(def: KindDef, item: ItemState, caller: Caller, members: Members): boolean {
+  if (isOwner(item.owner, caller) || (item.delegate?.userId !== null && item.delegate?.userId === caller.userId)) return true;
   return def.moves.some((m) => m.from === item.state && (m.who ?? []).some((w) => !BUILT_IN_ROLES.includes(w) && holds(w, item, caller, members)));
 }
 
-const option = (def: KindDef, m: LifecycleMove): MoveOption => ({ to: m.to, toText: stateOf(def, m.to)?.text ?? m.to, label: m.label ?? `to ${m.to}`, needs: [...(m.needs ?? [])], approval: !!m.approval, people: !!m.people });
+const option = (def: KindDef, m: LifecycleMove): MoveOption => ({ to: m.to, toText: stateOf(def, m.to)?.text ?? m.to, label: m.label ?? `to ${m.to}`, needs: [...(m.needs ?? [])], approval: !!m.approval, people: !!m.people, independent: !!m.independent });
 
 /** The moves open to this caller from where the item stands. */
 export function openMoves(def: KindDef, item: ItemState, caller: Caller, members: Members): MoveOption[] {
@@ -104,6 +110,7 @@ export function checkMove(def: KindDef, item: ItemState, to: string, caller: Cal
   const move = def.moves.find((m) => m.from === item.state && m.to === to);
   if (!move) return refuse(`the lifecycle draws no move from ${item.state} to ${to}`);
   if (move.approval && item.askerId === caller.userId) return refuse(`${move.label ?? 'this move'} is an approval, and the person who asked for ${item.key} never approves it`);
+  if (move.independent && item.workedBy.includes(caller.userId)) return refuse(`${move.label ?? 'this move'} is a review by someone other than the worker, and you or an agent acting for you worked ${item.key}`);
   if (move.people && caller.agent) return refuse(`${move.label ?? 'this move'} is for people only; an agent never makes it, so ask your person to make it themselves`);
   if (!mayMake(move, item, caller, members)) return refuse(`${move.label ?? `the move to ${to}`} is for ${(move.who ?? ['author']).join(' or ')}`);
   for (const n of move.needs ?? []) {
@@ -114,10 +121,12 @@ export function checkMove(def: KindDef, item: ItemState, to: string, caller: Cal
   return { ok: true, move };
 }
 
-/** Who an item names: its asker, its holders, and the people and teams a role on a move out of its state resolves to. */
+/** Who an item names: its asker, its owner, the person whose agent it is delegated to, its holders, and the people and teams a role on a move out of its state resolves to. */
 export function namedBy(def: KindDef, item: ItemState, members: Members): Named[] {
   const out: Named[] = [];
   if (item.askerId) out.push({ kind: 'user', id: item.askerId, why: 'asker' });
+  if (item.owner) out.push({ kind: item.owner.kind, id: item.owner.id, why: 'owner' });
+  if (item.delegate?.userId) out.push({ kind: 'user', id: item.delegate.userId, why: 'delegate' });
   for (const h of item.holders) out.push({ kind: 'user', id: h, why: 'holder' });
   for (const m of def.moves.filter((x) => x.from === item.state)) {
     for (const role of (m.who ?? []).filter((w) => !BUILT_IN_ROLES.includes(w))) {

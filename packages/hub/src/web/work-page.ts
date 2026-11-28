@@ -57,7 +57,7 @@ function tabHref(ws: AccessibleWorkspace, kind: string | undefined, state?: stri
 }
 
 function rowLink(ws: AccessibleWorkspace, r: Row, stateText: ReadonlyMap<string, string>): string {
-  const sub = [r.holders.length ? `held by ${r.holders.join(', ')}` : 'nobody holds it', ...Object.entries(r.labels).filter(([k]) => k !== 'horizon').map(([k, v]) => `${k} ${v}`), ...(r.proofAt ? [`proof ${r.proofAt}`] : [])].join(' · ');
+  const sub = [r.owner ? `owner ${r.owner}` : 'no owner', r.holders.length ? `held by ${r.holders.join(', ')}` : 'nobody holds it', ...(r.run ? [`working now: ${r.run}`] : []), ...Object.entries(r.labels).filter(([k]) => k !== 'horizon').map(([k, v]) => `${k} ${v}`), ...(r.proofAt ? [`proof ${r.proofAt}`] : [])].join(' · ');
   return `<a class="dec-row" href="${escapeHtml(itemUrl(ws.slug, r.key))}"><span class="ref">${escapeHtml(r.key)}</span><span class="t"><b>${escapeHtml(r.title)}</b><span>${escapeHtml(sub)}</span></span><span class="pill ${PILL[r.class]}">${escapeHtml(stateText.get(r.state) ?? r.state)}</span><time datetime="${escapeHtml(r.updated)}" title="Last changed">${escapeHtml(r.updated)}</time></a>`;
 }
 
@@ -108,8 +108,11 @@ export function itemBody(ws: AccessibleWorkspace | undefined, wsName: string, m:
   const cell = (label: string, value: string): string => `<div><span class="caps">${label}</span><b>${value}</b></div>`;
   const meta = [
     cell('Asked by', escapeHtml(c.asker ?? 'Nobody')),
+    cell('Owner', escapeHtml(c.owner ?? 'Nobody')),
+    ...(c.delegated ? [cell('Delegated', escapeHtml(c.delegated))] : []),
     cell('Held by', escapeHtml(c.holders.join(', ') || 'Nobody')),
     ...(c.claim ? [cell('Working now', escapeHtml(c.claim))] : []),
+    ...(c.scope ? [cell('Scope', escapeHtml(c.scope))] : []),
     ...Object.entries(c.labels).map(([k, v]) => cell(escapeHtml(k), escapeHtml(String(v)))),
     ...(c.parent ? [cell('Part of', escapeHtml(c.parent))] : []),
     ...(c.span ? [cell('Span', escapeHtml(spanText(c.span)))] : []),

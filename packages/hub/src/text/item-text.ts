@@ -2,8 +2,8 @@
  * An item's text form (VAN-5002, VAN-3005): a short header of its
  * fields, then its Markdown body when the hub keeps it. Reading an item and
  * writing the same text back changes nothing. A write changes the title,
- * the labels, the parent, and the body; the state, the holders, and the
- * links are actions, so a write that changes them is refused with the
+ * the labels, the parent, the owner, the scope, and the body; the state,
+ * the holders, the delegation, and the links are actions, so a write that changes them is refused with the
  * action that does.
  */
 import { parse as parseYaml, stringify } from 'yaml';
@@ -17,6 +17,9 @@ export interface ItemFields {
   readonly title: string | undefined;
   readonly labels: Readonly<Record<string, LabelValue>>;
   readonly parent: string | undefined;
+  /** Who answers for it, and the scope it serves; `none` and an absent field leave it with none. */
+  readonly owner: string | undefined;
+  readonly scope: string | undefined;
   readonly body: string;
   /** The fields a write may not change, as the text gave them, to compare with the item. */
   readonly fixed: Readonly<Record<string, unknown>>;
@@ -29,6 +32,7 @@ const FIXED: Readonly<Record<string, string>> = {
   state: 'a state changes by a move: vantage_item {"actions":[{"item":"<key>","move":"<state>"}]}',
   asker: 'the person who asked is who made the item',
   holders: 'holders change by hold and release: vantage_item {"actions":[{"item":"<key>","hold":"me"}]}',
+  delegated: 'the owner delegates it: vantage_item {"actions":[{"item":"<key>","delegate":true}]}',
   ref: "the owner's key is set when the owner puts the item",
   revision: 'a revision comes with the owner\'s put or with a move that pins one',
   counts: 'notes, files, links, and events are counted by the hub',
@@ -45,6 +49,9 @@ export function itemText(c: Card, body: string): string {
     title: c.title,
     state: `${c.state} (${c.stateText}, ${c.class.replace('-', ' ')}, since ${c.since})`,
     asker: c.asker ?? 'nobody',
+    owner: c.owner ?? 'none',
+    ...(c.scope ? { scope: c.scope } : {}),
+    ...(c.delegated ? { delegated: c.delegated } : {}),
     holders: [...c.holders],
     ...(c.claim ? { claim: c.claim } : {}),
     ...(Object.keys(c.labels).length ? { labels: { ...c.labels } } : {}),
@@ -84,9 +91,9 @@ export function parseItemText(text: string): ItemFields {
   }
   if (typeof head !== 'object' || Array.isArray(head)) throw badRequest("the item's fields are a YAML map");
   // The live run is shown for as long as its claim holds, and a write never sets it, so a copy read while it held still writes.
-  const known = new Set(['title', 'labels', 'parent', 'claim', ...Object.keys(FIXED)]);
+  const known = new Set(['title', 'labels', 'parent', 'owner', 'scope', 'claim', ...Object.keys(FIXED)]);
   const stray = Object.keys(head).filter((k) => !known.has(k));
-  if (stray.length) throw badRequest(`an item has no field ${stray.join(', ')}; its fields: title, labels, parent`);
+  if (stray.length) throw badRequest(`an item has no field ${stray.join(', ')}; its fields: title, labels, parent, owner, scope`);
   const labels = head['labels'] ?? {};
   if (typeof labels !== 'object' || Array.isArray(labels) || labels === null) throw badRequest('labels is a map of name to value');
   for (const [k, v] of Object.entries(labels)) if (typeof v !== 'string' && typeof v !== 'number') throw badRequest(`label ${k} is a flat value; a nested value or a list is never a label`);
@@ -95,6 +102,8 @@ export function parseItemText(text: string): ItemFields {
     title: typeof head['title'] === 'string' ? head['title'] : head['title'] === undefined ? undefined : String(head['title']),
     labels: labels as Record<string, LabelValue>,
     parent: typeof head['parent'] === 'string' ? head['parent'] : undefined,
+    owner: typeof head['owner'] === 'string' ? head['owner'] : undefined,
+    scope: typeof head['scope'] === 'string' ? head['scope'] : undefined,
     body: m[2]!.replace(/^\n/, '').replace(/\n$/, ''),
     fixed,
   };

@@ -30,7 +30,7 @@ const Labels = z.record(z.string(), z.union([z.string(), z.number(), z.null()]))
 const BodyEdit = z.object({ old: z.string().min(1), new: z.string() }).strict();
 // A place puts an item in order among its kind in its horizon; with labels.horizon in the same put it moves to another.
 const Place = z.union([z.enum(['first', 'last']), z.object({ before: z.string().min(1) }).strict(), z.object({ after: z.string().min(1) }).strict()]);
-const PutBody = z.object({ kind: z.string().optional(), item: z.string().optional(), ref: z.string().min(1).max(200).optional(), title: z.string().optional(), labels: Labels.optional(), revision: z.string().min(1).max(200).optional(), body: z.string().max(200_000).optional(), edits: z.array(BodyEdit).min(1).max(50).optional(), parent: z.string().optional(), place: Place.optional() }).strict();
+const PutBody = z.object({ kind: z.string().optional(), item: z.string().optional(), ref: z.string().min(1).max(200).optional(), title: z.string().optional(), labels: Labels.optional(), revision: z.string().min(1).max(200).optional(), body: z.string().max(200_000).optional(), edits: z.array(BodyEdit).min(1).max(50).optional(), parent: z.string().optional(), place: Place.optional(), owner: z.string().min(1).max(200).nullable().optional(), scope: z.string().min(1).max(200).nullable().optional(), delegate: z.union([z.boolean(), z.string().min(1).max(200)]).optional() }).strict();
 // ask is a move whose lifecycle picks the state that waits for a person.
 const MoveBody = z.object({ to: z.string().optional(), note: z.string().optional(), revision: z.string().optional(), ask: z.string().optional() }).strict();
 // A claim is a hold that runs out; renew keeps one.
@@ -143,7 +143,7 @@ export function itemRoutes(ctx: AppContext, reg: OpenApiRegistry): Hono<HubEnv> 
     return c.json({ item: f.item.key, state: f.item.state, moves: openMoves(f.kind.definition, f.item, f.caller, await membersOf(ctx.db, p.orgId, f.kind.definition)) });
   });
 
-  reg.add({ method: 'put', path: '/items', summary: "put: make an item, or change the fields named; by the caller's own key (kind + ref) it is safe to send twice", tag: 'items', body: { kind: 'prefix, for a new item or one named by ref', item: 'optional: an item to change', ref: "optional: the owner's own key", title: 'optional', labels: 'optional: {name: value}; null removes one', revision: 'optional: the content revision', body: 'optional: Markdown, for a new item of a kind the hub keeps', edits: "optional: [{old, new}], each old matching the body exactly once; how a body changes", parent: 'optional: an item key', place: "optional: first, last, {before: KEY}, or {after: KEY}; its order among its kind in its horizon" }, auth: 'author', responses: { '201': 'created', '200': 'changed, unchanged, or a repeat' } });
+  reg.add({ method: 'put', path: '/items', summary: "put: make an item, or change the fields named; by the caller's own key (kind + ref) it is safe to send twice", tag: 'items', body: { kind: 'prefix, for a new item or one named by ref', item: 'optional: an item to change', ref: "optional: the owner's own key", title: 'optional', labels: 'optional: {name: value}; null removes one', revision: 'optional: the content revision', body: 'optional: Markdown, for a new item of a kind the hub keeps', edits: "optional: [{old, new}], each old matching the body exactly once; how a body changes", parent: 'optional: an item key', place: "optional: first, last, {before: KEY}, or {after: KEY}; its order among its kind in its horizon", owner: 'optional: who answers for it, me, an email, or team:<slug>; a new item with none takes its scope\'s steward', scope: "optional: the scope it serves, from the scope tree; a new item with none serves its workspace's", delegate: "optional, the owner's: true hands it to the owner's agents, an agent's id or name to that agent, false takes it back" }, auth: 'author', responses: { '201': 'created', '200': 'changed, unchanged, or a repeat' } });
   app.put('/items', async (c) => answer(c, await put(ctx, principal(c), await body(c, PutBody), idempotencyKey(c)), true));
 
   reg.add({ method: 'put', path: '/items/roadmap', summary: 'put many: a Markdown roadmap (a table with an outcome column, or bullets under Now, Next, and Later) as items of a kind, sent as the request body; sent twice it makes nothing twice', tag: 'items', query: ['kind', 'dryRun'], auth: 'author' });
@@ -242,7 +242,7 @@ export function itemRoutes(ctx: AppContext, reg: OpenApiRegistry): Hono<HubEnv> 
   reg.add({ method: 'get', path: '/items/:item/notes', summary: "An item's notes, newest first, a page at a time", tag: 'items', params: ['item'], query: ['before', 'limit'], auth: 'viewer' });
   app.get('/items/:item/notes', async (c) => c.json(await notes(ctx, await findItem(ctx, principal(c), item(c)), { ...(intParam(c.req.query('before'), 'before') ? { before: intParam(c.req.query('before'), 'before')! } : {}), ...(intParam(c.req.query('limit'), 'limit') ? { limit: intParam(c.req.query('limit'), 'limit')! } : {}) })));
 
-  reg.add({ method: 'get', path: '/items', summary: 'get many by key (keys=VAN-1,VAN-2, held=VAN-1@5), or find: a page of items the caller may see, filtered, with the total; count=state|class|kind|holder answers counts; list=queue answers what the caller may pick up; fields=title,state answers only those', tag: 'items', query: ['keys', 'held', 'kind', 'state', 'class', 'holder', 'asker', 'parent', 'q', 'label.<name>', 'limit', 'offset', 'count', 'list', 'fields'], auth: 'user' });
+  reg.add({ method: 'get', path: '/items', summary: 'get many by key (keys=VAN-1,VAN-2, held=VAN-1@5), or find: a page of items the caller may see, filtered, with the total; owner=me|email|team:<slug>, scope=<id> (and the scopes under it), delegated=true|false; count=state|class|kind|holder answers counts; list=queue answers what the caller may pick up (the items delegated to its agents, and those a role it holds waits on); fields=title,state answers only those', tag: 'items', query: ['keys', 'held', 'kind', 'state', 'class', 'holder', 'asker', 'owner', 'scope', 'delegated', 'parent', 'q', 'label.<name>', 'limit', 'offset', 'count', 'list', 'fields'], auth: 'user' });
   app.get('/items', async (c) => {
     const p = principal(c);
     const fields = fieldsOf(c.req.query('fields'));
@@ -260,6 +260,8 @@ export function itemRoutes(ctx: AppContext, reg: OpenApiRegistry): Hono<HubEnv> 
     const count = c.req.query('count');
     if (count && !['state', 'class', 'kind', 'holder'].includes(count)) throw badRequest('count is state, class, kind, or holder');
     const labels = Object.fromEntries(Object.entries(c.req.queries()).filter(([k]) => k.startsWith('label.')).map(([k, v]) => [k.slice(6), v[0] ?? '']));
+    const delegated = c.req.query('delegated');
+    if (delegated !== undefined && delegated !== 'true' && delegated !== 'false') throw badRequest('delegated is true or false');
     const kind = c.req.query('kind');
     const opt = <T,>(v: T | undefined, k: string) => (v === undefined || v === '' ? {} : { [k]: v });
     const r = await find(ctx, p, {
@@ -268,6 +270,9 @@ export function itemRoutes(ctx: AppContext, reg: OpenApiRegistry): Hono<HubEnv> 
       ...(cls ? { class: cls as (typeof STATE_CLASSES)[number] } : {}),
       ...opt(c.req.query('holder'), 'holder'),
       ...opt(c.req.query('asker'), 'asker'),
+      ...opt(c.req.query('owner'), 'owner'),
+      ...opt(c.req.query('scope'), 'scope'),
+      ...(delegated !== undefined ? { delegated: delegated === 'true' } : {}),
       ...opt(c.req.query('parent'), 'parent'),
       ...opt(c.req.query('q'), 'q'),
       labels,

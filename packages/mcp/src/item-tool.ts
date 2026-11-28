@@ -40,13 +40,14 @@ const action = {
     .optional()
     .describe('End the run in one action: its record, its move, and letting the item go'),
   ask: z.string().optional().describe('A question for a person; the item waits for the answer'),
+  delegate: z.union([z.boolean(), z.string()]).optional().describe("The owner hands the item to agents: true for any agent acting for the owner, an agent's id or name for that one, false takes it back. Only a delegated item is in the agent queue"),
   key: z.string().max(200).optional().describe('Set by the door; leave it out'),
 };
 
 export const ITEM = {
   name: 'vantage_item',
   description:
-    'Act on tracked items: claim one, move it, ask a person a question on it, finish a run on it, hold or release it, place it in order, note, attach, or link, several actions in one call, each landing alone with one line. Read an item with vantage_read VAN-12 (its moves open to you are in its card); change its title, labels, or body with vantage_patch.',
+    'Act on tracked items: claim one, move it, ask a person a question on it, finish a run on it, hold or release it, place it in order, delegate it to agents, note, attach, or link, several actions in one call, each landing alone with one line. Read an item with vantage_read VAN-12 (its moves open to you are in its card); change its title, labels, owner, scope, or body with vantage_patch.',
   shape: {
     actions: z
       .array(z.object({ ...action, attach: z.object({ name: z.string(), data: z.string().describe('The file in base64'), contentType: z.string().optional() }).optional() }).strict())
@@ -72,6 +73,6 @@ export const ROADMAP_IMPORT = {
 
 export const QUEUE = {
   name: 'vantage_queue',
-  description: 'What you may pick up: items not done, not waiting for a person, and not claimed by another run, oldest first, each with what to read first (addresses and sizes) and the last handoff note. Then claim one with vantage_item.',
+  description: 'What you may pick up: items their owner delegated to agents acting for your person or to you, and items a role you hold waits on; not done, not waiting for a person, and not claimed by another run, oldest first, each with what to read first (addresses and sizes) and the last handoff note. Then claim one with vantage_item.',
   shape: { kinds: z.array(z.string()).optional().describe('Kind prefixes to look in; every kind you may work when left out'), limit: z.number().int().min(1).max(20).optional() },
 };

@@ -1032,6 +1032,18 @@ VAN-0001 sets. The code is `packages/hub/src/tracking/`.
   the person. A second run is refused while a claim lives, even for the
   same person. A move that says `people: true` is refused to an agent
   (VAN-2009).
+- **Owners.** An item has one owner, a person or a team, who answers for
+  it; assigning sets it, as an event. The owner delegates it to agents:
+  any agent acting for the owner, or one named agent, also an event, and
+  only a delegated item is in the agent queue, beside the items a role
+  waits on. An item serves a scope from the tree, checked when it is set;
+  with none it serves its workspace's, and a new item with no owner takes
+  that scope's steward. The lists filter by owner, by scope with the
+  scopes under it, and by delegated. The card shows the owner, the
+  delegation, and the live run; a board card shows the owner and a mark
+  for a live run. A move that says `independent: true` is refused to
+  anyone who held or claimed the item and to agents acting for them; the
+  shipped approve says it (VAN-3024).
 - **Access.** A workspace grant, or being named on the item: the person
   who asked, a holder, or a person a waiting move's role resolves to.
   Being named shows that item only, and a role's person may also claim

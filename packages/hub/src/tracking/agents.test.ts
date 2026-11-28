@@ -26,7 +26,11 @@ async function seeded() {
   expect((await t.json(`/api/v1/workspaces/${ws.slug}/documents`, { method: 'POST', headers: me.headers, body: JSON.stringify({ yaml: WORK }) })).status).toBe(201);
   // The other agent writes the same workspace.
   await t.ctx.db.query("insert into grants (id, org_id, workspace_id, subject_kind, subject_id, role) select 'g1', org_id, id, 'user', $1, 'author' from workspaces where slug = $2", [other.principal.userId, ws.slug]);
-  for (const [i, title] of ['Cache the prices', 'Read through the cache', 'Retire the old reports'].entries()) await put(t.ctx, me.principal, { kind: 'SW', title }, `p${i}`);
+  // The other agent's person owns the work and hands it to agents, so it is in their queue (VAN-3024).
+  for (const [i, title] of ['Cache the prices', 'Read through the cache', 'Retire the old reports'].entries()) {
+    await put(t.ctx, me.principal, { kind: 'SW', title, owner: 'other-agent@example.com' }, `p${i}`);
+    await put(t.ctx, other.principal, { item: `SW-${i + 1}`, delegate: true }, `d${i}`);
+  }
   return { t, me, other, ws };
 }
 
@@ -69,9 +73,9 @@ describe('agents on items', () => {
   });
 
   test('a claim belongs to one run: a second run for the same person is refused while it lives, and the first renews', async () => {
-    const { t, me } = await seeded();
-    const first = { ...me.principal, run: 'run-1' };
-    const second = { ...me.principal, run: 'run-2' };
+    const { t, me, other } = await seeded();
+    const first = { ...other.principal, run: 'run-1' };
+    const second = { ...other.principal, run: 'run-2' };
     await claim(t.ctx, first, 'SW-1', undefined, 'c1');
     expect((await refusal(claim(t.ctx, second, 'SW-1', undefined, 'c2'))).message).toContain('is claimed by another run of yours until');
     expect((await queue(t.ctx, second)).cards.map((c) => c.key)).not.toContain('SW-1');
@@ -81,7 +85,7 @@ describe('agents on items', () => {
     expect((await claim(t.ctx, first, 'SW-1', undefined, 'c3')).line).toContain('is claimed by you');
     expect((await renew(t.ctx, first, 'SW-1', 'r1')).line).toContain('more minutes');
     const held = (await findItem(t.ctx, me.principal, 'SW-1')).item.claim!;
-    expect(held).toMatchObject({ userId: me.principal.userId, run: 'run-1', agentId: null });
+    expect(held).toMatchObject({ userId: other.principal.userId, run: 'run-1', agentId: null });
     // With no run named, an agent is its own run, and a person with no agent is theirs.
     const row = await createAgent(t.ctx.db, { orgId: me.principal.orgId, userId: me.principal.userId, name: 'vantage', client: 'vantage', host: 'laptop-1' });
     const asAgent = { ...me.principal, agent: { id: row.id, label: 'vantage on laptop-1' } };
@@ -109,7 +113,7 @@ describe('agents on items', () => {
     const after = (await findItem(t.ctx, me.principal, 'SW-1')).item.claim!;
     expect(Date.parse(after.until) - Date.now()).toBeGreaterThan(15 * 60_000);
     const types = await t.ctx.db.query<{ type: string }>("select e.type from item_events e join items i on i.id = e.item_id where i.key = 'SW-1' order by e.position");
-    expect(types.map((r) => r.type)).toEqual(['created', 'claimed', 'noted', 'renewed']);
+    expect(types.map((r) => r.type)).toEqual(['created', 'delegated', 'claimed', 'noted', 'renewed']);
   });
 
   test('finishing is one call: a run record, a move, and the release, and the next run reads the handoff in the queue', async () => {
@@ -141,8 +145,8 @@ describe('agents on items', () => {
   });
 
   test('an agent takes an item, reads it, and finishes it in a fixed number of calls through the door', async () => {
-    const { t, me } = await seeded();
-    const hub = await agent(t, me.headers);
+    const { t, other } = await seeded();
+    const hub = await agent(t, other.headers);
     const q = await hub.call('vantage_tool', { tool: 'vantage_queue', arguments: { limit: 1 } });
     expect(q).toContain('SW-1  open  Cache the prices');
     await hub.call('vantage_tool', { tool: 'vantage_item', arguments: { actions: [{ item: 'SW-1', claim: true }, { item: 'SW-1', move: 'doing' }] } });

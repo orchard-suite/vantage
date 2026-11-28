@@ -89,7 +89,8 @@ describe('items through the doors', () => {
   test('over HTTP the nine verbs carry the agent work: claim and renew are holds, ask is a move, finish is a release, the queue is a find, a roadmap is a put', async () => {
     const { t, me } = await seeded();
     const send = (path: string, method: string, key: string, body: unknown) => t.json(path, { method, headers: { ...me.headers, 'idempotency-key': key }, body: JSON.stringify(body) });
-    await send('/api/v1/items', 'PUT', 'p1', { kind: 'SW', title: 'Cache the price list' });
+    await send('/api/v1/items', 'PUT', 'p1', { kind: 'SW', title: 'Cache the price list', owner: 'me', delegate: true });
+    await send('/api/v1/items', 'PUT', 'p2', { kind: 'SW', title: 'Kept by its owner', owner: 'me' });
     expect((await t.json('/api/v1/items?list=queue', { headers: me.headers })).body['cards']).toEqual([expect.objectContaining({ key: 'SW-1' })]);
     expect((await send('/api/v1/items/SW-1/hold', 'POST', 'c1', { claim: 30 })).body['line']).toBe('SW-1 is claimed by you for 30 minutes; any call you make on it renews the claim');
     expect((await send('/api/v1/items/SW-1/hold', 'POST', 'c2', { renew: true })).body['line']).toBe('SW-1 is claimed by you for 20 more minutes');

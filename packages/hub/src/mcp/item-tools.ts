@@ -31,13 +31,14 @@ interface Action {
   readonly renew?: boolean | undefined;
   readonly finish?: { move?: string | undefined; summary: string; proof?: string[] | undefined; handoff?: string | undefined; seconds?: number | undefined; cost?: { amount: number; currency: string; tokens?: number | undefined } | undefined } | undefined;
   readonly ask?: string | undefined;
+  readonly delegate?: boolean | string | undefined;
   readonly key?: string | undefined;
 }
 
-/** Runs one action: exactly one of move, hold, release, place, link, unlink, attach, or a note alone. */
+/** Runs one action: exactly one of move, hold, release, place, delegate, link, unlink, attach, or a note alone. */
 export async function runAction(ctx: AppContext, p: Principal, a: Action): Promise<WriteAnswer> {
   const key = a.key ?? randomId();
-  const verbs = (['move', 'hold', 'release', 'place', 'link', 'unlink', 'attach', 'claim', 'renew', 'finish', 'ask'] as const).filter((v) => a[v] !== undefined && a[v] !== false);
+  const verbs = (['move', 'hold', 'release', 'place', 'link', 'unlink', 'attach', 'claim', 'renew', 'finish', 'ask', 'delegate'] as const).filter((v) => a[v] !== undefined && (a[v] !== false || v === 'delegate'));
   if (verbs.length > 1) throw badRequest(`one action does one thing; ${verbs.join(' and ')} go in separate actions`);
   if (a.revision !== undefined && !a.move) throw badRequest('revision goes with a move; to set it alone, the owner puts the item');
   switch (verbs[0]) {
@@ -49,6 +50,8 @@ export async function runAction(ctx: AppContext, p: Principal, a: Action): Promi
       return release(ctx, p, a.item, a.release, key);
     case 'place':
       return put(ctx, p, { item: a.item, place: a.place! }, key);
+    case 'delegate':
+      return put(ctx, p, { item: a.item, delegate: a.delegate! }, key);
     case 'link':
       return link(ctx, p, a.item, a.link!, key);
     case 'unlink':

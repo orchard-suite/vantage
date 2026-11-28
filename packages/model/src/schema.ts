@@ -314,9 +314,8 @@ export const DocViewSchema = viewBase
 export const STATE_CLASSES = ['not-started', 'in-progress', 'done', 'parked'] as const;
 export type StateClass = (typeof STATE_CLASSES)[number];
 
-/** Who a move may name without the kind declaring it. */
-/** Who a move may name without the kind declaring it: `proof` is the hub, moving an item when its proof says so. */
-export const BUILT_IN_ROLES: readonly string[] = ['author', 'holder', 'asker', 'proof'];
+/** Who a move may name without the kind declaring it: `owner` is the person or team that answers for the item; `proof` is the hub, moving an item when its proof says so. */
+export const BUILT_IN_ROLES: readonly string[] = ['author', 'holder', 'asker', 'owner', 'proof'];
 
 export const LifecycleStateSchema = z
   .object({
@@ -334,10 +333,11 @@ export const LifecycleMoveSchema = z
     from: z.string(),
     to: z.string(),
     label: text.optional().describe('The move as people say it: approve, send back'),
-    who: z.array(z.string()).optional().describe('Who may make it: author (anyone who writes the workspace), holder, asker, proof (the hub, when the item\'s proof says so), or a role the kind names. Default author'),
+    who: z.array(z.string()).optional().describe('Who may make it: author (anyone who writes the workspace), holder, asker, owner (the person or team that answers for the item), proof (the hub, when the item\'s proof says so), or a role the kind names. Default author'),
     needs: z.array(z.string().regex(/^(note|revision|label:[a-z][a-z0-9_]*)$/, 'note, revision, or label:<name>')).optional().describe('What the move needs: a note, a content revision to pin, or a label that must be set'),
     approval: z.boolean().optional().describe('An approval: the person who asked for the item never makes it'),
     people: z.boolean().optional().describe('For people only: an agent never makes it, so a person makes it themselves'),
+    independent: z.boolean().optional().describe('A review by someone other than the worker: refused to anyone who held or claimed the item, and to agents acting for them'),
   })
   .strict();
 

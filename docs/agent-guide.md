@@ -1380,8 +1380,9 @@ machine form (`adr:<ULID>`). Both are read-only: a write ignores them. The
 ## Kinds and items
 
 A hub tracks work as items. An item has a key people say (`SW-12`), a
-kind, a state, who asked for it, who holds it, a few labels, notes, files,
-links, and a history. The system that keeps the work's content keeps the
+kind, a state, who asked for it, one owner who answers for it, who holds
+it, the scope it serves, a few labels, notes, files, links, and a
+history. The system that keeps the work's content keeps the
 content; the hub keeps where the work stands and who has it. An item the
 hub keeps itself also has a Markdown body.
 
@@ -1441,12 +1442,17 @@ views:
 - Every state is one of four classes: `not-started`, `in-progress`,
   `done`, `parked`. A list or a report reads any kind by them.
 - `who` names `author` (anyone who writes the workspace, the default),
-  `holder`, `asker`, or a role the kind declares.
+  `holder`, `asker`, `owner` (the person or team that answers for the
+  item), or a role the kind declares.
 - `needs` is `note`, `revision` (the content revision the move is about),
   or `label:<name>` (a label that must be set first).
 - `approval: true`: the person who asked never makes the move.
 - `people: true`: a person makes it themselves; an agent acting for them
   is refused.
+- `independent: true`: a review by someone other than the worker. Anyone
+  who held or claimed the item, and any agent acting for them, is refused.
+  The shipped work item's `approve` says it, and is the owner's or an
+  author's.
 - Two moves never join the same two states; a move is named by where it
   goes. It draws as a flow: work reads from the first state, and done
   states sit last.
@@ -1480,8 +1486,14 @@ views:
   The price list answers from the cache.
   ```
 
-- The title, the labels, the parent, and the body change with
-  `vantage_patch`, like any text. The state, the holders, and the links
+- An item has one owner, who answers for it: they approve it, answer its
+  questions, and are told when it moves. In the text it is `owner:
+  ada@example.com` (or `team:platform`, or `none`). It serves a scope from
+  the scope tree, `scope: payments`; with none it serves its workspace's.
+  A new item with no owner takes its scope's steward. A scope the tree
+  does not have is refused.
+- The title, the labels, the parent, the owner, the scope, and the body
+  change with `vantage_patch`, like any text. The state, the holders, and the links
   are actions: `vantage_item` (through `vantage_tool`), several in one
   call, each landing alone:
 
@@ -1503,15 +1515,27 @@ views:
   the item after the placed ones there. On the board a person drags a
   card, or uses its Up and Down buttons, which call the same put.
 - People see an item when they can open its workspace, or when it names
-  them: who asked, who holds it, or a role a move out of its state waits
-  for. Being named lets a person make the moves the lifecycle gives them.
-  A person a role on a move out of its state names may also work it:
-  claim it, and finish the run. Nothing else.
+  them: who asked, its owner, who holds it, the person whose agent it is
+  delegated to, or a role a move out of its state waits for. Being named
+  lets a person make the moves the lifecycle gives them. Its owner, the
+  person whose agent it is delegated to, and a person a role on a move
+  out of its state names may also work it: claim it, and finish the run.
+  Nothing else.
 
 ### Agents on items
 
 - `vantage_queue` (through `vantage_tool`) lists what you may pick up,
-  oldest first, each with what to read first and the last handoff note.
+  oldest first, each with what to read first and the last handoff note:
+  the items an owner delegated to agents acting for your person or to you
+  by name, and the items a role you hold waits on. An item nobody
+  delegated is never offered; you take work a person kept only when they
+  ask you to.
+- The owner delegates: `{"item": "SW-12", "delegate": true}` hands it to
+  any agent acting for the owner; `"delegate": "agt_..."` (or the name of
+  one of your person's agents) to that agent alone; `"delegate": false`
+  takes it back. A new owner ends the old owner's delegation. The card
+  says who owns it, who it is delegated to and by whom, and the live run:
+  which agent works it, for whom, until when.
 - `{"item": "SW-12", "claim": true}` takes the item for 20 minutes. Any
   call you make on it renews the claim, and on a laptop the bridge renews
   it while your session lives. A claim that runs out puts the item back
@@ -1543,6 +1567,9 @@ views:
   finishes; `PUT /items/roadmap?kind=PLAN` brings a Markdown roadmap in.
   `get` and `find` take `fields=title,state` and answer only those; a
   `put` changes a body by `edits: [{"old", "new"}]`, never the whole body.
+  A `put` takes `owner`, `scope`, and `delegate`; `find` takes
+  `owner=me|<email>|team:<slug>`, `scope=<id>` (the scope and every scope
+  under it), and `delegated=true|false`.
 
 ### Roadmaps
 
