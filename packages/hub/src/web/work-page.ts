@@ -109,6 +109,7 @@ export function itemBody(ws: AccessibleWorkspace | undefined, wsName: string, m:
   const meta = [
     cell('Asked by', escapeHtml(c.asker ?? 'Nobody')),
     cell('Held by', escapeHtml(c.holders.join(', ') || 'Nobody')),
+    ...(c.claim ? [cell('Working now', escapeHtml(c.claim))] : []),
     ...Object.entries(c.labels).map(([k, v]) => cell(escapeHtml(k), escapeHtml(String(v)))),
     ...(c.parent ? [cell('Part of', escapeHtml(c.parent))] : []),
     ...(c.span ? [cell('Span', escapeHtml(spanText(c.span)))] : []),

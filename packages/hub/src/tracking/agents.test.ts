@@ -7,9 +7,11 @@ import { agent, laptop } from '../mcp/testing.ts';
 import { testApp } from '../testing.ts';
 import { HttpError } from '../http.ts';
 import { findItem } from './access.ts';
+import { createAgent } from '../auth/agents.ts';
 import { get } from './read.ts';
 import { queue } from './queue.ts';
-import { ask, claim, finish, hold, move, note, put } from './write.ts';
+import { hold, move, note, put } from './write.ts';
+import { ask, claim, finish, renew } from './work.ts';
 
 const WORK = `title: Shop work
 kind: { prefix: SW, name: Shop work, base: work-item }
@@ -56,7 +58,7 @@ describe('agents on items', () => {
     const { t, me, other } = await seeded();
     expect((await queue(t.ctx, other.principal)).cards.map((c) => c.key)).toEqual(['SW-1', 'SW-2', 'SW-3']);
     expect((await claim(t.ctx, me.principal, 'SW-1', undefined, 'c1')).line).toBe('SW-1 is claimed by you for 20 minutes; any call you make on it renews the claim');
-    expect((await refusal(claim(t.ctx, other.principal, 'SW-1', undefined, 'c2'))).message).toContain('is claimed until');
+    expect((await refusal(claim(t.ctx, other.principal, 'SW-1', undefined, 'c2'))).message).toContain('is claimed by another person until');
     expect((await queue(t.ctx, other.principal)).cards.map((c) => c.key)).toEqual(['SW-2', 'SW-3']);
     await lapse(t, 'SW-1');
     expect((await queue(t.ctx, other.principal)).cards.map((c) => c.key)).toContain('SW-1');
@@ -64,6 +66,39 @@ describe('agents on items', () => {
     const item = (await findItem(t.ctx, other.principal, 'SW-1')).item;
     expect(item.holders).toEqual([other.principal.userId]);
     expect(item.claim?.userId).toBe(other.principal.userId);
+  });
+
+  test('a claim belongs to one run: a second run for the same person is refused while it lives, and the first renews', async () => {
+    const { t, me } = await seeded();
+    const first = { ...me.principal, run: 'run-1' };
+    const second = { ...me.principal, run: 'run-2' };
+    await claim(t.ctx, first, 'SW-1', undefined, 'c1');
+    expect((await refusal(claim(t.ctx, second, 'SW-1', undefined, 'c2'))).message).toContain('is claimed by another run of yours until');
+    expect((await queue(t.ctx, second)).cards.map((c) => c.key)).not.toContain('SW-1');
+    expect((await queue(t.ctx, first)).cards.map((c) => c.key)).toContain('SW-1');
+    expect((await refusal(renew(t.ctx, second, 'SW-1', 'r2'))).message).toContain('you hold no claim on SW-1');
+    expect((await refusal(finish(t.ctx, second, 'SW-1', { run: { summary: 'Not mine.', proof: [] } }, 'f2'))).message).toContain('the run that holds it finishes it');
+    expect((await claim(t.ctx, first, 'SW-1', undefined, 'c3')).line).toContain('is claimed by you');
+    expect((await renew(t.ctx, first, 'SW-1', 'r1')).line).toContain('more minutes');
+    const held = (await findItem(t.ctx, me.principal, 'SW-1')).item.claim!;
+    expect(held).toMatchObject({ userId: me.principal.userId, run: 'run-1', agentId: null });
+    // With no run named, an agent is its own run, and a person with no agent is theirs.
+    const row = await createAgent(t.ctx.db, { orgId: me.principal.orgId, userId: me.principal.userId, name: 'vantage', client: 'vantage', host: 'laptop-1' });
+    const asAgent = { ...me.principal, agent: { id: row.id, label: 'vantage on laptop-1' } };
+    await claim(t.ctx, asAgent, 'SW-2', undefined, 'c4');
+    expect((await findItem(t.ctx, me.principal, 'SW-2')).item.claim).toMatchObject({ run: `agent:${row.id}`, agentId: row.id });
+    expect((await refusal(claim(t.ctx, me.principal, 'SW-2', undefined, 'c5'))).message).toContain('another run of yours (vantage on laptop-1)');
+    const [card] = await get(t.ctx, me.principal, ['SW-2']);
+    expect(card && 'card' in card && card.card.claim).toMatch(/^vantage on laptop-1 for author@example.com until .* UTC, run agt_/);
+  });
+
+  test('a laptop session is its own run: two sessions for one person never both claim an item', async () => {
+    const { t, me } = await seeded();
+    const one = await laptop(t, { url: 'http://hub.test', token: me.token });
+    const two = await laptop(t, { url: 'http://hub.test', token: me.token });
+    expect(await one.call('vantage_item', { actions: [{ item: 'SW-3', claim: true }] })).toContain('is claimed by you');
+    expect(await two.call('vantage_item', { actions: [{ item: 'SW-3', claim: true }] })).toContain('is claimed by another run of yours');
+    expect(await one.call('vantage_item', { actions: [{ item: 'SW-3', renew: true }] })).toContain('more minutes');
   });
 
   test('a claimant\'s own call renews a claim past its half, with no heartbeat from the model', async () => {

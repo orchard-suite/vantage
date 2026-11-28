@@ -1,7 +1,8 @@
 /**
  * The laptop's link to a hub: where it is and the bearer token that signs
  * this machine in. `vantage login <url>` writes it with the hub's device
- * code flow; VANTAGE_HUB_URL and VANTAGE_HUB_TOKEN override the file.
+ * code flow, which signs this machine in as an agent named vantage on its
+ * host; VANTAGE_HUB_URL and VANTAGE_HUB_TOKEN override the file.
  */
 import { chmodSync, existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { homedir, hostname } from 'node:os';
@@ -67,7 +68,7 @@ export async function loginToHub(url: string, opts: LoginOptions): Promise<HubLi
   const base = trimSlash(url);
   const f = opts.fetch ?? fetch;
   const sleep = opts.sleep ?? ((ms: number) => new Promise<void>((r) => setTimeout(r, ms)));
-  const res = await f(`${base}/auth/device`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ name: `vantage on ${hostname()}` }) });
+  const res = await f(`${base}/auth/device`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ name: `vantage on ${hostname()}`, client: 'vantage', host: hostname() }) });
   if (!res.ok) throw new Error(`${base}/auth/device answered ${res.status}: ${await res.text()}`);
   const start = (await res.json()) as DeviceStart;
   opts.prompt(start);

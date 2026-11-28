@@ -2,7 +2,8 @@ import { afterEach, describe, expect, setSystemTime, test } from 'bun:test';
 import { testApp } from '../testing.ts';
 import { setTimeZone } from '../day.ts';
 import { eventLine, get, history, notes } from './read.ts';
-import { claim, note, put } from './write.ts';
+import { note, put } from './write.ts';
+import { claim } from './work.ts';
 import { findItem } from './access.ts';
 
 const KIND = `title: Requests
@@ -57,7 +58,7 @@ describe('the days an item shows', () => {
     await note(t.ctx, me.principal, 'REQ-1', 'Started on the key.', 'k3');
     await t.ctx.db.query("update item_events set at = '2026-11-28T01:00:00Z'");
     const [x] = await get(t.ctx, me.principal, ['REQ-1']);
-    expect(x && 'card' in x ? x.card.claim : undefined).toBe('author@example.com until 2026-11-27 19:20 CST');
+    expect(x && 'card' in x ? x.card.claim : undefined).toMatch(/^author@example.com until 2026-11-27 19:20 CST, run /);
     const f = await findItem(t.ctx, me.principal, 'REQ-1');
     expect((await history(t.ctx, f)).lines).toContain('2026-11-27 19:00 CST author@example.com: claimed until 2026-11-27 19:20 CST');
     expect((await notes(t.ctx, f)).lines[0]).toBe('### 2026-11-27 19:00 CST author@example.com\n\nStarted on the key.');

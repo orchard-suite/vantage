@@ -46,6 +46,7 @@ export function itemText(c: Card, body: string): string {
     state: `${c.state} (${c.stateText}, ${c.class.replace('-', ' ')}, since ${c.since})`,
     asker: c.asker ?? 'nobody',
     holders: [...c.holders],
+    ...(c.claim ? { claim: c.claim } : {}),
     ...(Object.keys(c.labels).length ? { labels: { ...c.labels } } : {}),
     ...(c.parent ? { parent: c.parent } : {}),
     ...(c.ref ? { ref: c.ref } : {}),
@@ -82,7 +83,8 @@ export function parseItemText(text: string): ItemFields {
     throw badRequest(`the item's fields do not parse: ${(err as Error).message}`);
   }
   if (typeof head !== 'object' || Array.isArray(head)) throw badRequest("the item's fields are a YAML map");
-  const known = new Set(['title', 'labels', 'parent', ...Object.keys(FIXED)]);
+  // The live run is shown for as long as its claim holds, and a write never sets it, so a copy read while it held still writes.
+  const known = new Set(['title', 'labels', 'parent', 'claim', ...Object.keys(FIXED)]);
   const stray = Object.keys(head).filter((k) => !known.has(k));
   if (stray.length) throw badRequest(`an item has no field ${stray.join(', ')}; its fields: title, labels, parent`);
   const labels = head['labels'] ?? {};

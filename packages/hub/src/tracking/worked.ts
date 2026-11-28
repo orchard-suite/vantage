@@ -122,7 +122,7 @@ export async function rework(tx: Db, orgId: string, itemIds: Iterable<string>): 
     const members = await membersOf(tx, orgId, def);
     const summary = `${proof.items.length} item${proof.items.length === 1 ? '' : 's'}, ${proof.boxes.length} box${proof.boxes.length === 1 ? '' : 'es'}`;
     for (const to of path) {
-      s = await append(tx, { orgId, itemId: s.id, before: s, data: { type: 'moved', from: s.state, to, class: classOf(def, to)!, note: `worked out from its proof (${summary})` }, actor: { userId: null, kind: 'system', surface: 'system' }, key: undefined, answer: `${s.key} moved ${s.state} → ${to} by its proof`, named: (x) => namedBy(def, x, members) });
+      s = await append(tx, { orgId, itemId: s.id, before: s, data: { type: 'moved', from: s.state, to, class: classOf(def, to)!, note: `worked out from its proof (${summary})` }, actor: { userId: null, kind: 'system', agentId: null, surface: 'system' }, key: undefined, answer: `${s.key} moved ${s.state} → ${to} by its proof`, named: (x) => namedBy(def, x, members) });
     }
     moved.push(s.key);
   }

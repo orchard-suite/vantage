@@ -1,7 +1,7 @@
 /**
  * The reader's account page at /account, opened from their menu at the foot
  * of the sidebar: who the hub knows them as, the apps they connected by
- * signing in (disconnect one), the tokens that let an agent or a script act
+ * signing in and the agents acting for them (disconnect one), the tokens that let an agent or a script act
  * as them (make one, see it once, revoke it), and the ID
  * their sign-in service gave them, for an admin who asks.
  */
@@ -9,6 +9,7 @@ import type { AccessibleWorkspace } from '../authz.ts';
 import type { AgentSetup } from '../agents.ts';
 import type { TokenRow } from '../auth/tokens.ts';
 import type { GrantRow } from '../auth/oauth.ts';
+import { agentLabel, type AgentListed } from '../auth/agents.ts';
 import type { HomeDocument } from './home-data.ts';
 import { avatar, appPage } from './frame.ts';
 import { frameWorkspaces, type HomeUser } from './home.ts';
@@ -29,6 +30,8 @@ export interface AccountModel {
   readonly tokens: readonly TokenRow[];
   /** Apps the reader connected by signing in through the hub. */
   readonly connections: readonly GrantRow[];
+  /** The agents acting for the reader (VAN-2009), newest first. */
+  readonly actors: readonly AgentListed[];
   readonly now?: number;
 }
 
@@ -46,6 +49,11 @@ function connectionRow(g: GrantRow): string {
   return `<li><span class="tk-name">${ico('link', 15)}<b>${escapeHtml(g.client_name)}</b></span><span class="tk-when">Connected ${dayOf(g.created_at)} · ${used}</span><button class="btn ghost sm" type="button" data-revoke="${escapeHtml(g.id)}" data-what="connections">Disconnect</button></li>`;
 }
 
+function agentRow(a: AgentListed): string {
+  const used = a.last_used_at ? `Last used ${dayOf(a.last_used_at)}` : 'Not used yet';
+  return `<li><span class="tk-name">${ico('link', 15)}<b>${escapeHtml(agentLabel(a))}</b></span><span class="tk-when">Through ${escapeHtml(a.client)} · Connected ${dayOf(a.created_at)} · ${used}</span><button class="btn ghost sm" type="button" data-revoke="${escapeHtml(a.id)}" data-what="agents">Disconnect</button></li>`;
+}
+
 /** Makes a token and shows it once; revokes one after a second click. Both go through the API with the session. */
 const SCRIPT = `(function(){var m=document.querySelector('meta[name=csrf]'),h={'content-type':'application/json'};if(m)h['x-csrf-token']=m.content;
 var f=document.querySelector('form[data-make-token]');if(f)f.addEventListener('submit',function(e){e.preventDefault();var go=f.querySelector('button'),say=f.querySelector('[role=alert]'),days=Number(f.querySelector('select').value),b={name:f.querySelector('input[name=name]').value.trim(),kind:'personal'};if(days)b.expiresInDays=days;go.disabled=true;say.hidden=true;
@@ -55,14 +63,19 @@ fetch('/api/v1/'+(b.getAttribute('data-what')||'tokens')+'/'+encodeURIComponent(
 
 export function accountHtml(m: AccountModel): string {
   const now = m.now ?? Date.now();
-  const live = m.tokens.filter((t) => t.revoked_at === null && t.grant_id === null);
-  const apps = m.connections.length
-    ? `<section class="acct-sec" aria-labelledby="ca-h"><header><h2 id="ca-h">Connected apps</h2><p>Apps you let in by signing in from them, such as Claude. Each acts as you until you disconnect it.</p></header><ul class="tk-list">${m.connections.map(connectionRow).join('')}</ul></section>`
+  // A token or a grant that signs in an agent is listed with the agent, and ends with it.
+  const live = m.tokens.filter((t) => t.revoked_at === null && t.grant_id === null && t.agent_id === null);
+  const legacy = m.connections.filter((g) => g.agent_id === null);
+  const agents = m.actors.length
+    ? `<section class="acct-sec" aria-labelledby="ag-h"><header><h2 id="ag-h">Agents</h2><p>Agents acting for you, such as Claude Code on your laptop. Each can do what you can, and its work is recorded as its own, for you. Disconnect one to end its access now.</p></header><ul class="tk-list">${m.actors.map(agentRow).join('')}</ul></section>`
+    : '';
+  const apps = legacy.length
+    ? `<section class="acct-sec" aria-labelledby="ca-h"><header><h2 id="ca-h">Connected apps</h2><p>Apps you let in by signing in from them, such as Claude. Each acts as you until you disconnect it.</p></header><ul class="tk-list">${legacy.map(connectionRow).join('')}</ul></section>`
     : '';
   const list = live.length ? live.map((t) => tokenRow(t, now)).join('') : '';
   const body = `<nav class="crumbs" aria-label="Breadcrumb"><a href="/">Home</a>${ico('right', 12)}<span aria-current="page">Account</span></nav>
 <header class="acct-head">${avatar(m.user.name, 'lg')}<div><h1>${escapeHtml(m.user.name)}</h1>${m.user.email ? `<p>${escapeHtml(m.user.email)}</p>` : ''}</div></header>
-${apps}
+${agents}${apps}
 <section class="acct-sec" aria-labelledby="tk-h"><header><h2 id="tk-h">Tokens</h2><p>A token lets an agent or a script act as you on this hub. Claude Code asks for one when you add the Vantage plugin. Anyone who holds it can do what you can, so keep it like a password.</p></header>
 <form class="tk-make" data-make-token><label class="sr-only" for="tk-name">Token name</label><input class="field" id="tk-name" name="name" maxlength="100" placeholder="What it is for, like Claude Code on my laptop" autocomplete="off" required><label class="sr-only" for="tk-days">How long it lasts</label><select class="field" id="tk-days"><option value="90">90 days</option><option value="365">1 year</option><option value="30">30 days</option><option value="0">Never ends</option></select><button class="btn primary sm">${ico('plus', 15)}Make a token</button><p class="f-hint bad" role="alert" hidden></p></form>
 <div class="tk-new" id="tk-new" role="status" hidden><b>${ico('check', 15)}Your new token. Copy it now: this is the only time it shows.</b><div class="url"><code></code><button class="btn ghost sm icon" type="button" data-copy="" aria-label="Copy the token">${ico('copy', 14)}</button></div></div>

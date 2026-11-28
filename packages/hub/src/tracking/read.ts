@@ -18,6 +18,7 @@ import { spanFrom, spanOf, spanSql, type Span } from './dates.ts';
 import { horizonOf, orderSql } from './rank.ts';
 import { isMilestone, rollupOf, type Rollup } from './milestone.ts';
 import { clockOf, dayOf } from '../day.ts';
+import { agentLabels } from '../auth/agents.ts';
 
 export interface Card {
   readonly key: string;
@@ -42,7 +43,7 @@ export interface Card {
   readonly hasBody: boolean;
   /** For a kind the hub moves from its proof: what the proof says, and how old it is. */
   readonly proof?: string;
-  /** Who claims it and until when, while the claim holds. */
+  /** The live run: which agent works it, for whom, until when, while the claim holds. */
   readonly claim?: string;
   readonly runs: number;
   /** For a parent: the span its parts give it, from the earliest start to the latest end. */
@@ -67,6 +68,16 @@ async function people(ctx: AppContext, ids: readonly (string | null)[]): Promise
   if (!want.length) return new Map();
   const rows = await ctx.db.query<{ id: string; label: string }>("select id, coalesce(email, display_name, subject) as label from users where id = any($1::text[])", [want]);
   return new Map(rows.map((r) => [r.id, r.label]));
+}
+
+/** "<agent> for <person>", or the person alone for their own act (VAN-2009). */
+export const actingText = (person: string, agent: string | undefined): string => (agent ? `${agent} for ${person}` : person);
+
+/** A live claim in one line: who works it, for whom, until when, and its run. */
+async function claimText(ctx: AppContext, c: NonNullable<ItemState['claim']>): Promise<string> {
+  const person = (await people(ctx, [c.userId])).get(c.userId) ?? 'a person';
+  const agent = c.agentId ? (await agentLabels(ctx.db, [c.agentId])).get(c.agentId) : undefined;
+  return `${actingText(person, agent)} until ${clockOf(c.until)}, run ${c.run.replace(/^(user|agent):/, '').slice(0, 8)}`;
 }
 
 export async function cardOf(ctx: AppContext, f: Found): Promise<Card> {
@@ -96,7 +107,7 @@ export async function cardOf(ctx: AppContext, f: Found): Promise<Card> {
     version: item.position,
     hasBody: !def.owner,
     ...(isWorked(def) ? { proof: proofText(await readProof(ctx.db, item)) } : {}),
-    ...(item.claim && Date.parse(item.claim.until) > Date.now() ? { claim: `${(await people(ctx, [item.claim.userId])).get(item.claim.userId) ?? 'a person'} until ${clockOf(item.claim.until)}` } : {}),
+    ...(item.claim && Date.parse(item.claim.until) > Date.now() ? { claim: await claimText(ctx, item.claim) } : {}),
     runs: item.runs,
     ...(span ? { span } : {}),
     ...(isMilestone(def) ? { milestone: await rollupOf(ctx.db, item) } : {}),
@@ -241,6 +252,8 @@ export interface Change {
   readonly type: EventData['type'];
   readonly at: string;
   readonly actor: string | null;
+  /** The agent that acted for the actor; absent for a person's own act. */
+  readonly agent?: string;
   readonly actorKind: string;
   readonly surface: string;
   readonly data: EventData;
@@ -261,17 +274,18 @@ export async function changes(ctx: AppContext, p: Principal, opts: { after?: num
   params.push(...vis.params);
   const limit = Math.min(Math.max(1, opts.limit ?? 100), CHANGES_LIMIT);
   // The feed reads the primary: a reader that saw a position must never miss an event a replica has not caught up to.
-  const rows = await ctx.db.query<{ position: string; key: string; prefix: string; type: EventData['type']; at: Date; actor_id: string | null; actor_kind: string; surface: string; data: EventData }>(
-    `select e.position, i.key, k.prefix, e.type, e.at, e.actor_id, e.actor_kind, e.surface, e.data from item_events e join items i on i.id = e.item_id join item_kinds k on k.id = i.kind_id where e.org_id = $1 and e.position > $2${kinds} and ${vis.sql} order by e.position limit ${limit}`,
+  const rows = await ctx.db.query<{ position: string; key: string; prefix: string; type: EventData['type']; at: Date; actor_id: string | null; agent_id: string | null; actor_kind: string; surface: string; data: EventData }>(
+    `select e.position, i.key, k.prefix, e.type, e.at, e.actor_id, e.agent_id, e.actor_kind, e.surface, e.data from item_events e join items i on i.id = e.item_id join item_kinds k on k.id = i.kind_id where e.org_id = $1 and e.position > $2${kinds} and ${vis.sql} order by e.position limit ${limit}`,
     params,
   );
   const who = await people(ctx, rows.map((x) => x.actor_id));
-  const out = rows.map((x) => ({ position: Number(x.position), item: x.key, kind: x.prefix, type: x.type, at: new Date(x.at).toISOString(), actor: x.actor_id ? (who.get(x.actor_id) ?? 'a person') : null, actorKind: x.actor_kind, surface: x.surface, data: x.data }));
+  const agents = await agentLabels(ctx.db, rows.map((x) => x.agent_id));
+  const out = rows.map((x) => ({ position: Number(x.position), item: x.key, kind: x.prefix, type: x.type, at: new Date(x.at).toISOString(), actor: x.actor_id ? (who.get(x.actor_id) ?? 'a person') : null, ...(x.agent_id ? { agent: agents.get(x.agent_id) ?? 'an agent' } : {}), actorKind: x.actor_kind, surface: x.surface, data: x.data }));
   return { changes: out, next: out.length ? out[out.length - 1]!.position : Math.max(0, opts.after ?? 0) };
 }
 
 /** One line of an event, for an item's history. */
-export function eventLine(c: Pick<Change, 'type' | 'data' | 'actor' | 'at'>): string {
+export function eventLine(c: Pick<Change, 'type' | 'data' | 'actor' | 'agent' | 'at'>): string {
   const d = c.data;
   const what = (() => {
     switch (d.type) {
@@ -305,7 +319,7 @@ export function eventLine(c: Pick<Change, 'type' | 'data' | 'actor' | 'at'>): st
         return `erased: ${d.reason.split('\n')[0]!.slice(0, 160)}`;
     }
   })();
-  return `${clockOf(c.at)} ${c.actor ?? 'the hub'}: ${what}`;
+  return `${clockOf(c.at)} ${c.actor ? actingText(c.actor, c.agent) : 'the hub'}: ${what}`;
 }
 
 export const PART_PAGE = 20;
@@ -313,12 +327,13 @@ export const PART_PAGE = 20;
 /** An item's history, newest first, a page at a time. */
 export async function history(ctx: AppContext, f: Found, opts: { before?: number; limit?: number } = {}): Promise<{ lines: string[]; total: number; next?: number }> {
   const limit = Math.min(Math.max(1, opts.limit ?? PART_PAGE), 100);
-  const rows = await ctx.db.query<{ position: string; type: EventData['type']; at: Date; actor_id: string | null; data: EventData }>(
-    `select position, type, at, actor_id, data from item_events where item_id = $1${opts.before ? ' and position < $2' : ''} order by position desc limit ${limit}`,
+  const rows = await ctx.db.query<{ position: string; type: EventData['type']; at: Date; actor_id: string | null; agent_id: string | null; data: EventData }>(
+    `select position, type, at, actor_id, agent_id, data from item_events where item_id = $1${opts.before ? ' and position < $2' : ''} order by position desc limit ${limit}`,
     opts.before ? [f.item.id, opts.before] : [f.item.id],
   );
   const who = await people(ctx, rows.map((x) => x.actor_id));
-  const lines = rows.map((x) => eventLine({ type: x.type, data: x.data, actor: x.actor_id ? (who.get(x.actor_id) ?? 'a person') : null, at: new Date(x.at).toISOString() }));
+  const agents = await agentLabels(ctx.db, rows.map((x) => x.agent_id));
+  const lines = rows.map((x) => eventLine({ type: x.type, data: x.data, actor: x.actor_id ? (who.get(x.actor_id) ?? 'a person') : null, ...(x.agent_id ? { agent: agents.get(x.agent_id) ?? 'an agent' } : {}), at: new Date(x.at).toISOString() }));
   const last = rows[rows.length - 1];
   return { lines, total: f.item.events, ...(rows.length === limit && last ? { next: Number(last.position) } : {}) };
 }
@@ -326,15 +341,16 @@ export async function history(ctx: AppContext, f: Found, opts: { before?: number
 /** An item's notes, newest first: the notes and the notes a move carried. */
 export async function notes(ctx: AppContext, f: Found, opts: { before?: number; limit?: number } = {}): Promise<{ lines: string[]; total: number; next?: number }> {
   const limit = Math.min(Math.max(1, opts.limit ?? PART_PAGE), 100);
-  const rows = await ctx.db.query<{ position: string; at: Date; actor_id: string | null; data: EventData }>(
-    `select position, at, actor_id, data from item_events where item_id = $1 and (type = 'noted' or (type = 'moved' and data ? 'note'))${opts.before ? ' and position < $2' : ''} order by position desc limit ${limit}`,
+  const rows = await ctx.db.query<{ position: string; at: Date; actor_id: string | null; agent_id: string | null; data: EventData }>(
+    `select position, at, actor_id, agent_id, data from item_events where item_id = $1 and (type = 'noted' or (type = 'moved' and data ? 'note'))${opts.before ? ' and position < $2' : ''} order by position desc limit ${limit}`,
     opts.before ? [f.item.id, opts.before] : [f.item.id],
   );
   const who = await people(ctx, rows.map((x) => x.actor_id));
+  const agents = await agentLabels(ctx.db, rows.map((x) => x.agent_id));
   const lines = rows.map((x) => {
     const d = x.data;
     const text = d.type === 'noted' ? d.text : d.type === 'moved' ? `(moving ${d.from} → ${d.to}) ${d.note ?? ''}` : '';
-    return `### ${clockOf(x.at)} ${x.actor_id ? (who.get(x.actor_id) ?? 'a person') : 'the hub'}\n\n${text}`;
+    return `### ${clockOf(x.at)} ${x.actor_id ? actingText(who.get(x.actor_id) ?? 'a person', x.agent_id ? (agents.get(x.agent_id) ?? 'an agent') : undefined) : 'the hub'}\n\n${text}`;
   });
   const last = rows[rows.length - 1];
   return { lines, total: f.item.notes, ...(rows.length === limit && last ? { next: Number(last.position) } : {}) };

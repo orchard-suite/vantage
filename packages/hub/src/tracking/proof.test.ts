@@ -1,6 +1,7 @@
 /**
  * The proofs the tracking records name in their Verification sections:
- * VAN-2008, VAN-3005, VAN-3006, VAN-3007, VAN-3015, and VAN-5001.
+ * VAN-2008, VAN-2009, VAN-3005, VAN-3006, VAN-3007, VAN-3010, VAN-3015,
+ * and VAN-5001.
  */
 import { describe, expect, test } from 'bun:test';
 import { readFileSync, writeFileSync } from 'node:fs';
@@ -15,7 +16,8 @@ import { saveDocument } from '../documents/save.ts';
 import { personalWorkspace } from '../text/things.ts';
 import { HttpError } from '../http.ts';
 import { changes, get } from './read.ts';
-import { claim, move, note, put } from './write.ts';
+import { move, note, put } from './write.ts';
+import { claim } from './work.ts';
 
 const REQUESTS = `title: Requests
 kind:
@@ -223,6 +225,28 @@ describe.if(Boolean(url))('3006 on a real Postgres', () => {
     expect(results.filter((r) => r.status === 'fulfilled')).toHaveLength(1);
     const claims = await db.query<{ n: number }>("select count(*)::int as n from item_events where type = 'claimed'");
     expect(Number(claims[0]!.n)).toBe(1);
+    await db.close();
+  }, 120_000);
+
+  test('2009: eight runs of one person race for one item on separate connections, and exactly one claim holds', async () => {
+    const base = await testContext();
+    const db = connectPostgres(url!, silentLogger, { max: 12 });
+    await db.exec('drop schema public cascade; create schema public;');
+    await migrate(db, silentLogger);
+    const ctx = { ...base, db, dbRead: db };
+    const me = (await testUser(ctx, 'author')).principal;
+    const ws = await personalWorkspace(ctx, me, 'author');
+    await saveDocument(ctx, { orgId: me.orgId, workspaceId: ws.id, yaml: REQUESTS, authorUserId: me.userId, who: me.userId, surface: 'api' });
+    await put(ctx, me, { kind: 'REQ', title: 'Wanted by every run' }, 'k');
+    const runs = Array.from({ length: 8 }, (_, i) => ({ ...me, run: `run-${i}` }));
+    const results = await Promise.allSettled(runs.map((r, i) => claim(ctx, r, 'REQ-1', undefined, `race-${i}`)));
+    expect(results.filter((r) => r.status === 'fulfilled')).toHaveLength(1);
+    const refused = results.filter((r): r is PromiseRejectedResult => r.status === 'rejected').map((r) => (r.reason as Error).message);
+    expect(refused.every((m) => m.includes('claimed by another run of yours'))).toBe(true);
+    const claims = await db.query<{ data: { run: string } }>("select data from item_events where type = 'claimed'");
+    expect(claims).toHaveLength(1);
+    const held = await db.query<{ claim_run: string }>("select claim_run from items where key = 'REQ-1'");
+    expect(held[0]!.claim_run).toBe(claims[0]!.data.run);
     await db.close();
   }, 120_000);
 });

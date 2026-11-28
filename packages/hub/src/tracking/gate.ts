@@ -17,6 +17,8 @@ export interface Caller {
   readonly teamIds: readonly string[];
   /** Their role in the item's workspace; undefined when they see it only because it names them. */
   readonly role: Role | undefined;
+  /** An agent acting for the person (VAN-2009): it holds the person's roles, and never makes a move for people only. */
+  readonly agent: boolean;
 }
 
 /** The people and teams each role the kind declares resolves to. */
@@ -28,6 +30,7 @@ export interface MoveOption {
   readonly label: string;
   readonly needs: readonly string[];
   readonly approval: boolean;
+  readonly people: boolean;
 }
 
 export interface Given {
@@ -69,6 +72,7 @@ function holds(who: string, item: ItemState, caller: Caller, members: Members): 
 /** Whether the caller may make this move on this item, need aside. */
 export function mayMake(move: LifecycleMove, item: ItemState, caller: Caller, members: Members): boolean {
   if (move.approval && item.askerId === caller.userId) return false;
+  if (move.people && caller.agent) return false;
   return (move.who ?? ['author']).some((w) => holds(w, item, caller, members));
 }
 
@@ -77,7 +81,7 @@ export function worksBy(def: KindDef, item: ItemState, caller: Caller, members: 
   return def.moves.some((m) => m.from === item.state && (m.who ?? []).some((w) => !BUILT_IN_ROLES.includes(w) && holds(w, item, caller, members)));
 }
 
-const option = (def: KindDef, m: LifecycleMove): MoveOption => ({ to: m.to, toText: stateOf(def, m.to)?.text ?? m.to, label: m.label ?? `to ${m.to}`, needs: [...(m.needs ?? [])], approval: !!m.approval });
+const option = (def: KindDef, m: LifecycleMove): MoveOption => ({ to: m.to, toText: stateOf(def, m.to)?.text ?? m.to, label: m.label ?? `to ${m.to}`, needs: [...(m.needs ?? [])], approval: !!m.approval, people: !!m.people });
 
 /** The moves open to this caller from where the item stands. */
 export function openMoves(def: KindDef, item: ItemState, caller: Caller, members: Members): MoveOption[] {
@@ -100,6 +104,7 @@ export function checkMove(def: KindDef, item: ItemState, to: string, caller: Cal
   const move = def.moves.find((m) => m.from === item.state && m.to === to);
   if (!move) return refuse(`the lifecycle draws no move from ${item.state} to ${to}`);
   if (move.approval && item.askerId === caller.userId) return refuse(`${move.label ?? 'this move'} is an approval, and the person who asked for ${item.key} never approves it`);
+  if (move.people && caller.agent) return refuse(`${move.label ?? 'this move'} is for people only; an agent never makes it, so ask your person to make it themselves`);
   if (!mayMake(move, item, caller, members)) return refuse(`${move.label ?? `the move to ${to}`} is for ${(move.who ?? ['author']).join(' or ')}`);
   for (const n of move.needs ?? []) {
     if (n === 'note' && !given.note?.trim()) return refuse(`${move.label ?? `the move to ${to}`} needs a note`);

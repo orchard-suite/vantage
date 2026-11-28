@@ -71,9 +71,11 @@ export function authRoutes(ctx: AppContext, oidc: OidcProvider | undefined): Hon
 
   app.post('/auth/device', async (c) => {
     if (!deviceLimiter.allow(clientAddress(c.req.raw))) throw new HttpError(429, 'too many device requests');
-    const body = (await c.req.json().catch(() => ({}))) as { name?: string };
-    const start = await startDevice(ctx.db, DEFAULT_ORG, body.name ?? 'device');
-    ctx.log.info('device.start', { name: body.name ?? 'device' });
+    const raw = (await c.req.json().catch(() => ({}))) as Record<string, unknown>;
+    const text = (k: string): string | undefined => (typeof raw[k] === 'string' && (raw[k] as string).trim() ? (raw[k] as string).trim() : undefined);
+    const name = text('name') ?? 'device';
+    const start = await startDevice(ctx.db, DEFAULT_ORG, { name, client: text('client'), host: text('host') });
+    ctx.log.info('device.start', { name, client: text('client') ?? null });
     return c.json({ device_code: start.deviceCode, user_code: start.userCode, verification_uri: `${ctx.config.PUBLIC_URL}/auth/device/approve`, verification_uri_complete: `${ctx.config.PUBLIC_URL}/auth/device/approve?code=${start.userCode}`, expires_in: start.expiresIn, interval: 5 });
   });
 

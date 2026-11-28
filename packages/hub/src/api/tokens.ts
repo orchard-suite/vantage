@@ -1,4 +1,4 @@
-/** Personal and automation tokens for the caller, and the apps they connected by signing in. */
+/** Personal and automation tokens for the caller, the apps they connected by signing in, and the agents acting for them. */
 import { Hono } from 'hono';
 import { z } from 'zod';
 import type { AppContext } from '../context.ts';
@@ -9,6 +9,7 @@ import { createToken, listTokens, publicToken, revokeToken } from '../auth/token
 import { mayCreateTeamWorkspace, requireWorkspace } from '../authz.ts';
 import { audit } from '../audit.ts';
 import { listGrants, revokeGrant } from '../auth/oauth.ts';
+import { agentLabel, listAgents, revokeAgent } from '../auth/agents.ts';
 import { forbidden, notFound } from '../http.ts';
 import { READER_THEMES, readerTheme, setReaderTheme } from '../theme.ts';
 
@@ -18,7 +19,7 @@ export function tokenRoutes(ctx: AppContext, reg: OpenApiRegistry): Hono<HubEnv>
   reg.add({ method: 'get', path: '/me', summary: 'The caller: user, role, whether they may make team workspaces, teams, surface, the look they picked (system, light, or dark), and the CSRF token for cookie sessions', tag: 'auth' });
   app.get('/me', async (c) => {
     const p = principal(c);
-    return c.json({ userId: p.userId, subject: p.subject, admin: p.admin, canCreateWorkspaces: await mayCreateTeamWorkspace(ctx.db, ctx.config.TEAM_WORKSPACES, p), theme: readerTheme(p), teams: p.teamIds, via: p.via, token: p.token ? { id: p.token.id, kind: p.token.kind, scope: p.token.scope } : null, ...(c.get('csrf') ? { csrf: c.get('csrf') } : {}) });
+    return c.json({ userId: p.userId, subject: p.subject, admin: p.admin, canCreateWorkspaces: await mayCreateTeamWorkspace(ctx.db, ctx.config.TEAM_WORKSPACES, p), theme: readerTheme(p), teams: p.teamIds, via: p.via, token: p.token ? { id: p.token.id, kind: p.token.kind, scope: p.token.scope } : null, agent: p.agent ?? null, ...(c.get('csrf') ? { csrf: c.get('csrf') } : {}) });
   });
 
   reg.add({ method: 'put', path: '/me/theme', summary: 'Pick the look of the hub pages and the viewer for the caller, on every device: system follows their system setting', tag: 'auth', body: { theme: 'system|light|dark' } });
@@ -76,6 +77,21 @@ export function tokenRoutes(ctx: AppContext, reg: OpenApiRegistry): Hono<HubEnv>
     const ok = await revokeGrant(ctx.db, p.orgId, c.req.param('connection'), p.admin ? null : p.userId);
     if (!ok) throw notFound('connection');
     await audit(ctx.db, ctx.log, { orgId: p.orgId, who: who(p), what: 'connection.revoke', surface: p.surface, target: `user:${p.userId}`, details: { grantId: c.req.param('connection') } });
+    return c.body(null, 204);
+  });
+
+  reg.add({ method: 'get', path: '/agents', summary: 'The agents acting for the caller (VAN-2009): each with its name, client, host, when it connected, and when it last called the hub', tag: 'tokens' });
+  app.get('/agents', async (c) => {
+    const p = principal(c);
+    return c.json({ agents: (await listAgents(ctx.db, p.userId)).map((a) => ({ id: a.id, name: a.name, label: agentLabel(a), client: a.client, host: a.host, createdAt: a.created_at, lastUsedAt: a.last_used_at })) });
+  });
+
+  reg.add({ method: 'delete', path: '/agents/:agent', summary: 'Disconnect an agent: its tokens and grants end now, and it must sign in again', tag: 'tokens', params: ['agent'], responses: { '204': 'disconnected' } });
+  app.delete('/agents/:agent', async (c) => {
+    const p = principal(c);
+    const ok = await revokeAgent(ctx.db, p.orgId, c.req.param('agent'), p.admin ? null : p.userId);
+    if (!ok) throw notFound('agent');
+    await audit(ctx.db, ctx.log, { orgId: p.orgId, who: who(p), what: 'agent.revoke', surface: p.surface, target: `user:${p.userId}`, details: { agentId: c.req.param('agent') } });
     return c.body(null, 204);
   });
 

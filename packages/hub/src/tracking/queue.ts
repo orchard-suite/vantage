@@ -4,7 +4,7 @@
  * text, and the last handoff note, which is short enough to come along.
  */
 import type { AppContext } from '../context.ts';
-import type { Principal } from '../auth/principal.ts';
+import { runOf, type Principal } from '../auth/principal.ts';
 import { maybe } from '../db/db.ts';
 import { reachOf } from './access.ts';
 import type { KindDef } from './kinds.ts';
@@ -20,21 +20,21 @@ export interface QueueCard {
 }
 
 /**
- * Items not done or parked, not waiting for a person, not under another
- * live claim, in workspaces the caller writes or waiting on a role the
+ * Items not done or parked, not waiting for a person, not under a live
+ * claim of another run, in workspaces the caller writes or waiting on a role the
  * caller holds. Oldest first, so nothing starves.
  */
 export async function queue(ctx: AppContext, p: Principal, opts: { kinds?: readonly string[]; limit?: number } = {}): Promise<{ cards: QueueCard[]; total: number }> {
   const reach = await reachOf(ctx, p);
   const authored = [...reach.roles].filter(([, r]) => r === 'author').map(([w]) => w);
-  const params: unknown[] = [p.orgId, authored, p.userId, [...p.teamIds]];
+  const params: unknown[] = [p.orgId, authored, p.userId, [...p.teamIds], runOf(p)];
   let kinds = '';
   if (opts.kinds?.length) {
     params.push(opts.kinds.map((k) => k.toUpperCase()));
     kinds = ` and k.prefix = any($${params.length}::text[])`;
   }
   const where = `i.org_id = $1 and i.class in ('not-started', 'in-progress')${kinds}
-      and (i.claim_until is null or i.claim_until < now() or i.claim_user = $3)
+      and (i.claim_until is null or i.claim_until < now() or (i.claim_user = $3 and coalesce(i.claim_run, 'user:' || i.claim_user) = $5))
       and not exists (select 1 from jsonb_array_elements(k.definition -> 'states') st where st ->> 'id' = i.state and coalesce((st ->> 'waits')::boolean, false))
       and (i.workspace_id = any($2::text[]) or exists (select 1 from item_named n where n.item_id = i.id and n.why like 'role:%' and ((n.subject_kind = 'user' and n.subject_id = $3) or (n.subject_kind = 'team' and n.subject_id = any($4::text[])))))`;
   const total = Number((await ctx.db.query<{ n: number }>(`select count(*)::int as n from items i join item_kinds k on k.id = i.kind_id where ${where}`, params))[0]?.n ?? 0);

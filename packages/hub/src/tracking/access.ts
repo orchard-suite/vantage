@@ -5,7 +5,7 @@
  * twenty rows is twenty the caller may see.
  */
 import type { AppContext } from '../context.ts';
-import type { Principal, Role } from '../auth/principal.ts';
+import { isAgent, type Principal, type Role } from '../auth/principal.ts';
 import { accessibleWorkspaces } from '../authz.ts';
 import { maybe } from '../db/db.ts';
 import { HttpError, forbidden } from '../http.ts';
@@ -75,7 +75,7 @@ export async function findItem(ctx: AppContext, p: Principal, ref: string, r?: R
   if (!app && !role && !(await isNamed(ctx, item.id, reach))) throw missing(ref);
   const kind = await kindById(ctx.db, item.kindId);
   if (!kind) throw missing(ref);
-  return { item, kind, caller: { userId: p.userId, teamIds: p.teamIds, role }, ...(app ? { app: true as const } : {}) };
+  return { item, kind, caller: { userId: p.userId, teamIds: p.teamIds, role, agent: isAgent(p) }, ...(app ? { app: true as const } : {}) };
 }
 
 /** Throws 403 unless the caller writes the item's workspace: being named grants moves, and no other write. */

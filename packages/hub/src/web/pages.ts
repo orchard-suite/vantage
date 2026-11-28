@@ -54,6 +54,7 @@ import { agentSetup } from '../agents.ts';
 import { accountHtml } from './account.ts';
 import { listTokens } from '../auth/tokens.ts';
 import { listGrants } from '../auth/oauth.ts';
+import { listAgents } from '../auth/agents.ts';
 
 export const GUEST_LIMIT = { requests: 120, windowMs: 60_000 };
 
@@ -313,6 +314,7 @@ export function pageRoutes(ctx: AppContext, apiReference: readonly RouteDoc[]): 
       agents,
       tokens: await listTokens(ctx.db, p.orgId, p.userId),
       connections: await listGrants(ctx.db, p.userId),
+      actors: await listAgents(ctx.db, p.userId),
     }));
   });
 

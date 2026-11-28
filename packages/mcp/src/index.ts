@@ -2,7 +2,7 @@ export { createMcpServer, startMcp, type McpOptions } from './server.ts';
 export { registerGuideDoor, registerLocalTools, validationSummary, type LocalToolOptions, type SavedDocuments, type SavedDrawing } from './tools.ts';
 export { inlineEngine, type LocalEngine } from './engine.ts';
 export { drawDocument, drawExplore, drawView, drawnContent, drawnFrom, type DocumentArgs, type ExploreArgs, type DocumentFormat, type Drawn, type DrawOutcome, type ViewArgs, type ViewFormat } from './draw.ts';
-export { createBridge, createLocalDoor, type BridgeOptions } from './bridge.ts';
+export { createBridge, createLocalDoor, RUN_HEADER, type BridgeOptions } from './bridge.ts';
 export { checkout, sync, type TextApi } from './workcopy.ts';
 export { hubConfigPath, loginToHub, readHubLink, removeHubLink, writeHubLink, type DeviceStart, type HubLink, type LoginOptions } from './hub.ts';
 export { BUDGET } from './budget.ts';

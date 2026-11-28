@@ -73,7 +73,10 @@ describe('agents sign in through the hub', () => {
     expect((await token(t, { grant_type: 'refresh_token', refresh_token: String(first.json['refresh_token']), client_id: clientId })).status).toBe(400);
 
     const account = await (await t.app.request('/account', { headers: PERSON })).text();
-    expect(account).toContain('Connected apps');
+    // The grant signs in an agent named after its client, on the host its redirect goes to; it is listed with the person's agents.
+    expect(account).toContain('Agents');
+    expect(account).toContain('Claude on claude.ai');
+    expect(account).not.toContain('Connected apps');
     const listed = (await (await t.app.request('/api/v1/connections', { headers: PERSON })).json()) as { connections: { id: string; name: string }[] };
     expect(listed.connections.map((x) => x.name)).toEqual(['Claude']);
     expect((await t.app.request(`/api/v1/connections/${listed.connections[0]!.id}`, { method: 'DELETE', headers: { ...PERSON, origin: 'http://hub.test' } })).status).toBe(204);

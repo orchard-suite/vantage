@@ -30,7 +30,7 @@ export interface ItemState {
   /** Targets by relation: `part-of`, `came-from`, `waits-on`, and `toward` name item ids; `box`, `view`, `adds`, `changes`, and `retires` name document-id#id; `decision` names a record's ULID; `proof` names an item id or a document-id#box. */
   readonly links: readonly { readonly rel: LinkRel; readonly target: string }[];
   /** Who claims the item and until when; a claim past its end holds nothing. */
-  readonly claim: { readonly userId: string; readonly until: string } | null;
+  readonly claim: Claim | null;
   /** Its place among the items of its kind: a fractional rank, compared byte by byte; null sorts after every ranked item. */
   readonly rank: string | null;
   readonly position: number;
@@ -43,12 +43,24 @@ export interface ItemState {
   readonly updatedAt: string;
 }
 
+/**
+ * A claim belongs to one run (VAN-2009): the person it is for, the agent
+ * that made it when an agent did, and the run, which only a call from the
+ * same run renews.
+ */
+export interface Claim {
+  readonly userId: string;
+  readonly agentId: string | null;
+  readonly run: string;
+  readonly until: string;
+}
+
 /** What each kind of event sets. An event holds the values it set and never a body's text. */
 export type EventData =
   | { readonly type: 'created'; readonly key: string; readonly number: number; readonly kindId: string; readonly workspaceId: string; readonly ref: string | null; readonly title: string; readonly state: string; readonly class: StateClass; readonly askerId: string | null; readonly labels: Readonly<Record<string, LabelValue>>; readonly revision: string | null; readonly bodyId: string | null }
   | { readonly type: 'changed'; readonly title?: string; readonly labels?: Readonly<Record<string, LabelValue | null>>; readonly revision?: string; readonly bodyId?: string }
   | { readonly type: 'moved'; readonly from: string; readonly to: string; readonly class: StateClass; readonly note?: string; readonly revision?: string; readonly question?: true }
-  | { readonly type: 'claimed'; readonly userId: string; readonly until: string }
+  | { readonly type: 'claimed'; readonly userId: string; readonly until: string; readonly agentId?: string | null; readonly run?: string }
   | { readonly type: 'renewed'; readonly until: string }
   | { readonly type: 'ran'; readonly run: RunRecord }
   | { readonly type: 'erased'; readonly reason: string }
@@ -145,7 +157,7 @@ export function fold(before: ItemState | undefined, e: ItemEvent, orgId: string)
     case 'released':
       return { ...s, holders: before.holders.filter((h) => h !== d.userId), claim: before.claim?.userId === d.userId ? null : before.claim };
     case 'claimed':
-      return { ...s, holders: before.holders.includes(d.userId) ? before.holders : [...before.holders, d.userId], claim: { userId: d.userId, until: d.until } };
+      return { ...s, holders: before.holders.includes(d.userId) ? before.holders : [...before.holders, d.userId], claim: { userId: d.userId, agentId: d.agentId ?? null, run: d.run ?? `user:${d.userId}`, until: d.until } };
     case 'renewed':
       return { ...s, claim: before.claim ? { ...before.claim, until: d.until } : null };
     case 'ran':

@@ -8,11 +8,15 @@
  * rotates on every use and lapses after REFRESH_DAYS unused. The access
  * token is an ordinary personal token tied to the grant, so /mcp checks it
  * like any other, and revoking the grant ends both. VAN-2001 records why.
+ * Each grant names the agent it signs in (VAN-2009), named after its
+ * client, on the host its redirect goes to; a grant made before agents
+ * gets one on its next refresh.
  */
 import type { Db } from '../db/db.ts';
 import { maybe } from '../db/db.ts';
 import { base64url, newToken, randomId, sha256 } from '../crypto.ts';
 import { createToken } from './tokens.ts';
+import { createAgent } from './agents.ts';
 
 export const ACCESS_SECONDS = 3600;
 export const REFRESH_DAYS = 30;
@@ -67,11 +71,20 @@ async function s256(verifier: string): Promise<string> {
   return base64url(new Uint8Array(await crypto.subtle.digest('SHA-256', new TextEncoder().encode(verifier))));
 }
 
-/** Mints the grant's access token, replacing the one it issued before. */
-async function mintAccess(db: Db, orgId: string, userId: string, grantId: string, clientName: string): Promise<string> {
+/** Mints the grant's access token for its agent, replacing the one it issued before. */
+async function mintAccess(db: Db, orgId: string, userId: string, grantId: string, clientName: string, agentId: string): Promise<string> {
   await db.query('delete from tokens where grant_id = $1', [grantId]);
-  const { plaintext } = await createToken(db, { orgId, userId, kind: 'personal', name: clientName, expiresAt: new Date(Date.now() + ACCESS_SECONDS * 1000), grantId });
+  const { plaintext } = await createToken(db, { orgId, userId, kind: 'personal', name: clientName, expiresAt: new Date(Date.now() + ACCESS_SECONDS * 1000), grantId, agentId });
   return plaintext;
+}
+
+/** Where a client runs, as its redirect says: claude.ai, or this machine for a desktop app. */
+function hostOf(redirectUri: string | undefined): string | null {
+  try {
+    return redirectUri ? new URL(redirectUri).hostname : null;
+  } catch {
+    return null;
+  }
 }
 
 /** The code grant: the code is used once, by the client it was issued to, at the same redirect, with the verifier that matches its challenge. */
@@ -86,16 +99,17 @@ export async function exchangeCode(db: Db, a: { code: string; clientId: string; 
   if (!client) return { ok: false, error: 'invalid_client', why: 'client unknown' };
   const grantId = randomId(16);
   const refreshToken = newToken('vrt');
-  await db.query("insert into oauth_grants (id, org_id, user_id, client_id, refresh_hash, refresh_expires_at, last_used_at) values ($1, $2, $3, $4, $5, now() + ($6 || ' days')::interval, now())", [grantId, client.org_id, row.user_id, a.clientId, await sha256(refreshToken), String(REFRESH_DAYS)]);
-  return { ok: true, issued: { accessToken: await mintAccess(db, client.org_id, row.user_id, grantId, client.name), refreshToken, grantId } };
+  const agent = await createAgent(db, { orgId: client.org_id, userId: row.user_id, name: client.name, client: a.clientId, host: hostOf(row.redirect_uri) });
+  await db.query("insert into oauth_grants (id, org_id, user_id, client_id, refresh_hash, refresh_expires_at, last_used_at, agent_id) values ($1, $2, $3, $4, $5, now() + ($6 || ' days')::interval, now(), $7)", [grantId, client.org_id, row.user_id, a.clientId, await sha256(refreshToken), String(REFRESH_DAYS), agent.id]);
+  return { ok: true, issued: { accessToken: await mintAccess(db, client.org_id, row.user_id, grantId, client.name, agent.id), refreshToken, grantId } };
 }
 
 /** The refresh grant: the refresh token is spent and a new one takes its place, so a stolen one works once at most. */
 export async function refresh(db: Db, a: { refreshToken: string; clientId: string }): Promise<TokenResult> {
   const next = newToken('vrt');
-  const rows = await db.query<{ id: string; org_id: string; user_id: string; client_id: string }>(
+  const rows = await db.query<{ id: string; org_id: string; user_id: string; client_id: string; agent_id: string | null }>(
     `update oauth_grants set refresh_hash = $2, refresh_expires_at = now() + ($3 || ' days')::interval, last_used_at = now()
-      where refresh_hash = $1 and revoked_at is null and refresh_expires_at > now() returning id, org_id, user_id, client_id`,
+      where refresh_hash = $1 and revoked_at is null and refresh_expires_at > now() returning id, org_id, user_id, client_id, agent_id`,
     [await sha256(a.refreshToken), await sha256(next), String(REFRESH_DAYS)],
   );
   const grant = rows[0];
@@ -107,7 +121,13 @@ export async function refresh(db: Db, a: { refreshToken: string; clientId: strin
   const user = await maybe<{ disabled_at: Date | null }>(db, 'select disabled_at from users where id = $1', [grant.user_id]);
   if (!user || user.disabled_at) return { ok: false, error: 'invalid_grant', why: 'the person is disabled' };
   const client = (await findClient(db, grant.client_id))!;
-  return { ok: true, issued: { accessToken: await mintAccess(db, grant.org_id, grant.user_id, grant.id, client.name), refreshToken: next, grantId: grant.id } };
+  let agentId = grant.agent_id;
+  if (!agentId) {
+    // A grant made before agents becomes one, named after its client.
+    agentId = (await createAgent(db, { orgId: grant.org_id, userId: grant.user_id, name: client.name, client: client.id, host: hostOf(client.redirectUris[0]) })).id;
+    await db.query('update oauth_grants set agent_id = $2 where id = $1', [grant.id, agentId]);
+  }
+  return { ok: true, issued: { accessToken: await mintAccess(db, grant.org_id, grant.user_id, grant.id, client.name, agentId), refreshToken: next, grantId: grant.id } };
 }
 
 export interface GrantRow {
@@ -115,19 +135,22 @@ export interface GrantRow {
   readonly client_name: string;
   readonly created_at: Date;
   readonly last_used_at: Date | null;
+  /** The agent it signs in; null for a grant made before agents, until its next refresh. */
+  readonly agent_id: string | null;
 }
 
-/** The apps a person connected and has not disconnected. */
+/** The apps a person connected and has not disconnected, with the agent each signs in. */
 export async function listGrants(db: Db, userId: string): Promise<GrantRow[]> {
-  return db.query<GrantRow>('select g.id, c.name as client_name, g.created_at, g.last_used_at from oauth_grants g join oauth_clients c on c.id = g.client_id where g.user_id = $1 and g.revoked_at is null and g.refresh_expires_at > now() order by g.created_at desc', [userId]);
+  return db.query<GrantRow>('select g.id, c.name as client_name, g.created_at, g.last_used_at, g.agent_id from oauth_grants g join oauth_clients c on c.id = g.client_id where g.user_id = $1 and g.revoked_at is null and g.refresh_expires_at > now() order by g.created_at desc', [userId]);
 }
 
-/** Ends a grant and its access token. `userId` null is an admin or the hub itself. */
+/** Ends a grant, its access token, and the agent it signs in. `userId` null is an admin or the hub itself. */
 export async function revokeGrant(db: Db, orgId: string, id: string, userId: string | null): Promise<boolean> {
   const rows = userId === null
-    ? await db.query('update oauth_grants set revoked_at = now() where org_id = $1 and id = $2 and revoked_at is null returning id', [orgId, id])
-    : await db.query('update oauth_grants set revoked_at = now() where org_id = $1 and id = $2 and user_id = $3 and revoked_at is null returning id', [orgId, id, userId]);
+    ? await db.query<{ agent_id: string | null }>('update oauth_grants set revoked_at = now() where org_id = $1 and id = $2 and revoked_at is null returning agent_id', [orgId, id])
+    : await db.query<{ agent_id: string | null }>('update oauth_grants set revoked_at = now() where org_id = $1 and id = $2 and user_id = $3 and revoked_at is null returning agent_id', [orgId, id, userId]);
   if (rows.length) await db.query('delete from tokens where grant_id = $1', [id]);
+  if (rows[0]?.agent_id) await db.query('update agents set revoked_at = now() where id = $1 and revoked_at is null', [rows[0].agent_id]);
   return rows.length > 0;
 }
 

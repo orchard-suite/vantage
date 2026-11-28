@@ -17,6 +17,8 @@ import { decodeJwt } from 'jose';
 import { isJwt, type IssuerTokens } from './issuer-token.ts';
 import type { ConnectorTokens } from './connector-token.ts';
 import type { Principal } from './principal.ts';
+import { RUN_HEADER } from '@vantage/mcp';
+import { agentById, agentLabel } from './agents.ts';
 
 export const DEFAULT_ORG = 'default';
 
@@ -53,7 +55,13 @@ export async function authenticate(db: Db, config: Config, log: Logger, req: Req
       log.debug('auth.bearer.rejected', { reason: 'user missing or disabled', tokenId: token.id });
       return {};
     }
-    log.debug('auth.bearer', { tokenId: token.id, kind: token.kind });
+    const agent = token.agent_id ? await agentById(db, token.agent_id) : undefined;
+    if (agent?.revoked_at) {
+      log.debug('auth.bearer.rejected', { reason: 'agent disconnected', tokenId: token.id, agentId: agent.id });
+      return {};
+    }
+    const run = runHeader(req);
+    log.debug('auth.bearer', { tokenId: token.id, kind: token.kind, agentId: agent?.id ?? null });
     return {
       principal: {
         userId: user.id,
@@ -64,6 +72,8 @@ export async function authenticate(db: Db, config: Config, log: Logger, req: Req
         surface: surface === 'browser' ? 'api' : surface,
         via: 'token',
         token: { id: token.id, kind: token.kind, scope: token.scope },
+        ...(agent ? { agent: { id: agent.id, label: agentLabel(agent) } } : {}),
+        ...(run ? { run } : {}),
         ...pick(user),
       },
     };
@@ -174,6 +184,12 @@ async function knownUser(db: Db, log: Logger, orgId: string, signIn: SignIn): Pr
   if (cache.size > 10_000) cache.clear();
   cache.set(key, { at: Date.now(), identity });
   return identity;
+}
+
+/** The run a bearer names: a short id of letters, digits, and dashes, or none. */
+function runHeader(req: Request): string | undefined {
+  const raw = req.headers.get(RUN_HEADER)?.trim();
+  return raw && /^[\w.:-]{1,100}$/.test(raw) ? raw : undefined;
 }
 
 /** The person's look, when they picked one. */

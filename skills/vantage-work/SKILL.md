@@ -20,10 +20,11 @@ lifecycle moves it through, and the people and runs that hold it. Read
    {"actions": [{"item": "SW-12", "claim": true}, {"item": "SW-12", "move": "doing"}]}
    ```
 
-   A claim lasts 20 minutes. Every call you make on the item renews it,
-   and on a laptop the bridge renews it while your session lives. Never
-   send a heartbeat yourself. If the claim is refused, another run holds
-   the item: take the next card.
+   A claim lasts 20 minutes and belongs to your run: on a laptop, the
+   bridge's session. Every call you make on the item renews it, and the
+   bridge renews it while your session lives. Never send a heartbeat
+   yourself. If the claim is refused, another run holds the item, even
+   when it acts for the same person: take the next card.
 3. Read the item (`vantage_read SW-12`) and only the parts you need: the
    state's page, `SW-12#notes`, `SW-12#files`. Its card names the moves
    open to you; a refused move names them too, so you never read the

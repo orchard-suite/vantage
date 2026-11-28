@@ -604,8 +604,14 @@ diagrams, points an embed at a storage account static site or at the hub.
   own sign-in; the client trades the code and its PKCE (S256) verifier at
   `/oauth/token` for a personal access token that lasts an hour and a
   refresh token that rotates on every use and lapses after 30 days unused.
-  A refresh token shown by another client revokes the grant. The person
-  sees and disconnects each app under Connected apps on the Account page.
+  A refresh token shown by another client revokes the grant.
+- An agent acts as itself for one person (VAN-2009). The hub keeps an
+  agent row: the person it acts for, its name (the client's), the client,
+  and the host it runs on. Every device-flow token and every OAuth grant
+  names one, and its token carries both the agent and the person. Its
+  reach is the person's. The person sees each agent under Agents on the
+  Account page and disconnects it, which ends its tokens and grants at
+  once. A grant made before agents becomes one on its next refresh.
 - Issuer tokens: with `OIDC_API_SCOPE`, `/mcp` also takes an access token
   the OIDC issuer signed for the hub with that scope, acting as the person,
   so an agent platform set up by hand to sign people in with the issuer
@@ -1019,7 +1025,13 @@ VAN-0001 sets. The code is `packages/hub/src/tracking/`.
 - **Agents.** A queue an agent asks for what it may pick up; a claim that
   expires and is renewed while the run works; one run record per run on
   the item, with proof and reported cost; a handoff note; a question that
-  makes the item wait for a person (VAN-3010).
+  makes the item wait for a person (VAN-3010). Every event records the
+  agent beside the person, and history reads "the agent for the person".
+  A claim belongs to one run, named by the run header the bridge sends
+  (one per session); with none, the agent is the run, and with no agent,
+  the person. A second run is refused while a claim lives, even for the
+  same person. A move that says `people: true` is refused to an agent
+  (VAN-2009).
 - **Access.** A workspace grant, or being named on the item: the person
   who asked, a holder, or a person a waiting move's role resolves to.
   Being named shows that item only, and a role's person may also claim

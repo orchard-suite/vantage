@@ -29,8 +29,8 @@ import { checkout, sync, type Listed, type Result, type TextApi } from './workco
 export interface BridgeOptions {
   /** Where bridge events go; stdout belongs to the protocol, so the CLI passes stderr. */
   readonly log?: (line: string) => void;
-  /** Connects to the hub; tests hand in an in-process one. */
-  readonly connectHub?: (link: HubLink) => Promise<Client>;
+  /** Connects to the hub with the headers every call carries; tests hand in an in-process one. */
+  readonly connectHub?: (link: HubLink, headers: Readonly<Record<string, string>>) => Promise<Client>;
   /** Reaches the hub's HTTP API; tests hand in the app's own. */
   readonly fetch?: (input: string | URL, init?: RequestInit) => Promise<Response>;
   /** List every tool and leave vantage_tool out. */
@@ -41,6 +41,8 @@ export interface BridgeOptions {
 }
 
 const BRIDGE_VERSION = '1.0.0';
+/** The header that names this session's run on every call (VAN-2009), so a claim belongs to this run alone. */
+export const RUN_HEADER = 'x-vantage-run';
 const answer = (t: string, isError = false): CallToolResult => ({ content: [{ type: 'text', text: t }], ...(isError ? { isError } : {}) });
 
 type Reply = { content: ({ type: 'text'; text: string } | { type: 'image'; data: string; mimeType: string })[]; isError?: boolean };
@@ -66,12 +68,15 @@ export async function createBridge(link: HubLink, opts: BridgeOptions = {}): Pro
   const log = opts.log ?? ((line: string) => process.stderr.write(`${line}\n`));
   const connectHub = opts.connectHub ?? connectHttpHub;
   const fetchHub = opts.fetch ?? fetch;
+  // One run per session: the claims it takes are its own, and another session for the same person is refused them.
+  const run = randomUUID();
+  const sent = { [RUN_HEADER]: run };
   let hub: Client | undefined;
 
   const hubClient = async (): Promise<Client> => {
     if (hub) return hub;
-    hub = await connectHub(link);
-    log(`vantage: connected to hub ${link.url}`);
+    hub = await connectHub(link, sent);
+    log(`vantage: connected to hub ${link.url} as run ${run}`);
     return hub;
   };
   const callHub = async (name: string, args: Record<string, unknown>): Promise<CallToolResult> => {
@@ -98,7 +103,7 @@ export async function createBridge(link: HubLink, opts: BridgeOptions = {}): Pro
   };
 
   const rest = async (method: string, path: string, body?: unknown): Promise<Response> => {
-    const res = await fetchHub(`${link.url}/api/v1${path}`, { method, headers: { authorization: `Bearer ${link.token}`, ...(body === undefined ? {} : { 'content-type': 'application/json' }) }, ...(body === undefined ? {} : { body: JSON.stringify(body) }) });
+    const res = await fetchHub(`${link.url}/api/v1${path}`, { method, headers: { authorization: `Bearer ${link.token}`, ...sent, ...(body === undefined ? {} : { 'content-type': 'application/json' }) }, ...(body === undefined ? {} : { body: JSON.stringify(body) }) });
     if (!res.ok) {
       const detail = (await res.json().catch(() => ({}))) as { error?: string; message?: string };
       throw new Error(`${res.status}: ${detail.message ?? detail.error ?? `the hub refused ${path}`}`);
@@ -251,9 +256,9 @@ export async function createBridge(link: HubLink, opts: BridgeOptions = {}): Pro
   return front;
 }
 
-async function connectHttpHub(link: HubLink): Promise<Client> {
+async function connectHttpHub(link: HubLink, headers: Readonly<Record<string, string>>): Promise<Client> {
   // Every tool: this door decides what the agent is shown.
-  const transport = new StreamableHTTPClientTransport(new URL(`${link.url}/mcp?tools=all`), { requestInit: { headers: { authorization: `Bearer ${link.token}` } } });
+  const transport = new StreamableHTTPClientTransport(new URL(`${link.url}/mcp?tools=all`), { requestInit: { headers: { authorization: `Bearer ${link.token}`, ...headers } } });
   const client = new Client({ name: 'vantage-bridge', version: BRIDGE_VERSION });
   await client.connect(transport);
   return client;

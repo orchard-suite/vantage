@@ -58,9 +58,9 @@ export async function laptop(t: TestApp | undefined, link: HubLink, opts: { rene
     if (!t) throw new Error('connect ECONNREFUSED');
     return Promise.resolve(t.app.request(String(input).replace(link.url, ''), init));
   };
-  const connectHub = async (l: HubLink): Promise<Client> => {
+  const connectHub = async (l: HubLink, headers: Readonly<Record<string, string>>): Promise<Client> => {
     if (!t) throw new Error('connect ECONNREFUSED');
-    const transport = new StreamableHTTPClientTransport(new URL(`${l.url}/mcp?tools=all`), { fetch: (input, init) => Promise.resolve(t.app.request(String(input), init)), requestInit: { headers: { authorization: `Bearer ${l.token}` } } });
+    const transport = new StreamableHTTPClientTransport(new URL(`${l.url}/mcp?tools=all`), { fetch: (input, init) => Promise.resolve(t.app.request(String(input), init)), requestInit: { headers: { authorization: `Bearer ${l.token}`, ...headers } } });
     const client = new Client({ name: 'bridge-test', version: '0' });
     await client.connect(transport);
     return client;

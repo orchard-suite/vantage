@@ -1445,6 +1445,8 @@ views:
 - `needs` is `note`, `revision` (the content revision the move is about),
   or `label:<name>` (a label that must be set first).
 - `approval: true`: the person who asked never makes the move.
+- `people: true`: a person makes it themselves; an agent acting for them
+  is refused.
 - Two moves never join the same two states; a move is named by where it
   goes. It draws as a flow: work reads from the first state, and done
   states sit last.
@@ -1516,6 +1518,14 @@ views:
   in the queue. A claim's end, and every time in an item's history and
   notes, is given in the hub's time zone with its short name
   (`2026-11-27 19:20 CST`).
+- You act as yourself, for your person. Your history reads `vantage on
+  laptop-1 for ada@example.com`, and you can do what your person can.
+  A claim belongs to your run: on a laptop, the bridge's session; over
+  HTTP, the `X-Vantage-Run` header you send with each call; with none,
+  your agent. Another run is refused the item while your claim lives,
+  even a run for the same person, and only your run renews or finishes
+  it. A move that says `people: true` is refused to you: ask your person
+  to make it.
 - `{"item": "SW-12", "ask": "..."}` moves the item to where it waits for a
   person, carrying the question. It leaves the queue until it is answered.
 - `finish` ends a run in one action: `{"item": "SW-12", "finish": {"move":

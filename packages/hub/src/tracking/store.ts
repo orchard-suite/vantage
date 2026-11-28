@@ -18,6 +18,8 @@ export type ActorKind = 'person' | 'agent' | 'app' | 'system';
 export interface Actor {
   readonly userId: string | null;
   readonly kind: ActorKind;
+  /** The agent that acted for the person (VAN-2009); null for a person's own act. */
+  readonly agentId: string | null;
   /** Where the change came from: a surface, with the client a person acted through when it was another app's, or a module's own app. */
   readonly surface: Surface | `${Surface}:${string}` | `app:${string}`;
 }
@@ -47,6 +49,8 @@ interface ItemRow {
   readonly body_id: string | null;
   readonly claim_user: string | null;
   readonly claim_until: Date | null;
+  readonly claim_agent: string | null;
+  readonly claim_run: string | null;
   readonly runs: number;
   readonly rank: string | null;
   readonly position: string | number;
@@ -98,7 +102,7 @@ export async function stateById(db: Db, id: string, lock = false): Promise<ItemS
     labels: row.labels,
     revision: row.revision,
     bodyId: row.body_id,
-    claim: row.claim_user && row.claim_until ? { userId: row.claim_user, until: iso(row.claim_until) } : null,
+    claim: row.claim_user && row.claim_until ? { userId: row.claim_user, agentId: row.claim_agent, run: row.claim_run ?? `user:${row.claim_user}`, until: iso(row.claim_until) } : null,
     runs: Number(row.runs),
     rank: row.rank,
     links,
@@ -130,8 +134,8 @@ export async function append(tx: Db, input: AppendInput): Promise<ItemState> {
   const id = ulid();
   const row = (
     await tx.query<{ position: string | number; at: Date }>(
-      'insert into item_events (id, org_id, item_id, kind_id, type, actor_id, actor_kind, surface, data, idempotency_key, answer) values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11) returning position, at',
-      [id, input.orgId, input.itemId, input.data.type === 'created' ? input.data.kindId : input.before!.kindId, input.data.type, input.actor.userId, input.actor.kind, input.actor.surface, JSON.stringify(input.data), input.key ?? null, input.answer],
+      'insert into item_events (id, org_id, item_id, kind_id, type, actor_id, actor_kind, surface, data, idempotency_key, answer, agent_id) values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12) returning position, at',
+      [id, input.orgId, input.itemId, input.data.type === 'created' ? input.data.kindId : input.before!.kindId, input.data.type, input.actor.userId, input.actor.kind, input.actor.surface, JSON.stringify(input.data), input.key ?? null, input.answer, input.actor.agentId],
     )
   )[0]!;
   const event: ItemEvent = { position: Number(row.position), id, itemId: input.itemId, at: iso(row.at), data: input.data };
@@ -142,13 +146,13 @@ export async function append(tx: Db, input: AppendInput): Promise<ItemState> {
 }
 
 async function writeState(tx: Db, s: ItemState, fresh: boolean): Promise<void> {
-  const values = [s.id, s.orgId, s.kindId, s.workspaceId, s.number, s.key, s.ref, s.title, s.state, s.class, s.askerId, JSON.stringify(s.holders), JSON.stringify(s.labels), s.revision, s.bodyId, parentOf(s), s.position, s.events, s.notes, s.files, s.stateSince, s.createdAt, s.updatedAt, s.claim?.userId ?? null, s.claim?.until ?? null, s.runs, s.rank];
+  const values = [s.id, s.orgId, s.kindId, s.workspaceId, s.number, s.key, s.ref, s.title, s.state, s.class, s.askerId, JSON.stringify(s.holders), JSON.stringify(s.labels), s.revision, s.bodyId, parentOf(s), s.position, s.events, s.notes, s.files, s.stateSince, s.createdAt, s.updatedAt, s.claim?.userId ?? null, s.claim?.until ?? null, s.runs, s.rank, s.claim?.agentId ?? null, s.claim?.run ?? null];
   const search = "to_tsvector('english', $8 || ' ' || $6 || ' ' || coalesce((select string_agg(value::text, ' ') from jsonb_each_text($13::jsonb)), '') || ' ' || coalesce((select text from item_bodies where id = $15), ''))";
   if (fresh) {
-    await tx.query(`insert into items (id, org_id, kind_id, workspace_id, number, key, ref, title, state, class, asker_id, holders, labels, revision, body_id, parent_id, position, events, notes, files, state_since, created_at, updated_at, claim_user, claim_until, runs, rank, search) values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25, $26, $27, ${search})`, values);
+    await tx.query(`insert into items (id, org_id, kind_id, workspace_id, number, key, ref, title, state, class, asker_id, holders, labels, revision, body_id, parent_id, position, events, notes, files, state_since, created_at, updated_at, claim_user, claim_until, runs, rank, claim_agent, claim_run, search) values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25, $26, $27, $28, $29, ${search})`, values);
   } else {
     await tx.query(
-      `update items set kind_id = $3, workspace_id = $4, number = $5, key = $6, ref = $7, title = $8, state = $9, class = $10, asker_id = $11, holders = $12, labels = $13, revision = $14, body_id = $15, parent_id = $16, position = $17, events = $18, notes = $19, files = $20, state_since = $21, created_at = $22, updated_at = $23, claim_user = $24, claim_until = $25, runs = $26, rank = $27, search = ${search} where id = $1 and org_id = $2`,
+      `update items set kind_id = $3, workspace_id = $4, number = $5, key = $6, ref = $7, title = $8, state = $9, class = $10, asker_id = $11, holders = $12, labels = $13, revision = $14, body_id = $15, parent_id = $16, position = $17, events = $18, notes = $19, files = $20, state_since = $21, created_at = $22, updated_at = $23, claim_user = $24, claim_until = $25, runs = $26, rank = $27, claim_agent = $28, claim_run = $29, search = ${search} where id = $1 and org_id = $2`,
       values,
     );
   }

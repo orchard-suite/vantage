@@ -15,11 +15,27 @@ concurrency:
 jobs:
   test:
     runs-on: ubuntu-latest
+    # The proofs that need a real Postgres (proof.test.ts, postgres.test.ts)
+    # run against this service; every other hub test runs on PGlite.
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_PASSWORD: proof
+          POSTGRES_DB: proof
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd "pg_isready -U postgres -d proof"
+          --health-interval 2s
+          --health-timeout 5s
+          --health-retries 30
+    env:
+      VANTAGE_TEST_DATABASE_URL: postgres://postgres:proof@localhost:5432/proof
     steps:
       - uses: actions/checkout@v4
       - uses: oven-sh/setup-bun@v2
         with:
           bun-version: 1.4.4
-      # The full check: typecheck, tests (the hub's on PGlite, so no database
-      # service), and the file-size gate.
+      # The full check: typecheck, tests (the hub's on PGlite, and its
+      # real-Postgres proofs on the service), and the file-size gate.
       - run: make check

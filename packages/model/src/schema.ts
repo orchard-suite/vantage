@@ -337,6 +337,7 @@ export const LifecycleMoveSchema = z
     who: z.array(z.string()).optional().describe('Who may make it: author (anyone who writes the workspace), holder, asker, proof (the hub, when the item\'s proof says so), or a role the kind names. Default author'),
     needs: z.array(z.string().regex(/^(note|revision|label:[a-z][a-z0-9_]*)$/, 'note, revision, or label:<name>')).optional().describe('What the move needs: a note, a content revision to pin, or a label that must be set'),
     approval: z.boolean().optional().describe('An approval: the person who asked for the item never makes it'),
+    people: z.boolean().optional().describe('For people only: an agent never makes it, so a person makes it themselves'),
   })
   .strict();
 

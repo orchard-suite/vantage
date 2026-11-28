@@ -20,6 +20,8 @@ export interface TokenRow {
   readonly created_at: Date;
   /** The connected app's grant that issued it (auth/oauth.ts); null for a token a person made. */
   readonly grant_id: string | null;
+  /** The agent it signs in (auth/agents.ts); null for a token a person made for themselves or a script. */
+  readonly agent_id: string | null;
 }
 
 export interface NewToken {
@@ -30,6 +32,7 @@ export interface NewToken {
   readonly name: string;
   readonly expiresAt?: Date | null;
   readonly grantId?: string;
+  readonly agentId?: string | null;
 }
 
 const PREFIX: Record<TokenKind, string> = { personal: 'vpt', automation: 'vat' };
@@ -37,7 +40,7 @@ const PREFIX: Record<TokenKind, string> = { personal: 'vpt', automation: 'vat' }
 export async function createToken(db: Db, t: NewToken): Promise<{ row: TokenRow; plaintext: string }> {
   const plaintext = newToken(PREFIX[t.kind]);
   const id = randomId();
-  await db.query('insert into tokens (id, org_id, user_id, hash, kind, scope, name, expires_at, grant_id) values ($1, $2, $3, $4, $5, $6, $7, $8, $9)', [
+  await db.query('insert into tokens (id, org_id, user_id, hash, kind, scope, name, expires_at, grant_id, agent_id) values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)', [
     id,
     t.orgId,
     t.userId,
@@ -47,12 +50,13 @@ export async function createToken(db: Db, t: NewToken): Promise<{ row: TokenRow;
     t.name,
     t.expiresAt ?? null,
     t.grantId ?? null,
+    t.agentId ?? null,
   ]);
   const row = (await maybe<TokenRow>(db, SELECT + ' where id = $1', [id]))!;
   return { row, plaintext };
 }
 
-const SELECT = 'select id, org_id, user_id, kind, scope, name, expires_at, revoked_at, last_used_at, created_at, grant_id from tokens';
+const SELECT = 'select id, org_id, user_id, kind, scope, name, expires_at, revoked_at, last_used_at, created_at, grant_id, agent_id from tokens';
 
 /** The live token for a bearer value, or undefined when unknown, revoked, or expired. */
 export async function resolveToken(db: Db, plaintext: string): Promise<TokenRow | undefined> {
@@ -96,5 +100,5 @@ export async function revokeToken(db: Db, orgId: string, id: string, userId: str
 
 /** What a token row looks like on the API: never the hash. */
 export function publicToken(t: TokenRow): Record<string, unknown> {
-  return { id: t.id, kind: t.kind, name: t.name, scope: t.scope, expiresAt: t.expires_at, revokedAt: t.revoked_at, lastUsedAt: t.last_used_at, createdAt: t.created_at, connection: t.grant_id };
+  return { id: t.id, kind: t.kind, name: t.name, scope: t.scope, expiresAt: t.expires_at, revokedAt: t.revoked_at, lastUsedAt: t.last_used_at, createdAt: t.created_at, connection: t.grant_id, agent: t.agent_id };
 }
