@@ -26,7 +26,7 @@ export interface Filing {
   readonly stewards?: readonly string[];
 }
 
-const HUB: Actor = { userId: null, kind: 'system', surface: 'api' };
+const HUB: Actor = { userId: null, kind: 'system', agentId: null, surface: 'api' };
 
 /** Files each filing that has no open item on its subject; answers the keys it filed. */
 export async function fileChecks(tx: Db, orgId: string, prefix: string | undefined, filings: readonly Filing[]): Promise<string[]> {
