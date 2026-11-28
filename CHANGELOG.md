@@ -2,6 +2,16 @@
 
 All notable changes to this project will be documented in this file.
 
+## [4.12.0](https://github.com/orchard-suite/vantage/compare/v4.11.1...v4.12.0) (2026-11-28)
+
+### Features
+
+* **vantage:** link a superseded record to its successor ([a554b8d](https://github.com/orchard-suite/vantage/commit/a554b8d9fa40d7d7d7b269985b844963bbf78ac4))
+
+### Bug Fixes
+
+* **vantage:** run schedules and limits in hub zone ([cfc2724](https://github.com/orchard-suite/vantage/commit/cfc2724bbdd728bc17811db7bcf966a1e2d36516))
+
 ## [4.11.1](https://github.com/orchard-suite/vantage/compare/v4.11.0...v4.11.1) (2026-11-28)
 
 ### Bug Fixes
