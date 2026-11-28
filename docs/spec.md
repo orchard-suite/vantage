@@ -955,8 +955,39 @@ by hand, and published in editions (VAN-3018). The code is
   steward gate on, a scope's own changes wait as a pending edition for its
   steward or an admin (`vantage_standard_publish`); what comes from above
   publishes at once.
+- **Inheritance** (VAN-3019). Everything that reaches a scope applies;
+  combining only adds. A record's `inherits` map marks each inherited line
+  it touches as `builds`, `refines`, or `departs`, with the edition of its
+  own scope it read (`decisions.inherits`). A refinement is at least as
+  strict as its line. An accepted record never departs without an
+  exception in force, and the machine gate refuses an edition whose line
+  departs with none. Relations are typed: `related`, `amends`
+  (`decisions.amends`), the map's `refines` and `departs`, and the
+  supersede links, each shown on the other record.
+- **Programs** (VAN-3017). A workspace may name the program it serves
+  (`workspaces.program`). The hub builds an edition for each owner and
+  program some workspace pairs, `standard/<owner>+<program>`: the owner's
+  edition and the program's own and facet lines, never the program's
+  ancestors'. Records in that workspace mark their lines against it.
+- **Conflicts** (`standard_conflicts`). Two lines that reach one scope and
+  cannot both hold, flagged at `conflicts` by anyone who may author; the
+  hub records who rules: the nearest scope at or above both lines' own
+  scopes, or each line's own scope when the clash crosses the program
+  axis. One of those stewards or an admin rules (`change`, `narrow`, `exception`) at
+  `conflicts/<n>`. Until then the setting `clash` decides in that scope
+  and below: `hold` (both stand, and a record marking either is not
+  accepted), `stricter`, or `ranked`. An edition lists its open conflicts
+  and the line each holds back; its hash covers them only when there are
+  any.
+- **Checks.** With `checks` naming a kind, the hub files items as itself
+  in the write that caused them: a re-check for each record whose map
+  marks a line its scope's new edition changed or removed, a check of each
+  newly accepted line against what reaches the same scopes and facets, and
+  one per conflict, held by its steward. An open item on the same subject
+  is not filed twice.
 - **Surfaces.** `standard` is the estate's settings (bindings, binds,
-  `steward_gate`, `withhold`, `packs` per scope) as YAML; the lists are an
+  `steward_gate`, `withhold`, `packs` per scope, `clash`, `ranked`,
+  `checks`) as YAML; the lists are an
   admin's and a scope's packs its steward's. `standard/<scope>` is the
   newest edition as Markdown and `standard/<scope>@<n>` edition n; both
   are read-only. REST: `GET` and `PUT /api/v1/standards`,
@@ -1241,7 +1272,8 @@ characters stand alone. The first paragraph is that self-contained lead.
   record, and an item; look at one view; bring in a folder of records;
   take an item and finish it; answer a plain question across the hub;
   find the standard that binds a repository; read a scope's built
-  standard, one area of it, and check the one held is current. A task's
+  standard, one area of it, and check the one held is current; read a
+  conflict and list the conflicts. A task's
   budget is its disk cost. The check
   gate runs it.
 - **Budgets.** One file holds them (`packages/mcp/src/budget.ts`). The
@@ -1255,7 +1287,8 @@ characters stand alone. The first paragraph is that self-contained lead.
 - **Text space.** Every thing has an address and one text form that loses
   nothing: `workspace/document` (YAML), `workspace/document/pages/x.md`,
   `SHOP-2001`, `SHOP`, `~` (the person's own workspace), `scopes`,
-  `scopes/<id>`, `standard`, `standard/<scope>`, `guide`, `schema` (a workspace never takes
+  `scopes/<id>`, `standard`, `standard/<scope>`, `conflicts`,
+  `conflicts/<n>`, `guide`, `schema` (a workspace never takes
   one of the hub's own words as its slug); a part after `#` is a heading,
   a YAML path, or a line range. Registry prefixes, kind prefixes, and
   workspace slugs share one namespace (VAN-5002).

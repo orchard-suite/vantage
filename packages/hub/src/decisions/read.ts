@@ -11,7 +11,8 @@ import { searchWorkspaceIds, type SearchScope } from '../search.ts';
 import { HttpError, notFound } from '../http.ts';
 import { machineRef } from '@vantage/model';
 import { categoryName } from './numbering.ts';
-import { aliasesOf, linksOf, linksToDocument, listPlaced, placedByIds, placedByRef, refOf, resolveRefs, registriesIn, registryByPrefix, revisionsOf, stubOf, type ListFilter, type PlacedRow, type RegistryRow } from './repo.ts';
+import { scopeName } from '../standards/model.ts';
+import { aliasesOf, linksOf, linksToDocument, listPlaced, placedByIds, placedByRef, refOf, relatedTo, resolveRefs, registriesIn, registryByPrefix, revisionsOf, stubOf, type ListFilter, type PlacedRow, type RegistryRow } from './repo.ts';
 import type { Decision, DecisionRevision, DecisionStub, Governs, Registry } from './types.ts';
 
 export interface Reach {
@@ -61,13 +62,16 @@ export async function present(ctx: AppContext, p: Principal, rows: readonly Plac
   if (!rows.length) return [];
   const seen = r ?? (await reach(ctx, p));
   const registries = new Map(seen.registries.map((g) => [g.id, g]));
-  const otherIds = [...new Set(rows.flatMap((row) => [...row.related, row.supersedes_id, row.superseded_by_id].filter((x): x is string => !!x)))];
+  const otherIds = [...new Set(rows.flatMap((row) => [...row.related, ...row.amends, ...row.inherits.map((i) => i.line), row.supersedes_id, row.superseded_by_id].filter((x): x is string => !!x)))];
   const others = new Map((await placedByIds(ctx.db, p.orgId, otherIds)).map((o) => [o.id, o]));
+  const pointing = await relatedTo(ctx.db, p.orgId, rows.map((x) => x.id));
+  for (const o of pointing) others.set(o.id, o);
   const stub = (id: string | null): DecisionStub | null => {
     const o = id ? others.get(id) : undefined;
     if (!o) return null;
     return registries.has(o.registry_id) ? stubOf(o) : hidden(o);
   };
+  const stubs = (ids: readonly string[]): DecisionStub[] => ids.map(stub).filter((x): x is DecisionStub => x !== null).sort((a, b) => a.ref.localeCompare(b.ref));
   const links = await linksOf(ctx.db, rows.map((x) => x.id));
   const aliases = await aliasesOf(ctx.db, rows.map((x) => x.id));
   const docIds = [...new Set(links.map((l) => l.document_id))];
@@ -107,6 +111,14 @@ export async function present(ctx: AppContext, p: Principal, rows: readonly Plac
       position: row.position,
       supersedes: stub(row.supersedes_id),
       supersededBy: stub(row.superseded_by_id),
+      amends: stubs(row.amends),
+      inherits: row.inherits.flatMap((i) => {
+        const line = stub(i.line);
+        return line ? [{ line, stance: i.stance, edition: `${scopeName(i.scope)}@${i.version}` }] : [];
+      }),
+      amendedBy: stubs(pointing.filter((o) => o.amends.includes(row.id)).map((o) => o.id)),
+      refinedBy: stubs(pointing.filter((o) => o.inherits.some((i) => i.line === row.id && i.stance === 'refines')).map((o) => o.id)),
+      departedBy: stubs(pointing.filter((o) => o.inherits.some((i) => i.line === row.id && i.stance === 'departs')).map((o) => o.id)),
       governs,
     };
   });

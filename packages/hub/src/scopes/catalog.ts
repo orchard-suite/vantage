@@ -13,6 +13,7 @@ import { workspaceBySlug } from '../authz.ts';
 import { replaceScopes, type Scope } from './repo.ts';
 import { scopeSetting, type CatalogSetting } from './setting.ts';
 import { rebuildNow } from '../standards/publish.ts';
+import { FACET_MAX } from '../decisions/types.ts';
 
 /** The kind of an observed entity among the kinds that are scopes: its type, or the tag its connector gave it. */
 function kindOf(tags: readonly string[], type: string, kinds: readonly string[]): string | undefined {
@@ -49,13 +50,16 @@ export function scopesFromCatalog(model: ObservedModel, setting: CatalogSetting,
       const v = profileText(e.facts[f]);
       return v === undefined ? [] : [[f, v]];
     }));
+    const facets = facetsOf(e.facts[setting.facets]);
+    const refused = facets.filter((f) => f.length > FACET_MAX);
     return {
       id: e.id,
       name: e.name,
       kind,
       ...(e.parent !== undefined && ids.has(e.parent) ? { parent: e.parent } : {}),
       ...(steward !== undefined ? { steward } : {}),
-      facets: facetsOf(e.facts[setting.facets]),
+      facets: facets.filter((f) => f.length <= FACET_MAX),
+      ...(refused.length ? { refusedFacets: refused } : {}),
       ...(e.url !== undefined ? { url: e.url } : {}),
       profile,
     };
@@ -95,7 +99,8 @@ export async function fillFromCatalog(ctx: AppContext, orgId: string, only?: Sou
   if (!source || (only && only.id !== source.id)) return undefined;
   const scopes = scopesFromCatalog((await observedModel(ctx.db, source.id)).model, setting.catalog, setting.profile);
   const counts = await replaceScopes(ctx.db, orgId, 'catalog', scopes);
-  ctx.log.info('scopes.catalog.filled', { orgId, source: setting.catalog.connector, scopes: scopes.length, ...counts });
+  const refused = scopes.flatMap((s) => (s.refusedFacets ?? []).map((f) => `${s.id}: ${f}`));
+  ctx.log.info('scopes.catalog.filled', { orgId, source: setting.catalog.connector, scopes: scopes.length, ...counts, ...(refused.length ? { refusedFacets: refused, facetMax: FACET_MAX } : {}) });
   if (counts.added || counts.changed || counts.removed) await rebuildNow(ctx, orgId, `connector:${source.id}`);
   return { scopes: scopes.length };
 }

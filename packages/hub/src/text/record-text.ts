@@ -7,7 +7,7 @@
  */
 import { parse as parseYaml, stringify } from 'yaml';
 import { badRequest } from '../http.ts';
-import { PositionSchema, type Alternative, type Decision, type DecisionCreate, type DecisionPatch, type DecisionStatus, type GovernsInput, type Position } from '../decisions/types.ts';
+import { InheritSchema, PositionSchema, type Alternative, type Decision, type DecisionCreate, type DecisionPatch, type DecisionStatus, type GovernsInput, type InheritInput, type Position } from '../decisions/types.ts';
 
 const SECTIONS = ['Context', 'Decision', 'Consequences', 'Alternatives considered'] as const;
 
@@ -28,7 +28,20 @@ export interface RecordFields {
   readonly alternatives: readonly Alternative[];
   readonly supersedes: string | undefined;
   readonly supersededBy: string | undefined;
+  readonly amends: readonly string[];
+  readonly inherits: readonly InheritInput[];
+  /** Kept by the records that name this one; a write never changes them. */
+  readonly amendedBy: readonly string[];
+  readonly refinedBy: readonly string[];
+  readonly departedBy: readonly string[];
 }
+
+/** The other ends of typed relations: header keys a record shows but only the naming record changes. */
+const BACK = [
+  ['amendedBy', 'amended_by', 'amends'],
+  ['refinedBy', 'refined_by', 'inherits (stance: refines)'],
+  ['departedBy', 'departed_by', 'inherits (stance: departs)'],
+] as const;
 
 const governsText = (g: { workspace?: string; document: string; box?: string | undefined; view?: string | undefined }): string => `${g.workspace ? `${g.workspace}/` : ''}${g.document} ${g.box !== undefined ? `box ${g.box}` : `view ${g.view}`}`;
 
@@ -67,9 +80,14 @@ export function recordText(d: Decision): string {
     deciders: [...d.deciders],
     ...(d.position ? { position: positionHeader(d.position) } : {}),
     ...(d.related.length ? { related: d.related.map((r) => r.ref) } : {}),
+    ...(d.amends.length ? { amends: d.amends.map((r) => r.ref) } : {}),
+    ...(d.inherits.length ? { inherits: d.inherits.map((i) => ({ line: i.line.ref, stance: i.stance, edition: i.edition })) } : {}),
     ...(d.governs.length ? { governs: d.governs.map(governsText) } : {}),
     ...(d.supersedes ? { supersedes: d.supersedes.ref } : {}),
     ...(d.supersededBy ? { superseded_by: d.supersededBy.ref } : {}),
+    ...(d.amendedBy.length ? { amended_by: d.amendedBy.map((r) => r.ref) } : {}),
+    ...(d.refinedBy.length ? { refined_by: d.refinedBy.map((r) => r.ref) } : {}),
+    ...(d.departedBy.length ? { departed_by: d.departedBy.map((r) => r.ref) } : {}),
   };
   const body = [
     '## Context',
@@ -135,6 +153,16 @@ const link = (value: unknown, what: string): string | undefined => {
   return value.trim();
 };
 
+function inheritsOf(value: unknown): InheritInput[] {
+  if (value === undefined || value === null) return [];
+  if (!Array.isArray(value)) throw badRequest('inherits is a list, one entry per inherited line: { line: PAY-3001, stance: builds, edition: payments@4 } (guide#standards)');
+  return value.map((v, i) => {
+    const r = InheritSchema.safeParse(v);
+    if (!r.success) throw badRequest(`inherits.${i} does not read: ${r.error.issues.map((x) => `${x.path.join('.') || 'entry'}: ${x.message}`).join('; ')} (guide#standards)`);
+    return r.data;
+  });
+}
+
 const day = (value: unknown): string | undefined => (value === undefined || value === null || value === '' ? undefined : value instanceof Date ? value.toISOString().slice(0, 10) : String(value));
 
 /** Reads a record's text form. Throws 400 with what is wrong when it is not one. */
@@ -185,6 +213,11 @@ export function parseRecordText(text: string): RecordFields {
     alternatives: alternatives.map((x) => ({ option: x.option, rejected: x.rejected.trim() })),
     supersedes: link(header['supersedes'], 'supersedes'),
     supersededBy: link(header['superseded_by'], 'superseded_by'),
+    amends: strings(header['amends'], 'amends'),
+    inherits: inheritsOf(header['inherits']),
+    amendedBy: strings(header['amended_by'], 'amended_by'),
+    refinedBy: strings(header['refined_by'], 'refined_by'),
+    departedBy: strings(header['departed_by'], 'departed_by'),
   };
 }
 
@@ -209,6 +242,9 @@ export function changedFields(current: RecordFields, next: RecordFields): Decisi
   if (!same(next.position, current.position)) patch['position'] = next.position;
   if (!same(next.related, current.related)) patch['related'] = next.related;
   if (!same(next.governs, current.governs)) patch['governs'] = next.governs;
+  if (!same(next.amends, current.amends)) patch['amends'] = next.amends;
+  if (!same(next.inherits, current.inherits)) patch['inherits'] = next.inherits;
+  for (const [k, key, kept] of BACK) if (!same(next[k], current[k])) throw badRequest(`${key} is kept by the records that name this one, in their ${kept}; change it there`);
   for (const k of ['context', 'decision', 'consequences'] as const) if (next[k] !== current[k]) patch[k] = next[k];
   if (!same(next.alternatives, current.alternatives)) patch['alternatives'] = next.alternatives;
   return patch as DecisionPatch;
@@ -219,6 +255,7 @@ export function createInput(f: RecordFields): DecisionCreate {
   if (!Number.isInteger(f.category)) throw badRequest("a new record's header names its category, a digit: category: 3");
   if (f.status !== 'proposed' && f.status !== 'accepted') throw badRequest('a new record is proposed or accepted');
   if (!f.decidedOn) throw badRequest("a new record's header names the day it was decided: decided: YYYY-MM-DD");
+  for (const [k, key, kept] of BACK) if (f[k].length) throw badRequest(`${key} is kept by the records that name this one, in their ${kept}; a new record has none`);
   if (f.supersedes !== undefined || f.supersededBy !== undefined) throw badRequest('a new record that replaces another is written with vantage_tool vantage_decision_supersede; an existing one names its successor with superseded_by');
   return {
     category: f.category,
@@ -234,5 +271,7 @@ export function createInput(f: RecordFields): DecisionCreate {
     related: [...f.related],
     ...(f.position ? { position: f.position } : {}),
     governs: [...f.governs],
+    amends: [...f.amends],
+    inherits: [...f.inherits],
   };
 }

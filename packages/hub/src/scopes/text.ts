@@ -12,9 +12,10 @@ import type { Principal } from '../auth/principal.ts';
 import { memberWorkspaces } from '../authz.ts';
 import { sha256 } from '../crypto.ts';
 import { badRequest } from '../http.ts';
-import { listScopes, workspaceScopes, type Scope } from './repo.ts';
+import { listScopes, workspacePrograms, workspaceScopes, type Scope } from './repo.ts';
 import { CatalogSettingSchema, DEFAULT_PROFILE, ProfileFieldsSchema, scopeSetting, type ScopeSetting } from './setting.ts';
 import { ESTATE } from '../standards/model.ts';
+import { FACET_MAX } from '../decisions/types.ts';
 
 /** The address of the tree. */
 export const SCOPES = 'scopes';
@@ -24,14 +25,16 @@ export interface ScopesState {
   readonly scopes: readonly Scope[];
   /** Workspace slug to the scope it names, for the workspaces the reader may see. */
   readonly workspaces: ReadonlyMap<string, string>;
+  /** Workspace slug to the program it serves, a second axis beside its owner (VAN-3017). */
+  readonly programs: ReadonlyMap<string, string>;
 }
 
 /** The tree as the reader may see it: every scope, and the workspaces of their library that name one. */
 export async function scopesState(ctx: AppContext, p: Principal): Promise<ScopesState> {
   const setting = await scopeSetting(ctx.db, p.orgId);
-  const [scopes, named, mine] = await Promise.all([listScopes(ctx.db, p.orgId, setting.source), workspaceScopes(ctx.db, p.orgId), memberWorkspaces(ctx.db, p)]);
+  const [scopes, named, serving, mine] = await Promise.all([listScopes(ctx.db, p.orgId, setting.source), workspaceScopes(ctx.db, p.orgId), workspacePrograms(ctx.db, p.orgId), memberWorkspaces(ctx.db, p)]);
   const seen = new Set(mine.map((w) => w.slug));
-  return { setting, scopes, workspaces: new Map([...named].filter(([slug]) => seen.has(slug))) };
+  return { setting, scopes, workspaces: new Map([...named].filter(([slug]) => seen.has(slug))), programs: new Map([...serving].filter(([slug]) => seen.has(slug))) };
 }
 
 export function scopesText(s: ScopesState): string {
@@ -41,7 +44,9 @@ export function scopesText(s: ScopesState): string {
   const fields = s.setting.profile;
   const profileOf = (x: Scope): Record<string, string> => Object.fromEntries([...fields.filter((f) => x.profile[f] !== undefined), ...Object.keys(x.profile).filter((f) => !fields.includes(f)).sort()].map((f) => [f, x.profile[f]!]));
   doc['scopes'] = s.scopes.map((x) => ({ id: x.id, name: x.name, kind: x.kind, ...(x.parent ? { parent: x.parent } : {}), ...(x.steward ? { steward: x.steward } : {}), ...(x.facets.length ? { facets: [...x.facets] } : {}), ...(x.url ? { url: x.url } : {}), ...(Object.keys(x.profile).length ? { profile: profileOf(x) } : {}) }));
-  doc['workspaces'] = Object.fromEntries(s.workspaces);
+  // A workspace that serves a program names both; one that only has an owner keeps the plain form.
+  const slugs = [...new Set([...s.workspaces.keys(), ...s.programs.keys()])].sort();
+  doc['workspaces'] = Object.fromEntries(slugs.map((slug) => [slug, s.programs.has(slug) ? { ...(s.workspaces.has(slug) ? { owner: s.workspaces.get(slug) } : {}), program: s.programs.get(slug) } : s.workspaces.get(slug)]));
   return stringify(doc, { lineWidth: 0 });
 }
 
@@ -56,7 +61,7 @@ const ScopeSchema = z
     kind: z.string().min(1),
     parent: z.string().min(1).optional(),
     steward: z.string().min(1).optional(),
-    facets: z.array(z.string().min(1)).default([]),
+    facets: z.array(z.string().min(1).max(FACET_MAX, `a facet is at most ${FACET_MAX} characters, the most a line's reach.facets can name`)).default([]),
     url: z.string().optional(),
     profile: z.record(z.string(), z.string().nullish()).default({}).describe('The profile fields it states; one left out shows its nearest ancestor'),
   })
@@ -68,7 +73,7 @@ const TextSchema = z
     catalog: CatalogSettingSchema.optional(),
     profile: ProfileFieldsSchema.default([...DEFAULT_PROFILE]),
     scopes: z.array(ScopeSchema).nullish(),
-    workspaces: z.record(z.string(), z.string().min(1)).nullish(),
+    workspaces: z.record(z.string(), z.union([z.string().min(1), z.object({ owner: z.string().min(1).optional(), program: z.string().min(1) }).strict()])).nullish(),
   })
   .strict();
 
@@ -92,7 +97,13 @@ export function parseScopesText(text: string): ScopesState {
     if (stranger && t.source === 'hub') throw badRequest(`scope ${x.id} states profile field ${stranger[0]}, which the estate does not name; add it to profile: (${t.profile.join(', ') || 'none'})`);
     return { id: x.id, name: x.name, kind: x.kind, ...(x.parent ? { parent: x.parent } : {}), ...(x.steward ? { steward: x.steward } : {}), facets: x.facets, ...(x.url ? { url: x.url } : {}), profile: Object.fromEntries(stated.sort(([a], [b]) => a.localeCompare(b))) };
   });
-  return { setting, scopes, workspaces: new Map(Object.entries(t.workspaces ?? {})) };
+  const named = Object.entries(t.workspaces ?? {});
+  return {
+    setting,
+    scopes,
+    workspaces: new Map(named.flatMap(([slug, v]) => (typeof v === 'string' ? [[slug, v] as const] : v.owner ? [[slug, v.owner] as const] : []))),
+    programs: new Map(named.flatMap(([slug, v]) => (typeof v === 'string' ? [] : [[slug, v.program] as const]))),
+  };
 }
 
 /** Refuses a tree an author keeps that does not hold together: an id twice, a parent that is not there, or a loop. */

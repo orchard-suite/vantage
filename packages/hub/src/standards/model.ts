@@ -16,6 +16,15 @@ export type ScopeKey = string;
 export const scopeName = (key: ScopeKey): string => (key === '' ? ESTATE : key);
 export const scopeKey = (name: string): ScopeKey => (name === ESTATE ? '' : name);
 
+/** Joins a workspace's owner and the program it serves in the key of the edition that binds it (VAN-3017). */
+export const PAIR = '+';
+
+/** The key of the edition that binds a workspace: its owner's, or its owner and program's. */
+export const bindingKey = (owner: ScopeKey, program: string | null): ScopeKey => (program === null ? owner : `${scopeName(owner)}${PAIR}${program}`);
+
+/** The same, as an address names it after standard/. */
+export const bindingName = (owner: string | null, program: string | null): string => scopeName(bindingKey(owner ?? '', program));
+
 /** One line of a standard: a record's position, where it came from, and how it reached this scope. */
 export interface StandardLine {
   /** The record's id, which survives a move. */
@@ -34,6 +43,12 @@ export interface StandardLine {
   /** The facet that brought it in from elsewhere in the tree, when one did. */
   readonly facet?: string;
   readonly position: Position;
+  /** The lines its record departs from, by record id; absent when none (VAN-3019). */
+  readonly departs?: readonly string[];
+  /** The open conflict that holds this line back here under the clash rule, by number; absent while it is in force. */
+  readonly held?: number;
+  /** The program it binds a workspace through, in an owner and program edition; absent when it came through the owner. */
+  readonly program?: ScopeKey;
 }
 
 export const PACK_ORIGINS = ['starter', 'estate'] as const;
@@ -68,11 +83,24 @@ export interface PagePin {
 /** An exception in force (VAN-3020). None is granted until exceptions are records. */
 export type ExceptionPin = never;
 
+/** An open conflict between two lines of an edition, and which one holds under the clash rule. */
+export interface ConflictPin {
+  readonly conflict: number;
+  /** The two lines' citations. */
+  readonly lines: readonly [string, string];
+  /** The citation of the line that holds, or both while the ruling waits. */
+  readonly holds: string;
+}
+
+export const BOTH = 'both';
+
 export interface EditionBody {
   readonly lines: readonly StandardLine[];
   readonly packs: readonly PackPin[];
   readonly exceptions: readonly ExceptionPin[];
   readonly pages: readonly PagePin[];
+  /** Present only when a conflict is open, so an edition with none keeps its hash. */
+  readonly conflicts?: readonly ConflictPin[];
 }
 
 export const EMPTY_BODY: EditionBody = { lines: [], packs: [], exceptions: [], pages: [] };

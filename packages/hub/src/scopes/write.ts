@@ -13,7 +13,7 @@ import { isWorkspaceOwner, requireWorkspace } from '../authz.ts';
 import { badRequest, forbidden } from '../http.ts';
 import { workspaceAt } from '../text/things.ts';
 import { fillFromCatalog } from './catalog.ts';
-import { adoptScopes, listScopes, replaceScopes, setWorkspaceScope, type Scope } from './repo.ts';
+import { adoptScopes, listScopes, replaceScopes, setWorkspaceProgram, setWorkspaceScope, type Scope } from './repo.ts';
 import { setScopeSetting } from './setting.ts';
 import { checkTree, parseScopesText, scopesState, scopesText, scopesVersion, SCOPES } from './text.ts';
 import { rebuildNow } from '../standards/publish.ts';
@@ -77,6 +77,16 @@ export async function writeScopes(ctx: AppContext, p: Principal, text: string, s
     if (want !== null && !ids.has(want)) throw badRequest(`workspace ${slug} names scope ${want}, which is not in the tree`);
     await setWorkspaceScope(ctx.db, p.orgId, ws.id, want);
     said.push(want === null ? `${slug} belongs to the whole estate` : `${slug} belongs to ${want}`);
+  }
+  for (const slug of new Set([...now.programs.keys(), ...next.programs.keys()])) {
+    const want = next.programs.get(slug) ?? null;
+    if ((now.programs.get(slug) ?? null) === want) continue;
+    const ws = await workspaceAt(ctx, p, slug, 'author');
+    if (!isWorkspaceOwner(p, ws)) throw forbidden(`only the owner of ${slug} or an admin sets the program it serves`);
+    if (want !== null && !ids.has(want)) throw badRequest(`workspace ${slug} serves program ${want}, which is not in the tree`);
+    if (want !== null && want === (next.workspaces.get(slug) ?? null)) throw badRequest(`workspace ${slug} names ${want} as its owner and its program; a workspace serves a program it does not belong to, or names it only as its owner`);
+    await setWorkspaceProgram(ctx.db, p.orgId, ws.id, want);
+    said.push(want === null ? `${slug} serves no program` : `${slug} serves ${want}`);
   }
   const version = await scopesVersion(scopesText(await scopesState(ctx, p)));
   if (!said.length) return { status: 'unchanged', version, message: `unchanged: ${SCOPES} is still version ${version}` };

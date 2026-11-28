@@ -97,6 +97,8 @@ export async function importDecisions(ctx: AppContext, p: Principal, prefix: str
         related: [],
         position: null,
         supersedes_id: null,
+        amends: [],
+        inherits: [],
         created_by: p.userId,
       });
     }

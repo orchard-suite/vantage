@@ -64,13 +64,17 @@ export type Alternative = z.infer<typeof AlternativeSchema>;
 export const LINE_MAX = 200;
 
 const Word = z.string().trim().min(1).max(40);
+
+/** The longest a facet may be, on a scope and in a line's reach: room for a role prefix and a 40 character key, as a catalog names its teams. */
+export const FACET_MAX = 100;
+const Facet = z.string().trim().min(1).max(FACET_MAX);
 const Ref = z.string().trim().min(1).max(300);
 
 /** Where a line reaches: its own scope, the scopes below unless `below` is false, every scope that carries one of its facets, and, inside a repository, the paths it names. */
 export const ReachSchema = z
   .object({
     below: z.boolean().default(true).describe('Whether the scopes below its own are bound too'),
-    facets: z.array(Word).max(20).default([]).describe('Scopes elsewhere in the tree that carry one of these facets are bound too'),
+    facets: z.array(Facet).max(20).default([]).describe('Scopes elsewhere in the tree that carry one of these facets are bound too'),
     paths: z.array(Ref).max(50).default([]).describe('Inside a repository, the paths the line binds; none is the whole repository'),
   })
   .strict();
@@ -94,6 +98,32 @@ export const PositionSchema = z
 export type Position = z.output<typeof PositionSchema>;
 export type PositionInput = z.input<typeof PositionSchema>;
 
+/** How a record stands against a line it inherits (VAN-3019): it builds to it, refines it with a stricter line, or departs from it. */
+export const STANCES = ['builds', 'refines', 'departs'] as const;
+export type Stance = (typeof STANCES)[number];
+
+/** One entry of a record's map of inherited lines, as a writer sends it. */
+export const InheritSchema = z
+  .object({
+    line: Ref.describe('The record that sets the inherited line: PAY-3001'),
+    stance: z.enum(STANCES).describe('builds, refines (a stricter line of its own), or departs (needs an exception)'),
+    edition: z
+      .string()
+      .trim()
+      .regex(/^[^@\s]+@\d+$/, 'an edition is <scope>@<n>, as standard/<scope> names it')
+      .describe("The edition of the record's own scope it read: payments@4"),
+  })
+  .strict();
+export type InheritInput = z.infer<typeof InheritSchema>;
+
+/** An inherited line as a record keeps it: the line's record by id, so a move keeps it. */
+export interface Inherit {
+  readonly line: string;
+  readonly stance: Stance;
+  readonly scope: string;
+  readonly version: number;
+}
+
 /** A box or a view a record governs: `document` is `workspace/document`, or a document slug in the registry's own workspace. */
 export const GovernsSchema = z
   .object({
@@ -116,6 +146,8 @@ const fields = {
   related: z.array(z.string().trim().min(1)).max(50),
   position: PositionSchema.nullable(),
   governs: z.array(GovernsSchema).max(200),
+  amends: z.array(z.string().trim().min(1)).max(50),
+  inherits: z.array(InheritSchema).max(100),
 };
 
 export const DecisionCreateSchema = z
@@ -131,6 +163,8 @@ export const DecisionCreateSchema = z
     related: fields.related.default([]),
     position: fields.position.optional(),
     governs: fields.governs.default([]),
+    amends: fields.amends.default([]),
+    inherits: fields.inherits.default([]),
   })
   .strict();
 export type DecisionCreate = z.input<typeof DecisionCreateSchema>;
@@ -149,6 +183,8 @@ export const DecisionPatchSchema = z
     related: fields.related.optional(),
     position: fields.position.optional(),
     governs: fields.governs.optional(),
+    amends: fields.amends.optional(),
+    inherits: fields.inherits.optional(),
     /** The record in the same registry that replaced this one, for a record superseded with none named. */
     supersededBy: z.string().trim().min(1).max(40).optional(),
     /** The record this one replaced, when that record is superseded with no successor named. */
@@ -214,6 +250,13 @@ export interface Decision {
   readonly position: Position | null;
   readonly supersedes: DecisionStub | null;
   readonly supersededBy: DecisionStub | null;
+  readonly amends: readonly DecisionStub[];
+  /** Its map of inherited lines (VAN-3019). */
+  readonly inherits: readonly { readonly line: DecisionStub; readonly stance: Stance; readonly edition: string }[];
+  /** The other ends of typed relations, kept by the records that name this one. */
+  readonly amendedBy: readonly DecisionStub[];
+  readonly refinedBy: readonly DecisionStub[];
+  readonly departedBy: readonly DecisionStub[];
   readonly governs: readonly Governs[];
 }
 

@@ -106,6 +106,13 @@ a record each.
   binding word, who it binds; `guide#standards`). The hub builds the
   scope's standard from these and publishes it at once. A one-off choice
   has none. Say how it stands against another standard in its Context.
+- **Inherits**: read `standard/<scope>` for the record's own scope, and
+  mark each line there it touches in `inherits:` as `builds`, `refines`
+  (a stricter line of its own), or `departs`, with the edition you read
+  (`checkout@4`). A record that departs stays `proposed` until the line's
+  steward grants an exception. Two lines that cannot both hold are a
+  conflict: write it to `conflicts` (`guide#standards`). A record that
+  changes part of another names it in `amends:`.
 - **Cite it where it applies.** Add the record to the `decisions:` list of
   each box it is about, and cite it in the pages that explain those parts
   (`[[decision:SHOP-2001]]`). The hub indexes these citations: they are

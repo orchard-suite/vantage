@@ -29,6 +29,7 @@ import { SCOPES } from '../scopes/text.ts';
 import { refuseStandardWrite, writeStandardSettings } from '../standards/write.ts';
 import { refuseScopeWrite } from '../scopes/profile.ts';
 import { STANDARD } from '../standards/text.ts';
+import { CONFLICTS, flagConflict, ruleConflict } from '../standards/conflicts.ts';
 
 export interface ChangeResult {
   /** The thing as the hub names it now; a new record's is the citation it was given. */
@@ -130,6 +131,15 @@ async function commitStandard(ctx: AppContext, p: Principal, text: string, opts:
   return { address: STANDARD, status: r.status, version: r.version, message: r.message };
 }
 
+async function commitConflict(ctx: AppContext, p: Principal, n: number | undefined, text: string, opts: ChangeOptions): Promise<ChangeResult> {
+  if (n === undefined) {
+    const r = await flagConflict(ctx, p, text, opts.surface);
+    return { address: `${CONFLICTS}/${r.number}`, status: 'created', version: String(r.number), message: r.message };
+  }
+  const r = await ruleConflict(ctx, p, n, text, opts.surface);
+  return { address: `${CONFLICTS}/${n}`, status: r.status, version: String(n), message: r.message };
+}
+
 async function settle(run: () => Promise<ChangeResult>, address: string, topic: Topic): Promise<ChangeResult> {
   try {
     return await run();
@@ -153,6 +163,7 @@ export async function write(ctx: AppContext, p: Principal, writes: readonly Writ
   const refused: ChangeResult[] = [];
   let scopes: string | undefined;
   let standard: string | undefined;
+  const conflicts: { number: number | undefined; text: string; address: string }[] = [];
   const docWork = (workspace: string, slug: string | undefined): DocumentWork => {
     const key = `${workspace}/${slug ?? ''}`;
     let w = docs.get(key);
@@ -177,6 +188,8 @@ export async function write(ctx: AppContext, p: Principal, writes: readonly Writ
       else if (a.kind === 'standards') standard = x.text;
       else if (a.kind === 'standard') refuseStandardWrite(x.address);
       else if (a.kind === 'scope') refuseScopeWrite(x.address);
+      else if (a.kind === 'conflicts') conflicts.push({ number: undefined, text: x.text, address: x.address });
+      else if (a.kind === 'conflict') conflicts.push({ number: a.number, text: x.text, address: x.address });
       else throw badRequest(`${x.address} is not a thing a write can make`);
     } catch (err) {
       refused.push({ address: x.address, status: 'refused', message: `${x.address} was not saved: ${taught(err, 'working-in-a-hub')}` });
@@ -190,6 +203,7 @@ export async function write(ctx: AppContext, p: Principal, writes: readonly Writ
   for (const i of items) out.push(await settle(() => commitItem(ctx, p, i.target, i.text, i.base), i.address, 'working-with-items'));
   if (scopes !== undefined) out.push(await settle(() => commitScopes(ctx, p, scopes!, opts), SCOPES, 'scopes-and-owners'));
   if (standard !== undefined) out.push(await settle(() => commitStandard(ctx, p, standard!, opts), STANDARD, 'standards'));
+  for (const c of conflicts) out.push(await settle(() => commitConflict(ctx, p, c.number, c.text, opts), c.address, 'standards'));
   return out;
 }
 
@@ -235,7 +249,7 @@ function swap(text: string, e: Edit, range: Range | undefined, where: string): s
 }
 
 interface Open {
-  readonly kind: 'document' | 'record' | 'item' | 'scopes' | 'standards';
+  readonly kind: 'document' | 'record' | 'item' | 'scopes' | 'standards' | 'conflict';
   readonly key: string;
   failed?: string;
   doc?: { at: DocumentAt; yaml: string; pages: Map<string, string>; touched: Set<string>; yamlTouched: boolean };
@@ -249,11 +263,14 @@ export async function patch(ctx: AppContext, p: Principal, edits: readonly Edit[
   const thing = async (a: Address): Promise<Open> => {
     if (a.kind === 'standard') refuseStandardWrite(thingAddress(a));
     if (a.kind === 'scope') refuseScopeWrite(thingAddress(a));
-    if (a.kind !== 'document' && a.kind !== 'page' && a.kind !== 'record' && a.kind !== 'item' && a.kind !== 'scopes' && a.kind !== 'standards') throw badRequest('a patch changes a document, a page, a record, an item, the scope tree, or the standard settings; a new thing is a vantage_write');
-    const key = a.kind === 'record' ? a.ref : a.kind === 'item' ? a.key : a.kind === 'scopes' ? SCOPES : a.kind === 'standards' ? STANDARD : `${a.workspace}/${a.document}`;
+    if (a.kind !== 'document' && a.kind !== 'page' && a.kind !== 'record' && a.kind !== 'item' && a.kind !== 'scopes' && a.kind !== 'standards' && a.kind !== 'conflict') throw badRequest('a patch changes a document, a page, a record, an item, the scope tree, the standard settings, or a conflict; a new thing is a vantage_write');
+    const key = a.kind === 'record' ? a.ref : a.kind === 'item' ? a.key : a.kind === 'scopes' ? SCOPES : a.kind === 'standards' ? STANDARD : a.kind === 'conflict' ? `${CONFLICTS}/${a.number}` : `${a.workspace}/${a.document}`;
     let o = open.get(key);
     if (o) return o;
-    if (a.kind === 'scopes' || a.kind === 'standards') {
+    if (a.kind === 'conflict') {
+      const current = (await readThing(ctx, p, a)).text;
+      o = { kind: 'conflict', key, record: { text: current, current } };
+    } else if (a.kind === 'scopes' || a.kind === 'standards') {
       const current = (await readThing(ctx, p, a)).text;
       o = { kind: a.kind, key, record: { text: current, current } };
     } else if (a.kind === 'item') {
@@ -289,8 +306,8 @@ export async function patch(ctx: AppContext, p: Principal, edits: readonly Edit[
           if (!path) throw badRequest('set, add, and remove take a path: workspaces.shop');
           r.text = applyEdits(r.text, [EditOperationSchema.parse({ op: e.op, path, ...(e.op === 'remove' ? {} : { value: e.value }) })]);
         } else r.text = swap(r.text, e, part ? lineRange(part, r.text.split('\n').length) ?? pathLines(r.text, part) ?? missing(o.key, part) : undefined, e.address);
-      } else if (a.kind === 'record' || a.kind === 'item') {
-        if (e.op) throw badRequest("a record or an item changes by old and new; its header's fields are text too (status: proposed)");
+      } else if (a.kind === 'record' || a.kind === 'item' || a.kind === 'conflict') {
+        if (e.op) throw badRequest("a record, an item, or a conflict changes by old and new; its header's fields are text too (status: proposed)");
         const r = o.record!;
         r.text = swap(r.text, e, part ? markdownRange(r.text, part) ?? missing(o.key, part) : undefined, e.address);
       } else if (a.kind === 'page') {
@@ -339,6 +356,11 @@ export async function patch(ctx: AppContext, p: Principal, edits: readonly Edit[
     if (o.kind === 'standards') {
       const r = o.record!;
       out.push(await settle(() => commitStandard(ctx, p, r.text, opts), STANDARD, 'standards'));
+      continue;
+    }
+    if (o.kind === 'conflict') {
+      const r = o.record!;
+      out.push(await settle(() => commitConflict(ctx, p, Number(o.key.slice(CONFLICTS.length + 1)), r.text, opts), o.key, 'standards'));
       continue;
     }
     if (o.kind === 'item') {

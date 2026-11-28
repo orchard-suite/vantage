@@ -7,7 +7,7 @@ import type { Db } from '../db/db.ts';
 import { maybe } from '../db/db.ts';
 import { randomId } from '../crypto.ts';
 import { parseDecisionRef, qualifiedRef } from '@vantage/model';
-import type { Alternative, Category, DecisionStatus, DecisionStub, Position } from './types.ts';
+import type { Alternative, Category, DecisionStatus, DecisionStub, Inherit, Position } from './types.ts';
 
 export interface RegistryRow {
   readonly id: string;
@@ -39,6 +39,8 @@ export interface DecisionRow {
   readonly position: Position | null;
   readonly supersedes_id: string | null;
   readonly superseded_by_id: string | null;
+  readonly amends: string[];
+  readonly inherits: Inherit[];
   readonly created_at: Date;
   readonly updated_at: Date;
 }
@@ -105,6 +107,15 @@ export async function lockRegistry(tx: Db, registryId: string): Promise<void> {
 
 export async function placedById(db: Db, orgId: string, id: string): Promise<PlacedRow | undefined> {
   return maybe<PlacedRow>(db, `${PLACED} where d.org_id = $1 and d.id = $2`, [orgId, id]);
+}
+
+/** The records whose typed relations name any of `ids`: an amends entry, or a refines or departs stance in their map. */
+export async function relatedTo(db: Db, orgId: string, ids: readonly string[]): Promise<PlacedRow[]> {
+  if (!ids.length) return [];
+  return db.query<PlacedRow>(
+    `${PLACED} where d.org_id = $1 and (d.amends ?| $2::text[] or exists (select 1 from jsonb_array_elements(d.inherits) e where e->>'line' = any($2::text[]) and e->>'stance' <> 'builds'))`,
+    [orgId, [...ids]],
+  );
 }
 
 export async function placedByIds(db: Db, orgId: string, ids: readonly string[]): Promise<PlacedRow[]> {
@@ -239,23 +250,25 @@ export interface NewDecisionRow {
   readonly related: readonly string[];
   readonly position: Position | null;
   readonly supersedes_id: string | null;
+  readonly amends: readonly string[];
+  readonly inherits: readonly Inherit[];
   readonly created_by: string | null;
 }
 
 export async function insertDecision(db: Db, r: NewDecisionRow): Promise<void> {
   await db.query(
-    `insert into decisions (id, org_id, registry_id, number, category, title, status, decided_on, updated_on, deciders, context, decision, consequences, alternatives, related, position, supersedes_id, created_by)
-     values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18)`,
-    [r.id, r.org_id, r.registry_id, r.number, r.category, r.title, r.status, r.decided_on, r.updated_on, JSON.stringify(r.deciders), r.context, r.decision, r.consequences, JSON.stringify(r.alternatives), JSON.stringify(r.related), r.position ? JSON.stringify(r.position) : null, r.supersedes_id, r.created_by],
+    `insert into decisions (id, org_id, registry_id, number, category, title, status, decided_on, updated_on, deciders, context, decision, consequences, alternatives, related, position, supersedes_id, amends, inherits, created_by)
+     values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20)`,
+    [r.id, r.org_id, r.registry_id, r.number, r.category, r.title, r.status, r.decided_on, r.updated_on, JSON.stringify(r.deciders), r.context, r.decision, r.consequences, JSON.stringify(r.alternatives), JSON.stringify(r.related), r.position ? JSON.stringify(r.position) : null, r.supersedes_id, JSON.stringify(r.amends), JSON.stringify(r.inherits), r.created_by],
   );
 }
 
-export type DecisionFields = Pick<DecisionRow, 'title' | 'status' | 'decided_on' | 'updated_on' | 'deciders' | 'context' | 'decision' | 'consequences' | 'alternatives' | 'related' | 'position' | 'superseded_by_id' | 'supersedes_id'>;
+export type DecisionFields = Pick<DecisionRow, 'title' | 'status' | 'decided_on' | 'updated_on' | 'deciders' | 'context' | 'decision' | 'consequences' | 'alternatives' | 'related' | 'position' | 'superseded_by_id' | 'supersedes_id' | 'amends' | 'inherits'>;
 
 export async function updateDecisionRow(db: Db, id: string, f: DecisionFields): Promise<void> {
   await db.query(
-    `update decisions set title = $2, status = $3, decided_on = $4, updated_on = $5, deciders = $6, context = $7, decision = $8, consequences = $9, alternatives = $10, related = $11, position = $12, superseded_by_id = $13, supersedes_id = $14, updated_at = now() where id = $1`,
-    [id, f.title, f.status, f.decided_on, f.updated_on, JSON.stringify(f.deciders), f.context, f.decision, f.consequences, JSON.stringify(f.alternatives), JSON.stringify(f.related), f.position ? JSON.stringify(f.position) : null, f.superseded_by_id, f.supersedes_id],
+    `update decisions set title = $2, status = $3, decided_on = $4, updated_on = $5, deciders = $6, context = $7, decision = $8, consequences = $9, alternatives = $10, related = $11, position = $12, superseded_by_id = $13, supersedes_id = $14, amends = $15, inherits = $16, updated_at = now() where id = $1`,
+    [id, f.title, f.status, f.decided_on, f.updated_on, JSON.stringify(f.deciders), f.context, f.decision, f.consequences, JSON.stringify(f.alternatives), JSON.stringify(f.related), f.position ? JSON.stringify(f.position) : null, f.superseded_by_id, f.supersedes_id, JSON.stringify(f.amends), JSON.stringify(f.inherits)],
   );
 }
 

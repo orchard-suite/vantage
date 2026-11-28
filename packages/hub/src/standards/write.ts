@@ -14,6 +14,7 @@ import { actsFor } from './steward.ts';
 import { listScopes } from '../scopes/repo.ts';
 import { scopeSetting } from '../scopes/setting.ts';
 import { sha256 } from '../crypto.ts';
+import { kindByPrefix } from '../tracking/kinds.ts';
 import { ESTATE } from './model.ts';
 import { rebuildStandards, type Built } from './publish.ts';
 import { lockStandards } from './repo.ts';
@@ -34,11 +35,12 @@ export async function writeStandardSettings(ctx: AppContext, p: Principal, text:
   const next = parseSettingsText(text);
   const now = await standardSetting(ctx.db, p.orgId);
   const said: string[] = [];
-  for (const k of ['bindings', 'binds', 'steward_gate', 'withhold'] as const) {
+  for (const k of ['bindings', 'binds', 'steward_gate', 'withhold', 'clash', 'ranked', 'checks'] as const) {
     if (same(now[k], next[k])) continue;
     if (!p.admin) throw forbidden(`only an admin changes ${STANDARD}#${k}`);
     said.push(`${k} set`);
   }
+  if (next.checks !== undefined && next.checks !== now.checks && !(await kindByPrefix(ctx.db, p.orgId, next.checks))) throw badRequest(`checks: no kind ${next.checks}; name a kind of tracked items, built on base: work-item, for the hub to file its checking into (guide#kinds-and-items)`);
   const tree = await listScopes(ctx.db, p.orgId, (await scopeSetting(ctx.db, p.orgId)).source);
   const stewards = new Map(tree.map((s) => [s.id, s.steward]));
   for (const name of new Set([...Object.keys(now.packs), ...Object.keys(next.packs)])) {

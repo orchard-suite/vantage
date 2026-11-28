@@ -1302,6 +1302,13 @@ A record you read also starts with `record:`, its citation, and `id:`, its
 machine form (`adr:<ULID>`). Both are read-only: a write ignores them. The
 `id` is what a record is known by outside the hub, for its whole life.
 
+Relations have types. `related:` and `amends:` are lists of citations;
+`inherits:` says how the record stands against the lines that reach its
+scope (guide#standards); `supersedes:` and `superseded_by:` link a
+replacement. The other record shows each one back as `amended_by:`,
+`refined_by:`, `departed_by:`, or `superseded_by:`; only the record that
+names the link changes it.
+
 - Search first: `vantage_find` with `in: SHOP`, or `vantage_outline SHOP`
   for every record in a line each (`SHOP#3` for one category,
   `SHOP#accepted` for one status). One decision per record.
@@ -1626,6 +1633,7 @@ scopes:
       description: Payments moves money in and out.   # optional; one left out is inherited
 workspaces:
   shop: payments         # a workspace not listed belongs to the whole estate
+  risk-infra: { owner: platform, program: risk }   # an owner, and the program it serves
 ```
 
 - `vantage_outline scopes` answers the tree indented by depth, with each
@@ -1642,6 +1650,18 @@ workspaces:
 - A workspace's owner sets its scope with one line under `workspaces`:
   `vantage_patch` with `op: set, path: workspaces.shop, value: payments`.
   Remove the line and the workspace belongs to the whole estate again.
+- A workspace may also name the program it serves, as `{ owner, program }`.
+  The program is a second axis, never a second parent: the owner's chain
+  gives every line that reaches the owner, and the program adds its own
+  lines and the lines that reach it by facet, never its ancestors'. Each
+  part of a program with a different owner is its own workspace, so its
+  infrastructure takes the platform's standard and its software the
+  development department's, and both share the program's lines. The
+  workspace's outline shows the program, its profile, and the edition
+  that binds it: `standard/<owner>+<program>`.
+- A facet is at most 100 characters, on a scope and in a line's
+  `reach.facets` alike. A catalog facet past that is kept aside, and the
+  tree's outline names it.
 - Only an admin changes the tree or its source. A scope id is there once,
   a parent must be in the tree, and a scope is never its own ancestor.
 - With `source: catalog`, the tree is the catalog's:
@@ -1728,6 +1748,64 @@ position:
   above publishes at once.
 - `standard/<scope>` is never written: change the record's position, or
   the packs at `standard`.
+
+### Inherited lines, departures, and conflicts
+
+Every line that reaches a scope applies at once: its own, every ancestor's,
+and every line whose facets it carries. No chain outranks another, so a
+local line never overrides a wider one.
+
+- A record says how it stands against each inherited line it touches, with
+  the edition that binds its workspace (its owner's, or
+  `<owner>+<program>` when it serves a program; its outline says which):
+
+  ```yaml
+  inherits:
+    - { line: ORG-2001, stance: builds, edition: checkout@4 }   # built to it
+    - { line: FIN-3001, stance: refines, edition: checkout@4 }  # a stricter line of its own
+    - { line: PAY-3001, stance: departs, edition: checkout@4 }  # needs an exception
+  ```
+
+  The line must be in that edition. A refinement carries a position whose
+  binding word is at least as strict (no later in `bindings`); a weaker
+  one is a departure. Both lines stay in force.
+- A record that departs may be proposed. It is accepted only with an
+  exception in force from that line's steward; until then the hub refuses
+  the acceptance and says so. The machine gate refuses an edition whose
+  line departs with no exception.
+- Two lines that reach one scope and cannot both hold are a conflict. Flag
+  it with a `vantage_write` to `conflicts`:
+
+  ```markdown
+  ---
+  lines: [PAY-3001, FIN-3001]
+  scope: payments
+  ---
+
+  A weekly settlement cannot be reconciled daily.
+  ```
+
+  The hub names the nearest scope at or above both lines' own scopes and
+  its steward. In an `<owner>+<program>` edition, a clash between a line
+  that came through the program and one that came through the owner goes
+  to the steward of each line's own scope, and either rules. `vantage_outline conflicts` lists them, open first;
+  `vantage_read conflicts/<n>` reads one. That steward or an admin rules
+  with a `vantage_patch` of its header: add `ruling:` (`change`, `narrow`,
+  or `exception`, with `exception:` naming it) and `note:`. A ruled
+  conflict closes; nothing else of a conflict changes.
+- Until the ruling, the setting `clash` at `standard` decides: `hold` (the
+  default) keeps both lines, and a record of that scope or below that
+  marks either line waits as proposed; `stricter` holds the line with the
+  earlier binding word; `ranked` holds the line whose own scope or an
+  ancestor of it comes first in `ranked:`. A line held back reads `held
+  back by conflicts/<n>`, and the edition lists its open conflicts under
+  `## Conflicts`.
+- The hub files the checking when `checks:` at `standard` names a kind
+  (built on `work-item`): an item for each record whose `inherits` marks a
+  line its scope's new edition changed or took out, one for each line
+  newly accepted, to check against the lines that reach the same scopes
+  and facets, and one for each conflict, held by its steward. Take them
+  from the queue; close one when the line holds, or flag a conflict.
 
 ## Voice walkthroughs in a hub
 

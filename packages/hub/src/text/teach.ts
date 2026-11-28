@@ -23,6 +23,8 @@ export function topicOf(a: Pick<Address, 'kind'> | undefined): Topic {
       return 'scopes-and-owners';
     case 'standards':
     case 'standard':
+    case 'conflicts':
+    case 'conflict':
       return 'standards';
     default:
       return 'working-in-a-hub';

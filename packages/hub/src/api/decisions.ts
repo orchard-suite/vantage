@@ -32,6 +32,8 @@ const PATCH_FIELDS: Record<string, string> = {
   related: 'optional: record citations',
   position: 'optional: {line, binding, binds, locked, reach, enforced_by, checked_by}, or null',
   governs: 'optional: [{document, box | view}]',
+  amends: 'optional: record citations this one amends',
+  inherits: 'optional: [{line, stance: builds | refines | departs, edition: <scope>@<n>}], the lines it inherits and how it stands against each',
   supersededBy: 'optional: the record of the same registry that replaced this one; only while it names none',
   supersedes: 'optional: the superseded record this one replaced; only while that record names no successor',
 };
