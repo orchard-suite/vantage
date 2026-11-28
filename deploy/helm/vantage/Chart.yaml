@@ -3,7 +3,7 @@ name: vantage
 description: The Vantage diagram hub - a web tier, a render worker, Postgres, and storage for rendered files.
 type: application
 # Both move with every release of the image.
-version: 4.13.1 # x-release-please-version
-appVersion: "4.13.1" # x-release-please-version
+version: 4.14.0 # x-release-please-version
+appVersion: "4.14.0" # x-release-please-version
 keywords: [diagrams, architecture, gitops]
 home: https://github.com/orchard-suite/vantage

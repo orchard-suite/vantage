@@ -2,6 +2,12 @@
 
 All notable changes to this project will be documented in this file.
 
+## [4.14.0](https://github.com/orchard-suite/vantage/compare/v4.13.1...v4.14.0) (2026-11-28)
+
+### Features
+
+* **vantage:** add kind bases and due dates ([4e4265a](https://github.com/orchard-suite/vantage/commit/4e4265a2a3c2582992ebee2fa2e8165938fe1016))
+
 ## [4.13.1](https://github.com/orchard-suite/vantage/compare/v4.13.0...v4.13.1) (2026-11-28)
 
 ### Bug Fixes
