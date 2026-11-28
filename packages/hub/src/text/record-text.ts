@@ -7,7 +7,7 @@
  */
 import { parse as parseYaml, stringify } from 'yaml';
 import { badRequest } from '../http.ts';
-import { STANCES, type Alternative, type Decision, type DecisionCreate, type DecisionPatch, type DecisionStatus, type GovernsInput, type Stance } from '../decisions/types.ts';
+import { PositionSchema, type Alternative, type Decision, type DecisionCreate, type DecisionPatch, type DecisionStatus, type GovernsInput, type Position } from '../decisions/types.ts';
 
 const SECTIONS = ['Context', 'Decision', 'Consequences', 'Alternatives considered'] as const;
 
@@ -19,7 +19,7 @@ export interface RecordFields {
   readonly decidedOn: string | undefined;
   readonly updatedOn: string | undefined;
   readonly deciders: readonly string[];
-  readonly alignment: { stance: Stance; rule?: string; note?: string } | null;
+  readonly position: Position | null;
   readonly related: readonly string[];
   readonly governs: readonly GovernsInput[];
   readonly context: string;
@@ -29,6 +29,29 @@ export interface RecordFields {
 }
 
 const governsText = (g: { workspace?: string; document: string; box?: string | undefined; view?: string | undefined }): string => `${g.workspace ? `${g.workspace}/` : ''}${g.document} ${g.box !== undefined ? `box ${g.box}` : `view ${g.view}`}`;
+
+/** A position as the header writes it: the line, its binding word, and who it binds, then only what differs from the defaults. */
+function positionHeader(x: Position): Record<string, unknown> {
+  const r = x.reach;
+  const reach = { ...(r.below ? {} : { below: false }), ...(r.facets.length ? { facets: [...r.facets] } : {}), ...(r.paths.length ? { paths: [...r.paths] } : {}) };
+  return {
+    line: x.line,
+    binding: x.binding,
+    binds: [...x.binds],
+    ...(x.locked ? { locked: true } : {}),
+    ...(Object.keys(reach).length ? { reach } : {}),
+    ...(x.enforced_by.length ? { enforced_by: [...x.enforced_by] } : {}),
+    ...(x.checked_by.length ? { checked_by: [...x.checked_by] } : {}),
+  };
+}
+
+/** Reads a header's position block; the schema fills its defaults, so two texts that say the same compare equal. */
+function positionOf(value: unknown): Position | null {
+  if (value === undefined || value === null) return null;
+  const r = PositionSchema.safeParse(value);
+  if (!r.success) throw badRequest(`position does not read: ${r.error.issues.map((i) => `${['position', ...i.path].join('.')}: ${i.message}`).join('; ')} (guide#standards)`);
+  return r.data;
+}
 
 export function recordText(d: Decision): string {
   const header: Record<string, unknown> = {
@@ -40,7 +63,7 @@ export function recordText(d: Decision): string {
     ...(d.decidedOn ? { decided: d.decidedOn } : {}),
     updated: d.updatedOn,
     deciders: [...d.deciders],
-    ...(d.alignment ? { alignment: { stance: d.alignment.stance, ...(d.alignment.rule ? { rule: d.alignment.rule } : {}), ...(d.alignment.note ? { note: d.alignment.note } : {}) } } : {}),
+    ...(d.position ? { position: positionHeader(d.position) } : {}),
     ...(d.related.length ? { related: d.related.map((r) => r.ref) } : {}),
     ...(d.governs.length ? { governs: d.governs.map(governsText) } : {}),
     ...(d.supersedes ? { supersedes: d.supersedes.ref } : {}),
@@ -136,8 +159,7 @@ export function parseRecordText(text: string): RecordFields {
     else if (alternatives.length) alternatives[alternatives.length - 1] = { option: alternatives[alternatives.length - 1]!.option, rejected: `${alternatives[alternatives.length - 1]!.rejected}\n${line}` };
     else if (line.trim() && line.trim() !== '_None recorded._') throw badRequest('under ## Alternatives considered, each option is a ### heading with why it was rejected below it');
   }
-  const a = header['alignment'] as { stance?: unknown; rule?: unknown; note?: unknown } | undefined | null;
-  if (a && !STANCES.includes(a.stance as Stance)) throw badRequest(`alignment.stance is one of ${STANCES.join(', ')}`);
+  if (header['alignment'] !== undefined) throw badRequest('alignment is retired: say how the record stands against another standard in its Context, and give the line it sets for its own scope as position: (guide#standards)');
   const status = String(header['status'] ?? 'accepted').toLowerCase() as DecisionStatus;
   return {
     title: String(header['title'] ?? '').trim(),
@@ -146,7 +168,7 @@ export function parseRecordText(text: string): RecordFields {
     decidedOn: day(header['decided']),
     updatedOn: day(header['updated']),
     deciders: strings(header['deciders'], 'deciders'),
-    alignment: a ? { stance: a.stance as Stance, ...(a.rule ? { rule: String(a.rule) } : {}), ...(a.note ? { note: String(a.note) } : {}) } : null,
+    position: positionOf(header['position']),
     related: strings(header['related'], 'related'),
     governs: governsOf(header['governs']),
     context: section('Context'),
@@ -168,7 +190,7 @@ export function changedFields(current: RecordFields, next: RecordFields): Decisi
   if (next.decidedOn !== current.decidedOn && next.decidedOn !== undefined) patch['decidedOn'] = next.decidedOn;
   if (next.updatedOn !== current.updatedOn && next.updatedOn !== undefined) patch['updatedOn'] = next.updatedOn;
   if (!same(next.deciders, current.deciders)) patch['deciders'] = next.deciders;
-  if (!same(next.alignment, current.alignment)) patch['alignment'] = next.alignment;
+  if (!same(next.position, current.position)) patch['position'] = next.position;
   if (!same(next.related, current.related)) patch['related'] = next.related;
   if (!same(next.governs, current.governs)) patch['governs'] = next.governs;
   for (const k of ['context', 'decision', 'consequences'] as const) if (next[k] !== current[k]) patch[k] = next[k];
@@ -193,7 +215,7 @@ export function createInput(f: RecordFields): DecisionCreate {
     consequences: f.consequences,
     alternatives: [...f.alternatives],
     related: [...f.related],
-    ...(f.alignment ? { alignment: f.alignment } : {}),
+    ...(f.position ? { position: f.position } : {}),
     governs: [...f.governs],
   };
 }

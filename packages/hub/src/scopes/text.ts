@@ -14,6 +14,7 @@ import { sha256 } from '../crypto.ts';
 import { badRequest } from '../http.ts';
 import { listScopes, workspaceScopes, type Scope } from './repo.ts';
 import { CatalogSettingSchema, scopeSetting, type ScopeSetting } from './setting.ts';
+import { ESTATE } from '../standards/model.ts';
 
 /** The address of the tree. */
 export const SCOPES = 'scopes';
@@ -88,6 +89,7 @@ export function checkTree(scopes: readonly Scope[]): void {
   const byId = new Map<string, Scope>();
   for (const s of scopes) {
     if (byId.has(s.id)) throw badRequest(`scope ${s.id} is in the tree twice`);
+    if (s.id === ESTATE) throw badRequest(`the scope id ${ESTATE} names the whole estate (standard/${ESTATE}); give the scope another id`);
     byId.set(s.id, s);
   }
   for (const s of scopes) {

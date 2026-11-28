@@ -22,6 +22,7 @@ import { documentUrl } from './backlinks.ts';
 import { present, recordUrl, requireDecision } from './read.ts';
 import { aliasesOf, lockRegistry, placedById, placedByIds, refOf, type PlacedRow } from './repo.ts';
 import { whoOf } from './write.ts';
+import { rebuildStandards } from '../standards/publish.ts';
 
 export const DiscardSchema = z
   .object({
@@ -152,6 +153,7 @@ export async function discardDecision(ctx: AppContext, p: Principal, ref: string
     const record = (await present({ ...ctx, db: tx }, p, [fresh]))[0]!;
     // Its governs links, its revisions, and its own citations go with it.
     await tx.query('delete from decisions where id = $1', [row.id]);
+    await rebuildStandards(ctx, tx, p.orgId, whoOf(p));
     await audit(tx, ctx.log, {
       orgId: p.orgId,
       who: whoOf(p),

@@ -1,7 +1,8 @@
 /**
  * An address names one thing in the hub: a workspace, a document, a page,
  * a registry, a decision record, a kind, an item, the scope tree, the
- * guide, or the schema.
+ * estate's standard settings, one scope's built standard, the guide, or
+ * the schema.
  * A part after `#` names a piece of it. Prefixes are upper case and
  * workspace slugs lower case, so an address needs no type beside it; a
  * prefix is a registry's or a kind's, never both, and placeAddress asks the
@@ -15,6 +16,10 @@ export type Address =
   | { readonly kind: 'guide' | 'schema'; readonly part?: string }
   /** The organization's tree of owner scopes, and the workspace each one owns. */
   | { readonly kind: 'scopes'; readonly part?: string }
+  /** The estate's standard settings, and the root of every scope's standard. */
+  | { readonly kind: 'standards'; readonly part?: string }
+  /** One scope's built standard, `estate` for the whole estate, with `@<n>` for one edition. */
+  | { readonly kind: 'standard'; readonly scope: string; readonly part?: string }
   | { readonly kind: 'workspace'; readonly workspace: string }
   | { readonly kind: 'document'; readonly workspace: string; readonly document: string; readonly part?: string }
   | { readonly kind: 'page'; readonly workspace: string; readonly document: string; readonly page: string; readonly part?: string }
@@ -40,6 +45,8 @@ export function parseAddress(text: string | undefined): Address {
   const withPart = part === undefined ? {} : { part };
   if (head === 'guide' || head === 'schema') return { kind: head, ...withPart };
   if (head === 'scopes') return { kind: 'scopes', ...withPart };
+  if (head === 'standard') return { kind: 'standards', ...withPart };
+  if (head.startsWith('standard/')) return { kind: 'standard', scope: head.slice('standard/'.length), ...withPart };
   if (head.startsWith('adr:') && isUlid(head.slice(4))) return { kind: 'record', ref: head, ...withPart };
   if (RECORD.test(head)) return { kind: 'record', ref: head, ...withPart };
   if (PREFIX_PATTERN.test(head)) return { kind: 'registry', prefix: head, ...withPart };
@@ -63,6 +70,10 @@ export function thingAddress(a: Address): string {
     case 'schema':
     case 'scopes':
       return a.kind;
+    case 'standards':
+      return 'standard';
+    case 'standard':
+      return `standard/${a.scope}`;
     case 'workspace':
       return a.workspace;
     case 'document':

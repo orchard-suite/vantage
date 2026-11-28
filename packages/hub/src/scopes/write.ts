@@ -16,6 +16,8 @@ import { fillFromCatalog } from './catalog.ts';
 import { adoptScopes, listScopes, replaceScopes, setWorkspaceScope, type Scope } from './repo.ts';
 import { sameSetting, setScopeSetting } from './setting.ts';
 import { checkTree, parseScopesText, scopesState, scopesText, scopesVersion, SCOPES } from './text.ts';
+import { rebuildNow } from '../standards/publish.ts';
+import { builtText } from '../standards/write.ts';
 
 export interface ScopesWrite {
   readonly status: 'saved' | 'unchanged';
@@ -73,6 +75,9 @@ export async function writeScopes(ctx: AppContext, p: Principal, text: string, s
   const version = await scopesVersion(scopesText(await scopesState(ctx, p)));
   if (!said.length) return { status: 'unchanged', version, message: `unchanged: ${SCOPES} is still version ${version}` };
   await audit(ctx.db, ctx.log, { orgId: p.orgId, who: whoOf(p), what: 'scopes.write', surface, target: SCOPES, details: { changes: said } });
+  // The tree is what a line reaches down: every scope's standard follows it.
+  const built = await rebuildNow(ctx, p.orgId, whoOf(p));
+  if (built.length) said.push(`built ${builtText(built)}`);
   return { status: 'saved', version, message: `saved ${SCOPES} version ${version}: ${said.join('; ')}` };
 }
 

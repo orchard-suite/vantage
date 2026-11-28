@@ -16,7 +16,9 @@ import { importDecisions } from '../decisions/import-apply.ts';
 import { moveDecision } from '../decisions/move.ts';
 import { discardDecision } from '../decisions/discard.ts';
 import { discardText, importText, moveText, registryLine } from '../decisions/text.ts';
-import { AlignmentSchema, AlternativeSchema, CategoriesSchema, GovernsSchema } from '../decisions/types.ts';
+import { publishEdition } from '../standards/publish.ts';
+import { whoOf } from '../decisions/write.ts';
+import { PositionSchema, AlternativeSchema, CategoriesSchema, GovernsSchema } from '../decisions/types.ts';
 
 
 const Day = z.string().regex(/^\d{4}-\d{2}-\d{2}$/).describe('YYYY-MM-DD, the local date');
@@ -32,7 +34,7 @@ const body = {
   consequences: md('What follows: the benefits and the costs (### Benefits, ### Costs)'),
   alternatives: z.array(AlternativeSchema).optional().describe('Each option not taken, with why it was rejected'),
   related: z.array(z.string()).optional().describe('Related records: SHOP-2001, adr:<ULID>, or ADR-2001 for one in the same registry'),
-  alignment: AlignmentSchema.optional().describe('How the record stands against an outside standard: follows, extends, departs, or new-ground, with the rule id and a short note. Leave out when no standard is in use.'),
+  position: PositionSchema.optional().describe("The line the record sets for its scope's standard: line, binding, binds, and optionally locked, reach, enforced_by, checked_by. Leave out for a one-off choice."),
   governs: z.array(GovernsSchema).optional().describe('Boxes and views the decision governs: { document: "workspace/document", box: "node-id" } or { document, view: "view-id" }. A box shows the records that govern it.'),
 };
 
@@ -81,6 +83,15 @@ export function registerDecisionTools(server: McpServer, ctx: AppContext, p: Pri
       const n = await peekNextNumber(ctx, p, a.registry, a.category);
       return text(`${n.ref} (${n.categoryName})`);
     }),
+  );
+
+  server.registerTool(
+    'vantage_standard_publish',
+    {
+      description: "Publish the edition of a scope's standard that waits for its steward (the steward gate is on). Only the scope's steward or an admin. The scopes below build on it at once. vantage_outline standard/<scope> says whether one waits; vantage_read standard/<scope>@<n> reads it first.",
+      inputSchema: { scope: z.string().min(1).describe('The scope id, or estate for the whole estate') },
+    },
+    guarded<{ scope: string }>('vantage_standard_publish', async (a) => text(await publishEdition(ctx, p, a.scope, whoOf(p)))),
   );
 
   server.registerTool(

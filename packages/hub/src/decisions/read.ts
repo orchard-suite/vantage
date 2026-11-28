@@ -104,7 +104,7 @@ export async function present(ctx: AppContext, p: Principal, rows: readonly Plac
       consequences: row.consequences,
       alternatives: row.alternatives,
       related: row.related.map((id) => stub(id)).filter((x): x is DecisionStub => x !== null),
-      alignment: row.alignment,
+      position: row.position,
       supersedes: stub(row.supersedes_id),
       supersededBy: stub(row.superseded_by_id),
       governs,

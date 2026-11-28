@@ -24,6 +24,7 @@ import { keptAttachments, overlayAttachments, type Attachment } from './assets.t
 import type { FileMerge } from './pages.ts';
 import { indexDocument, movedCitationsOf, type MovedCitation } from '../decisions/citations.ts';
 import { registerKind } from '../tracking/kinds.ts';
+import { rebuildStandards } from '../standards/publish.ts';
 import { checkDocument, refuseErrors } from './check.ts';
 
 
@@ -168,6 +169,8 @@ async function saveInTransaction(ctx: AppContext, input: SaveInput, phases: Phas
     await tx.query("update documents set head_version_id = $2, name = $3, search = to_tsvector('english', $4), bind_sources = $5, updated_at = now() where id = $1", [doc.id, id, name, `${name}${facts.searchAfterName}`, JSON.stringify(binds)]);
     phases.lap('head');
     const moved = await indexDocument(tx, input.orgId, doc.id, id, facts.cites);
+    // A page that cites a line is one of its procedures: the editions that carry it follow the save.
+    await rebuildStandards(ctx, tx, input.orgId, input.who);
     phases.lap('citations');
     // A kind block makes the document a kind the hub enforces; a save that would break one saves nothing.
     await registerKind(tx, { orgId: input.orgId, workspaceId: input.workspaceId, documentId: doc.id, versionId: id, doc: facts.kindDocument });

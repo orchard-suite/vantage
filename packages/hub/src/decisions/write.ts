@@ -21,6 +21,8 @@ import { addRevision, insertDecision, linksOf, insertRegistry, lockRegistry, pat
 import { present, requireDecision, requireRegistry, toRegistry } from './read.ts';
 import { ulid } from './ulid.ts';
 import { indexRecord, resolvePending } from './citations.ts';
+import { rebuildNow, rebuildStandards } from '../standards/publish.ts';
+import { standardSetting } from '../standards/setting.ts';
 import {
   DecisionCreateSchema,
   DecisionPatchSchema,
@@ -31,6 +33,7 @@ import {
   type DecisionCreate,
   type DecisionPatch,
   type GovernsInput,
+  type Position,
   type Registry,
   type RegistryInput,
   type RegistryPatch,
@@ -65,6 +68,8 @@ export async function updateRegistry(ctx: AppContext, p: Principal, prefix: stri
   if (dropped.length) throw badRequest(`records already use categor${dropped.length === 1 ? 'y' : 'ies'} ${dropped.join(', ')}; keep ${dropped.length === 1 ? 'it' : 'them'} in the scheme`);
   const next = await patchRegistry(ctx.db, row.id, { name: v.name ?? row.name, description: v.description ?? row.description, categories });
   await audit(ctx.db, ctx.log, { orgId: p.orgId, who: whoOf(p), what: 'registry.update', surface: p.surface, target: `workspace:${row.workspace_id}`, details: { prefix: row.prefix } });
+  // A category is an area of the standard: a renamed one regroups its lines.
+  if (v.categories) await rebuildNow(ctx, p.orgId, whoOf(p));
   return toRegistry(next, workspace);
 }
 
@@ -121,6 +126,17 @@ export async function remember(ctx: AppContext, tx: Db, p: Principal, rowId: str
   const snapshot = (await present({ ...ctx, db: tx }, p, [row]))[0]!;
   await addRevision(tx, { orgId: p.orgId, decisionId: rowId, snapshot, message, authorUserId: p.userId, surface: p.surface });
   await audit(tx, ctx.log, { orgId: p.orgId, who: whoOf(p), what, surface: p.surface, target: `decision:${rowId}`, details: { ref: refOf(row), message, ...details } });
+  // An acceptance and the edition it changes land together (VAN-3018).
+  await rebuildStandards(ctx, tx, p.orgId, whoOf(p));
+}
+
+/** Refuses a position whose binding word or binds are not on the estate's lists. */
+async function checkPosition(ctx: AppContext, p: Principal, position: Position | null | undefined): Promise<void> {
+  if (!position) return;
+  const s = await standardSetting(ctx.db, p.orgId);
+  if (!s.bindings.includes(position.binding)) throw badRequest(`position.binding "${position.binding}" is not on the estate's list: ${s.bindings.join(', ')} (standard#bindings)`);
+  const strangers = position.binds.filter((b) => !s.binds.includes(b));
+  if (strangers.length) throw badRequest(`position.binds ${strangers.join(', ')} not on the estate's list: ${s.binds.join(', ')} (standard#binds)`);
 }
 
 interface Prepared {
@@ -130,6 +146,7 @@ interface Prepared {
 
 async function prepare(ctx: AppContext, p: Principal, registry: RegistryRow, workspace: string, input: unknown, supersedes: string | null): Promise<Prepared> {
   const v = parse(DecisionCreateSchema, input);
+  await checkPosition(ctx, p, v.position);
   if (categoryName(registry.categories, v.category) === undefined) throw badRequest(`category ${v.category} is not in ${registry.prefix}'s scheme (${schemeText(registry.categories)})`);
   return {
     row: {
@@ -146,7 +163,7 @@ async function prepare(ctx: AppContext, p: Principal, registry: RegistryRow, wor
       consequences: v.consequences,
       alternatives: v.alternatives,
       related: await relatedIds(ctx.db, p.orgId, registry, v.related),
-      alignment: v.alignment ?? null,
+      position: v.position ?? null,
       supersedes_id: supersedes,
       created_by: p.userId,
     },
@@ -179,6 +196,7 @@ export async function createDecision(ctx: AppContext, p: Principal, prefix: stri
 export async function updateDecision(ctx: AppContext, p: Principal, ref: string, patch: DecisionPatch): Promise<Decision> {
   const { row, registry, workspace } = await requireDecision(ctx, p, ref, 'author');
   const v = parse(DecisionPatchSchema, patch);
+  await checkPosition(ctx, p, v.position);
   // A record marked superseded with no successor was marked so by mistake, and may be set right.
   if (v.status && v.status !== row.status && row.status === 'superseded' && row.superseded_by_id) throw badRequest(`${refOf(row)} is superseded; its status stays as it is`);
   const fields: DecisionFields = {
@@ -192,7 +210,7 @@ export async function updateDecision(ctx: AppContext, p: Principal, ref: string,
     consequences: v.consequences ?? row.consequences,
     alternatives: v.alternatives ?? row.alternatives,
     related: v.related ? await relatedIds(ctx.db, p.orgId, registry, v.related) : row.related,
-    alignment: v.alignment === undefined ? row.alignment : v.alignment,
+    position: v.position === undefined ? row.position : v.position,
     supersedes_id: row.supersedes_id,
     superseded_by_id: row.superseded_by_id,
   };
@@ -235,7 +253,7 @@ export function fieldsOf(row: PlacedRow): DecisionFields {
     consequences: row.consequences,
     alternatives: row.alternatives,
     related: row.related,
-    alignment: row.alignment,
+    position: row.position,
     supersedes_id: row.supersedes_id,
     superseded_by_id: row.superseded_by_id,
   };

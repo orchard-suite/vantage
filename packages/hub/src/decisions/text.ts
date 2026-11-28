@@ -1,12 +1,13 @@
 /** What the record tools answer an agent: one line per record or registry, and the report of a move, a discard, or an import. A record's own text form is text/record-text.ts. */
-import { STANCE_LABEL, STATUS_LABEL, type Alignment, type Decision, type Registry } from './types.ts';
+import { STATUS_LABEL, type Decision, type Position, type Registry } from './types.ts';
 import { schemeText } from './numbering.ts';
 import type { ImportReport } from './import-apply.ts';
 import type { MoveReport } from './move.ts';
 import { pointerLine, type DiscardReport } from './discard.ts';
 
-export function alignmentText(a: Alignment): string {
-  return [STANCE_LABEL[a.stance], a.rule, a.note ? `: ${a.note}` : ''].filter(Boolean).join(' ').replace(' :', ':');
+/** A position as one line: its binding word, who it binds, and the rule. */
+export function positionText(x: Position): string {
+  return `${x.binding} (${x.binds.join(', ')}${x.locked ? ', locked' : ''}): ${x.line}`;
 }
 
 export function moveText(r: MoveReport, publicUrl: string): string {

@@ -11,7 +11,7 @@ import { escapeHtml } from './html.ts';
 import { ico } from './icons.ts';
 import { recordUrl } from '../decisions/read.ts';
 import type { Backlinks } from '../decisions/backlinks.ts';
-import { alignmentText } from '../decisions/text.ts';
+import { positionText } from '../decisions/text.ts';
 import { STATUSES, STATUS_LABEL, type Decision, type DecisionStatus, type DecisionStub, type Registry } from '../decisions/types.ts';
 
 export interface DecisionFilter {
@@ -120,7 +120,7 @@ export function decisionBody(d: Decision, ws: AccessibleWorkspace, wsName: strin
     cell('Last updated', escapeHtml(d.updatedOn)),
     cell('Decision makers', escapeHtml(d.deciders.join(', ') || 'Not recorded')),
     ...(d.supersedes ? [cell('Supersedes', stubLink(ws.slug, d.supersedes))] : []),
-    ...(d.alignment ? [cell('Standard', escapeHtml(alignmentText(d.alignment)))] : []),
+    ...(d.position ? [cell('Position', escapeHtml(positionText(d.position)))] : []),
     cell('Cite as', `<code>${escapeHtml(d.ref)}</code> · <code>${escapeHtml(d.machineRef)}</code>`),
     ...(d.aliases.length ? [cell('Formerly', d.aliases.map((a) => `<code>${escapeHtml(a)}</code>`).join(' · '))] : []),
   ];

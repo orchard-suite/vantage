@@ -99,6 +99,11 @@ a record each.
 - **Governs**: the boxes and views it decides about, one line each:
   `workspace/document box node-id`. Find ids in the document's outline.
   Every record that governs a system links to its boxes.
+- **Position**: when the record sets a rule its scope's people, agents,
+  or systems must follow, give it a `position:` (the rule in one line, a
+  binding word, who it binds; `guide#standards`). The hub builds the
+  scope's standard from these and publishes it at once. A one-off choice
+  has none. Say how it stands against another standard in its Context.
 - **Cite it where it applies.** Add the record to the `decisions:` list of
   each box it is about, and cite it in the pages that explain those parts
   (`[[decision:SHOP-2001]]`). The hub indexes these citations: they are

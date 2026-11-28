@@ -25,6 +25,7 @@ import { RECORD_TEMPLATE } from './record-text.ts';
 import { itemOutline, kindOutline, placeAddress } from './items.ts';
 import { kindsFor } from '../tracking/read.ts';
 import { scopeLine, scopesOutline } from '../scopes/outline.ts';
+import { standardOutline, standardsOutline } from '../standards/outline.ts';
 
 const n = (x: number): string => x.toLocaleString('en-US');
 const day = (d: Date): string => d.toISOString().slice(0, 10);
@@ -76,7 +77,7 @@ async function root(ctx: AppContext, p: Principal): Promise<string> {
   lines.push('', 'kinds of tracked items (outline one for its items):');
   for (const k of kinds) lines.push(`  ${k.prefix}  ${k.name}  (workspace ${workspaces.find((w) => w.id === k.workspace_id)?.slug ?? 'shared'})`);
   if (!kinds.length) lines.push('  none; a kind is a document with a kind block (guide#kinds-and-items)');
-  lines.push('', 'scopes  the owners in the organization, and the workspace each one owns', 'guide  the language and the rules, by topic', 'schema  the JSON Schema of a document, by part');
+  lines.push('', 'scopes  the owners in the organization, and the workspace each one owns', "standard  the estate's standard settings, and each scope's built standard", 'guide  the language and the rules, by topic', 'schema  the JSON Schema of a document, by part');
   return fit(lines, 'vantage_outline one workspace or registry');
 }
 
@@ -180,6 +181,10 @@ export async function outline(ctx: AppContext, p: Principal, given: Address): Pr
       return schemaOutline();
     case 'scopes':
       return fit(await scopesOutline(ctx, p), 'vantage_read scopes#scopes.<id>');
+    case 'standards':
+      return fit(await standardsOutline(ctx, p), 'vantage_outline standard/<scope>');
+    case 'standard':
+      return fit(await standardOutline(ctx, p, a.scope), 'vantage_read standard/<scope>#<area>');
     case 'workspace':
       return workspace(ctx, p, a.workspace);
     case 'document':

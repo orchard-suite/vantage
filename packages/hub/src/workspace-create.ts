@@ -17,9 +17,13 @@ export interface CreatedWorkspace {
   readonly name: string;
 }
 
+/** Slugs an address reads as the hub's own things, never as a workspace. */
+const RESERVED = new Set(['guide', 'schema', 'scopes', 'standard']);
+
 export async function createTeamWorkspace(ctx: AppContext, p: Principal, who: string, input: { name: string; slug?: string | undefined }): Promise<CreatedWorkspace> {
   if (!(await mayCreateTeamWorkspace(ctx.db, ctx.config.TEAM_WORKSPACES, p))) throw forbidden('only admins and people an admin lets may make team workspaces here');
   const slug = input.slug ?? slugOf(input.name);
+  if (RESERVED.has(slug)) throw badRequest(`workspace slug ${slug} is an address of the hub itself; pick another`);
   if (await workspaceBySlug(ctx.db, p.orgId, slug)) throw badRequest(`workspace slug ${slug} is taken`);
   const id = randomId();
   await ctx.db.transaction(async (tx) => {

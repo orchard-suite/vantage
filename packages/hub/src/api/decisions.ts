@@ -17,7 +17,7 @@ import { moveDecision } from '../decisions/move.ts';
 import { discardDecision } from '../decisions/discard.ts';
 import { StatusSchema } from '../decisions/types.ts';
 
-const RECORD = 'title, category, status, decidedOn, updatedOn, deciders, context, decision, consequences, alternatives [{option, rejected}], related, alignment {stance, rule, note}, governs [{document, box | view}]';
+const RECORD = 'title, category, status, decidedOn, updatedOn, deciders, context, decision, consequences, alternatives [{option, rejected}], related, position {line, binding, binds, locked, reach {below, facets, paths}, enforced_by, checked_by}, governs [{document, box | view}]';
 /** The fields a refine changes, sent flat beside minor and message; every one optional. */
 const PATCH_FIELDS: Record<string, string> = {
   title: 'optional',
@@ -30,7 +30,7 @@ const PATCH_FIELDS: Record<string, string> = {
   consequences: 'optional: Markdown',
   alternatives: 'optional: [{option, rejected}]',
   related: 'optional: record citations',
-  alignment: 'optional: {stance, rule, note}, or null',
+  position: 'optional: {line, binding, binds, locked, reach, enforced_by, checked_by}, or null',
   governs: 'optional: [{document, box | view}]',
 };
 const ImportBody = z.object({ files: z.array(z.object({ path: z.string().min(1).max(500), text: z.string().max(500_000) })).min(1).max(500), dryRun: z.boolean().optional() });

@@ -834,9 +834,10 @@ the systems they decide about (VAN-3001).
   Accepted, Deprecated, Superseded) with supersedes and superseded-by
   links; the decision date, Last updated, and the decision makers by name;
   Context, Decision, Consequences, and Alternatives considered (each with
-  why it was rejected) as Markdown; related records; an optional standard
-  alignment (follows, extends, departs, or new ground, a rule id, a note);
-  and links to the boxes and views it governs (`decision_links`).
+  why it was rejected) as Markdown; related records; an optional position,
+  the line it sets for its scope's standard (VAN-3018); and links to the
+  boxes and views it governs (`decision_links`). The old `alignment`
+  field is retired: a migration moved what it said into Context.
 - **Living records.** A refinement is an edit in place that moves Last
   updated (`minor` keeps it, for a date or wording fix). A pivot is a new
   record that supersedes the old one, which keeps its body. Every write
@@ -902,6 +903,46 @@ the systems they decide about (VAN-3001).
   section it cannot place is kept under Decision as a heading of its
   own; everything it could not map is reported per file. A dry run writes nothing; a second run skips records
   already there.
+
+### Standards
+
+A scope's standard is built from the positions of its records, never kept
+by hand, and published in editions (VAN-3018). The code is
+`packages/hub/src/standards/`.
+
+- **Position.** A record's `position:` block: the line (at most 200
+  characters), a binding word and who it binds from the estate's lists,
+  whether it is locked, its reach (`below`, `facets`, `paths`), and what
+  enforces and checks it. Only an accepted record in a team workspace
+  brings its line in, to the scope of its registry's workspace; one with
+  no scope gives the whole estate's (`standard/estate`).
+- **Build.** A scope holds its own lines, every line its parent's edition
+  passes down (all but `below: false`), and every line whose facets it
+  carries, each with its path; a record that reaches twice keeps its
+  nearest path. Lines group by area, the record's category name. Packs
+  reach down the same way. Every write that can change a build rebuilds
+  every scope, parents first: a record (in its own transaction), the tree,
+  a workspace's scope or state, a registry's categories or workspace, the
+  settings, or a page that cites a line.
+- **Editions** (`standard_editions`). A version per scope counting from 1,
+  a SHA-256 hash over the body (lines, packs, exceptions, pages), a change
+  list against the last, and a manifest (scope, name, kind, steward, the
+  editions it built on). A published edition never changes. Packs travel
+  as pins (id, version, hash, `starter` or `estate`, parameters, on or
+  off), never their bodies; procedure pages travel by address.
+- **Gates.** The machine gate runs on every build: lists, line length,
+  every `checked_by` covered by a pack that reaches, a pack reaching once,
+  no personal workspace, no withheld word. A failed build is kept as a
+  refused edition with its reasons; the last stays in force. With the
+  steward gate on, a scope's own changes wait as a pending edition for its
+  steward or an admin (`vantage_standard_publish`); what comes from above
+  publishes at once.
+- **Surfaces.** `standard` is the estate's settings (bindings, binds,
+  `steward_gate`, `withhold`, `packs` per scope) as YAML; the lists are an
+  admin's and a scope's packs its steward's. `standard/<scope>` is the
+  newest edition as Markdown and `standard/<scope>@<n>` edition n; both
+  are read-only. REST: `GET` and `PUT /api/v1/standards`,
+  `GET /api/v1/standards/:scope`, `POST /api/v1/standards/:scope/publish`.
 
 ### Roadmaps and work
 
@@ -1177,7 +1218,9 @@ characters stand alone. The first paragraph is that self-contained lead.
   calls: find one fact; change one sentence in a box, a view, a page, a
   record, and an item; look at one view; bring in a folder of records;
   take an item and finish it; answer a plain question across the hub;
-  find the standard that binds a repository. A task's budget is its disk cost. The check
+  find the standard that binds a repository; read a scope's built
+  standard, one area of it, and check the one held is current. A task's
+  budget is its disk cost. The check
   gate runs it.
 - **Budgets.** One file holds them (`packages/mcp/src/budget.ts`). The
   standing budgets were set at what the rebuilt surface measured; a change
@@ -1189,8 +1232,9 @@ characters stand alone. The first paragraph is that self-contained lead.
   `vantage.agent.chars`.
 - **Text space.** Every thing has an address and one text form that loses
   nothing: `workspace/document` (YAML), `workspace/document/pages/x.md`,
-  `SHOP-2001`, `SHOP`, `~` (the person's own workspace), `scopes`, `guide`,
-  `schema`; a part after `#` is a heading,
+  `SHOP-2001`, `SHOP`, `~` (the person's own workspace), `scopes`,
+  `standard`, `standard/<scope>`, `guide`, `schema` (a workspace never takes
+  one of the hub's own words as its slug); a part after `#` is a heading,
   a YAML path, or a line range. Registry prefixes, kind prefixes, and
   workspace slugs share one namespace (VAN-5002).
 - **Five verbs.** `outline` (names and sizes, never text), `find` (lines

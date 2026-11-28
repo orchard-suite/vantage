@@ -94,7 +94,7 @@ export async function importDecisions(ctx: AppContext, p: Principal, prefix: str
         consequences: r.consequences,
         alternatives: r.alternatives,
         related: [],
-        alignment: null,
+        position: null,
         supersedes_id: null,
         created_by: p.userId,
       });

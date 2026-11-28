@@ -17,6 +17,7 @@ import { blockedReason, orgPublications, publicationById, setApproval } from '..
 import { publicationJson } from './publications.ts';
 import { orgConnectors, setConnectorApproval, sourceById } from '../sources/repo.ts';
 import { sourceJson } from './sources.ts';
+import { rebuildNow } from '../standards/publish.ts';
 
 export function adminRoutes(ctx: AppContext, reg: OpenApiRegistry): Hono<HubEnv> {
   const app = new Hono<HubEnv>();
@@ -105,6 +106,7 @@ export function adminRoutes(ctx: AppContext, reg: OpenApiRegistry): Hono<HubEnv>
     if (!ws) throw notFound('workspace');
     const purgeAfter = new Date(Date.now() + ctx.config.PURGE_GRACE_DAYS * 86_400_000);
     await ctx.db.query('update workspaces set disabled_at = now(), purge_after = $2 where id = $1', [ws.id, purgeAfter]);
+    await rebuildNow(ctx, p.orgId, who(p));
     await audit(ctx.db, ctx.log, { orgId: p.orgId, who: who(p), what: 'workspace.disable', surface: p.surface, target: `workspace:${ws.id}`, details: { purgeAfter: purgeAfter.toISOString() } });
     ctx.log.info('admin.workspace.disabled', { workspaceId: ws.id, purgeAfter: purgeAfter.toISOString() });
     return c.json({ id: ws.id, slug: ws.slug, disabled: true, purgeAfter });
@@ -116,6 +118,7 @@ export function adminRoutes(ctx: AppContext, reg: OpenApiRegistry): Hono<HubEnv>
     const ws = await workspaceBySlug(ctx.db, p.orgId, c.req.param('workspace'));
     if (!ws) throw notFound('workspace');
     await ctx.db.query('update workspaces set disabled_at = null, purge_after = null where id = $1', [ws.id]);
+    await rebuildNow(ctx, p.orgId, who(p));
     await audit(ctx.db, ctx.log, { orgId: p.orgId, who: who(p), what: 'workspace.enable', surface: p.surface, target: `workspace:${ws.id}` });
     return c.json({ id: ws.id, slug: ws.slug, disabled: false });
   });

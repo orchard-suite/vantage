@@ -1266,9 +1266,9 @@ A record holds a title, a status (Proposed, Accepted, Deprecated,
 Superseded), the decision date, Last updated, the decision makers by name,
 Context, Decision, Consequences (benefits and costs), Alternatives
 considered (each with why it was rejected), related records, an optional
-line saying how it stands against a standard (follows, extends, departs
-from, or new ground, with a rule id), and links to the boxes and views it
-governs.
+position (the line it sets for its scope's standard, guide#standards),
+and links to the boxes and views it governs. How a record stands against
+another standard is said in its Context.
 
 A record is text at its citation. Its text form is a header of fields,
 then its sections:
@@ -1639,6 +1639,70 @@ workspaces:
   the catalog. A scope removed from the tree leaves its workspaces to the
   whole estate. Setting `source: hub` (and dropping `catalog:`) keeps the
   copy for authors to keep.
+
+## Standards
+
+A scope's standard is built from its records, never written by hand. A
+record that sets a rule for its scope carries a `position:` in its header;
+a one-off choice carries none.
+
+```yaml
+position:
+  line: Every secret lives in the vault.   # the rule, at most 200 characters
+  binding: must                            # from the estate's list: must, should, may
+  binds: [people, agents]                  # from the estate's list: people, agents, systems
+  locked: true                             # optional: no departures
+  reach: { below: false, facets: [moves-money], paths: [infra/] }  # optional
+  enforced_by: [policy:deny-public-keys]   # optional: what enforces it
+  checked_by: [secrets.vault-only]         # optional: the judge's rules, pack.rule
+```
+
+- The line belongs to the scope of its registry's workspace, or to the
+  whole estate when the workspace names none. Only an accepted record in a
+  team workspace brings its line in.
+- It reaches its own scope and, unless `below: false`, every scope below.
+  `facets` reach every scope elsewhere in the tree that carries one.
+- `vantage_read standard/<scope>` reads the scope's newest edition: a
+  header (edition, hash, what it built on), one `##` section per area (the
+  record's category), a line each with its record and how it got here
+  (`own`, `from payments < acme`, `by facet moves-money from finance`),
+  then `## Packs`, `## Procedures` (the pages that cite its lines), and
+  what changed. `standard/estate` is the whole estate's.
+  `standard/<scope>#security` reads one area; `standard/<scope>@3` reads
+  edition 3. Hold the version you read and send it as `held`: an edition
+  that has not changed answers one line.
+- `vantage_outline standard` lists every scope's edition and any that
+  wait or were refused; `vantage_outline standard/<scope>` lists its areas
+  and its editions.
+- Every write that changes what reaches a scope publishes its next
+  edition at once. The machine gate refuses an edition whose binding word
+  or binds are off the estate's lists, whose `checked_by` names a pack
+  that does not reach the scope, that adopts a pack twice, or that holds a
+  withheld word; the outline says why, and the last edition stays in
+  force. Fix the record or the settings and the next write publishes.
+- The settings are YAML at `standard`: `bindings`, `binds`,
+  `steward_gate`, and `withhold` are an admin's; `packs.<scope>` (or
+  `packs.estate`) is that scope's steward's. A pack is a pin the judge
+  installs, never its body:
+
+  ```yaml
+  packs:
+    acme:
+      - pack: secrets
+        version: 1.0.0
+        hash: sha256:<64 hex>
+        origin: starter      # a judge's built-in set, adopted; estate for the estate's own
+        parameters: { days: 30 }
+        on: true
+  ```
+
+- With `steward_gate: true`, a scope's own change waits as a pending
+  edition; the outline names it. Read it at `standard/<scope>@<n>`, and the
+  scope's steward or an admin publishes it with
+  `vantage_standard_publish` (through `vantage_tool`). A change from
+  above publishes at once.
+- `standard/<scope>` is never written: change the record's position, or
+  the packs at `standard`.
 
 ## Voice walkthroughs in a hub
 

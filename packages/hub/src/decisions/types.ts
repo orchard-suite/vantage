@@ -10,12 +10,7 @@ export const STATUSES = ['proposed', 'accepted', 'deprecated', 'superseded'] as 
 export type DecisionStatus = (typeof STATUSES)[number];
 export const StatusSchema = z.enum(STATUSES);
 
-/** How a record stands against an outside standard: it follows a rule, extends it, departs from it, or covers what no rule does. */
-export const STANCES = ['follows', 'extends', 'departs', 'new-ground'] as const;
-export type Stance = (typeof STANCES)[number];
-
 export const STATUS_LABEL: Record<DecisionStatus, string> = { proposed: 'Proposed', accepted: 'Accepted', deprecated: 'Deprecated', superseded: 'Superseded' };
-export const STANCE_LABEL: Record<Stance, string> = { follows: 'Follows', extends: 'Extends', departs: 'Departs from', 'new-ground': 'New ground' };
 
 export const CategorySchema = z.object({ digit: z.number().int().min(0).max(9), name: z.string().trim().min(1).max(60) }).strict();
 export type Category = z.infer<typeof CategorySchema>;
@@ -65,14 +60,39 @@ export const AlternativeSchema = z
   .strict();
 export type Alternative = z.infer<typeof AlternativeSchema>;
 
-export const AlignmentSchema = z
+/** The longest a position's line may be: the rule people follow, in one sentence. */
+export const LINE_MAX = 200;
+
+const Word = z.string().trim().min(1).max(40);
+const Ref = z.string().trim().min(1).max(300);
+
+/** Where a line reaches: its own scope, the scopes below unless `below` is false, every scope that carries one of its facets, and, inside a repository, the paths it names. */
+export const ReachSchema = z
   .object({
-    stance: z.enum(STANCES),
-    rule: z.string().trim().min(1).max(200).optional().describe('The rule id the stance is about; absent for new ground'),
-    note: z.string().trim().max(500).optional(),
+    below: z.boolean().default(true).describe('Whether the scopes below its own are bound too'),
+    facets: z.array(Word).max(20).default([]).describe('Scopes elsewhere in the tree that carry one of these facets are bound too'),
+    paths: z.array(Ref).max(50).default([]).describe('Inside a repository, the paths the line binds; none is the whole repository'),
   })
   .strict();
-export type Alignment = z.infer<typeof AlignmentSchema>;
+
+/**
+ * The line a record sets for its scope's standard (VAN-3018). The binding
+ * word and who it binds come from the estate's lists, checked when the
+ * record is written and again by the machine gate.
+ */
+export const PositionSchema = z
+  .object({
+    line: z.string().trim().min(1).max(LINE_MAX).describe('The rule people follow, at most 200 characters'),
+    binding: Word.describe("The binding word from the estate's list: must, should, or may by default"),
+    binds: z.array(Word).min(1).max(10).describe("Who it binds, from the estate's list: people, agents, systems by default"),
+    locked: z.boolean().default(false).describe('Locked against departures: no exception, or only from the scope the estate names'),
+    reach: ReachSchema.default({ below: true, facets: [], paths: [] }),
+    enforced_by: z.array(Ref).max(20).default([]).describe('The mechanisms that enforce it, as things in the catalog'),
+    checked_by: z.array(Ref).max(20).default([]).describe("The judge's rules that check it, as pack.rule"),
+  })
+  .strict();
+export type Position = z.output<typeof PositionSchema>;
+export type PositionInput = z.input<typeof PositionSchema>;
 
 /** A box or a view a record governs: `document` is `workspace/document`, or a document slug in the registry's own workspace. */
 export const GovernsSchema = z
@@ -94,7 +114,7 @@ const fields = {
   consequences: Markdown,
   alternatives: z.array(AlternativeSchema).max(30),
   related: z.array(z.string().trim().min(1)).max(50),
-  alignment: AlignmentSchema.nullable(),
+  position: PositionSchema.nullable(),
   governs: z.array(GovernsSchema).max(200),
 };
 
@@ -109,7 +129,7 @@ export const DecisionCreateSchema = z
     updatedOn: Day.optional(),
     alternatives: fields.alternatives.default([]),
     related: fields.related.default([]),
-    alignment: fields.alignment.optional(),
+    position: fields.position.optional(),
     governs: fields.governs.default([]),
   })
   .strict();
@@ -126,7 +146,7 @@ export const DecisionPatchSchema = z
     consequences: Markdown.optional(),
     alternatives: fields.alternatives.optional(),
     related: fields.related.optional(),
-    alignment: fields.alignment.optional(),
+    position: fields.position.optional(),
     governs: fields.governs.optional(),
     updatedOn: Day.optional(),
     /** A fix to dates or wording: Last updated stays as it was. */
@@ -186,7 +206,7 @@ export interface Decision {
   readonly consequences: string;
   readonly alternatives: readonly Alternative[];
   readonly related: readonly DecisionStub[];
-  readonly alignment: Alignment | null;
+  readonly position: Position | null;
   readonly supersedes: DecisionStub | null;
   readonly supersededBy: DecisionStub | null;
   readonly governs: readonly Governs[];

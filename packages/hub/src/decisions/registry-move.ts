@@ -10,6 +10,7 @@ import type { Principal } from '../auth/principal.ts';
 import { requireWorkspace } from '../authz.ts';
 import { audit } from '../audit.ts';
 import { requireRegistry } from './read.ts';
+import { rebuildStandards } from '../standards/publish.ts';
 
 export async function moveRegistry(ctx: AppContext, p: Principal, who: string, prefix: string, toSlug: string): Promise<{ prefix: string; from: string; to: string; records: number }> {
   const { row, workspace } = await requireRegistry(ctx, p, prefix, 'author');
@@ -21,6 +22,8 @@ export async function moveRegistry(ctx: AppContext, p: Principal, who: string, p
     const details = { registryId: row.id, prefix: row.prefix, from: row.workspace_id, to: to.id, records };
     await audit(tx, ctx.log, { orgId: p.orgId, who, what: 'registry.move', surface: p.surface, target: `workspace:${row.workspace_id}`, details });
     await audit(tx, ctx.log, { orgId: p.orgId, who, what: 'registry.move', surface: p.surface, target: `workspace:${to.id}`, details });
+    // Its records' lines now belong to the scope of the workspace they moved to.
+    await rebuildStandards(ctx, tx, p.orgId, who);
   });
   ctx.log.info('registry.moved', { registryId: row.id, prefix: row.prefix, from: row.workspace_id, to: to.id, by: p.userId });
   return { prefix: row.prefix, from: workspace, to: to.slug, records };

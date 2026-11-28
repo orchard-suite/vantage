@@ -7,7 +7,7 @@ import { HttpError } from '../http.ts';
 import type { Address } from './address.ts';
 
 /** The guide's topic for the rules of a kind of thing; its headings are its topics. */
-export type Topic = 'working-in-a-hub' | 'decision-records-in-a-hub' | 'working-with-items' | 'scopes-and-owners';
+export type Topic = 'working-in-a-hub' | 'decision-records-in-a-hub' | 'working-with-items' | 'scopes-and-owners' | 'standards';
 
 /** The topic that explains what an address names. A document, a page, and the rest of the text space are working in a hub. */
 export function topicOf(a: Pick<Address, 'kind'> | undefined): Topic {
@@ -20,6 +20,9 @@ export function topicOf(a: Pick<Address, 'kind'> | undefined): Topic {
       return 'working-with-items';
     case 'scopes':
       return 'scopes-and-owners';
+    case 'standards':
+    case 'standard':
+      return 'standards';
     default:
       return 'working-in-a-hub';
   }

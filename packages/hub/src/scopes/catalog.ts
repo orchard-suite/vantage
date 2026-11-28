@@ -12,6 +12,7 @@ import { connectorIn, observedModel, type SourceRow } from '../sources/repo.ts';
 import { workspaceBySlug } from '../authz.ts';
 import { replaceScopes, type Scope } from './repo.ts';
 import { scopeSetting, type CatalogSetting } from './setting.ts';
+import { rebuildNow } from '../standards/publish.ts';
 
 /** The kind of an observed entity among the kinds that are scopes: its type, or the tag its connector gave it. */
 function kindOf(tags: readonly string[], type: string, kinds: readonly string[]): string | undefined {
@@ -64,5 +65,6 @@ export async function fillFromCatalog(ctx: AppContext, orgId: string, only?: Sou
   const scopes = scopesFromCatalog((await observedModel(ctx.db, source.id)).model, setting.catalog);
   const counts = await replaceScopes(ctx.db, orgId, 'catalog', scopes);
   ctx.log.info('scopes.catalog.filled', { orgId, source: setting.catalog.connector, scopes: scopes.length, ...counts });
+  if (counts.added || counts.changed || counts.removed) await rebuildNow(ctx, orgId, `connector:${source.id}`);
   return { scopes: scopes.length };
 }
