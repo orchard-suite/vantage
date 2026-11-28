@@ -26,6 +26,8 @@ export interface RecordFields {
   readonly decision: string;
   readonly consequences: string;
   readonly alternatives: readonly Alternative[];
+  readonly supersedes: string | undefined;
+  readonly supersededBy: string | undefined;
 }
 
 const governsText = (g: { workspace?: string; document: string; box?: string | undefined; view?: string | undefined }): string => `${g.workspace ? `${g.workspace}/` : ''}${g.document} ${g.box !== undefined ? `box ${g.box}` : `view ${g.view}`}`;
@@ -127,6 +129,12 @@ const strings = (value: unknown, what: string): string[] => {
   return value.map((v) => String(v).trim()).filter(Boolean);
 };
 
+const link = (value: unknown, what: string): string | undefined => {
+  if (value === undefined || value === null || value === '') return undefined;
+  if (typeof value !== 'string') throw badRequest(`${what} names one record: ${what}: SHOP-2002`);
+  return value.trim();
+};
+
 const day = (value: unknown): string | undefined => (value === undefined || value === null || value === '' ? undefined : value instanceof Date ? value.toISOString().slice(0, 10) : String(value));
 
 /** Reads a record's text form. Throws 400 with what is wrong when it is not one. */
@@ -175,6 +183,8 @@ export function parseRecordText(text: string): RecordFields {
     decision: section('Decision'),
     consequences: section('Consequences'),
     alternatives: alternatives.map((x) => ({ option: x.option, rejected: x.rejected.trim() })),
+    supersedes: link(header['supersedes'], 'supersedes'),
+    supersededBy: link(header['superseded_by'], 'superseded_by'),
   };
 }
 
@@ -183,8 +193,14 @@ const same = (a: unknown, b: unknown): boolean => JSON.stringify(a) === JSON.str
 /** The fields in which `next` differs from `current`, as a patch; empty when none do. */
 export function changedFields(current: RecordFields, next: RecordFields): DecisionPatch {
   if (next.category !== current.category) throw badRequest('a record changes its category by moving: vantage_tool vantage_decision_move');
-  if (next.status !== current.status && next.status === 'superseded') throw badRequest('a record is superseded by writing the record that replaces it: vantage_tool vantage_decision_supersede');
   const patch: Record<string, unknown> = {};
+  // A supersede link is set once, on a record that has none, and then stays.
+  for (const [k, key] of [['supersededBy', 'superseded_by'], ['supersedes', 'supersedes']] as const) {
+    if (next[k] === current[k]) continue;
+    if (current[k] !== undefined) throw badRequest(`${key}: ${current[k]} stays; a supersede link is never changed or taken off`);
+    patch[k] = next[k];
+  }
+  if (next.status !== current.status && next.status === 'superseded' && patch['supersededBy'] === undefined) throw badRequest('a record is superseded by writing the record that replaces it (vantage_tool vantage_decision_supersede), or, when that record exists, by naming it: status: superseded with superseded_by: SHOP-2002');
   if (next.title !== current.title) patch['title'] = next.title;
   if (next.status !== current.status) patch['status'] = next.status;
   if (next.decidedOn !== current.decidedOn && next.decidedOn !== undefined) patch['decidedOn'] = next.decidedOn;
@@ -203,6 +219,7 @@ export function createInput(f: RecordFields): DecisionCreate {
   if (!Number.isInteger(f.category)) throw badRequest("a new record's header names its category, a digit: category: 3");
   if (f.status !== 'proposed' && f.status !== 'accepted') throw badRequest('a new record is proposed or accepted');
   if (!f.decidedOn) throw badRequest("a new record's header names the day it was decided: decided: YYYY-MM-DD");
+  if (f.supersedes !== undefined || f.supersededBy !== undefined) throw badRequest('a new record that replaces another is written with vantage_tool vantage_decision_supersede; an existing one names its successor with superseded_by');
   return {
     category: f.category,
     title: f.title,

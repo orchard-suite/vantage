@@ -21,7 +21,7 @@ const RECORD = 'title, category, status, decidedOn, updatedOn, deciders, context
 /** The fields a refine changes, sent flat beside minor and message; every one optional. */
 const PATCH_FIELDS: Record<string, string> = {
   title: 'optional',
-  status: 'optional: proposed, accepted, or deprecated',
+  status: 'optional: proposed, accepted, or deprecated; superseded only with supersededBy',
   decidedOn: 'optional: YYYY-MM-DD',
   updatedOn: 'optional: YYYY-MM-DD',
   deciders: 'optional: names',
@@ -32,6 +32,8 @@ const PATCH_FIELDS: Record<string, string> = {
   related: 'optional: record citations',
   position: 'optional: {line, binding, binds, locked, reach, enforced_by, checked_by}, or null',
   governs: 'optional: [{document, box | view}]',
+  supersededBy: 'optional: the record of the same registry that replaced this one; only while it names none',
+  supersedes: 'optional: the superseded record this one replaced; only while that record names no successor',
 };
 const ImportBody = z.object({ files: z.array(z.object({ path: z.string().min(1).max(500), text: z.string().max(500_000) })).min(1).max(500), dryRun: z.boolean().optional() });
 

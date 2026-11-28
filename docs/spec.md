@@ -853,7 +853,10 @@ the systems they decide about (VAN-3001).
   field is retired: a migration moved what it said into Context.
 - **Living records.** A refinement is an edit in place that moves Last
   updated (`minor` keeps it, for a date or wording fix). A pivot is a new
-  record that supersedes the old one, which keeps its body. Every write
+  record that supersedes the old one, which keeps its body. Two records
+  that already exist are linked by a write of either one (`superseded_by`
+  on the old, `supersedes` on the successor), in the same registry, while
+  the old record names no successor; a link once set never changes. Every write
   keeps the whole record as a revision (`decision_revisions`) and an audit
   entry, shown in the workspace's activity.
 - **Discard.** A record's writer may take it back while nothing points to

@@ -198,9 +198,11 @@ export async function updateDecision(ctx: AppContext, p: Principal, ref: string,
   await checkPosition(ctx, p, v.position);
   // A record marked superseded with no successor was marked so by mistake, and may be set right.
   if (v.status && v.status !== row.status && row.status === 'superseded' && row.superseded_by_id) throw badRequest(`${refOf(row)} is superseded; its status stays as it is`);
+  const link = await successionOf(ctx.db, p.orgId, row, v);
+  const old = link?.old.id === row.id;
   const fields: DecisionFields = {
     title: v.title ?? row.title,
-    status: v.status ?? row.status,
+    status: old ? 'superseded' : (v.status ?? row.status),
     decided_on: v.decidedOn ?? row.decided_on,
     updated_on: v.updatedOn ?? (v.minor ? row.updated_on : dayOf()),
     deciders: v.deciders ?? row.deciders,
@@ -210,16 +212,54 @@ export async function updateDecision(ctx: AppContext, p: Principal, ref: string,
     alternatives: v.alternatives ?? row.alternatives,
     related: v.related ? await relatedIds(ctx.db, p.orgId, registry, v.related) : row.related,
     position: v.position === undefined ? row.position : v.position,
-    supersedes_id: row.supersedes_id,
-    superseded_by_id: row.superseded_by_id,
+    supersedes_id: link && !old ? link.old.id : row.supersedes_id,
+    superseded_by_id: link && old ? link.next.id : row.superseded_by_id,
   };
   const links = v.governs ? await resolveGoverns(ctx, p, workspace, v.governs) : undefined;
   await ctx.db.transaction(async (tx) => {
     await updateDecisionRow(tx, row.id, fields);
     if (links) await setLinks(tx, p.orgId, row.id, links);
-    await remember(ctx, tx, p, row.id, v.message ?? (v.minor ? 'fixed wording' : 'refined'), 'decision.update');
+    // The other end of a new supersede link: the successor's back link when it has none, or the old record's status and successor.
+    const other = link ? (old ? link.next : link.old) : undefined;
+    if (link && other && !(old ? other.supersedes_id : other.superseded_by_id)) {
+      await updateDecisionRow(tx, other.id, old ? { ...fieldsOf(other), supersedes_id: row.id } : { ...fieldsOf(other), superseded_by_id: row.id });
+      await remember(ctx, tx, p, other.id, old ? `supersedes ${refOf(row)}` : `superseded by ${refOf(row)}`, 'decision.supersede');
+    }
+    await remember(ctx, tx, p, row.id, v.message ?? (link ? (old ? `superseded by ${refOf(link.next)}` : `supersedes ${refOf(link.old)}`) : v.minor ? 'fixed wording' : 'refined'), 'decision.update');
   });
   return (await present(ctx, p, [(await placedById(ctx.db, p.orgId, row.id))!]))[0]!;
+}
+
+/**
+ * A supersede link between two records that already exist, named by a write
+ * of either one: the old record's `supersededBy`, or the successor's
+ * `supersedes`. The old record must be superseded with no successor, or be
+ * marked superseded by this same write. A link once set never changes.
+ */
+async function successionOf(db: Db, orgId: string, row: PlacedRow, v: z.output<typeof DecisionPatchSchema>): Promise<{ old: PlacedRow; next: PlacedRow } | undefined> {
+  if (v.supersededBy !== undefined && v.supersedes !== undefined) throw badRequest('name one supersede link in a write: superseded_by on the old record, or supersedes on its successor');
+  const named = v.supersededBy ?? v.supersedes;
+  if (named === undefined) {
+    if (v.status === 'superseded' && row.status !== 'superseded') throw badRequest(`a record is superseded by writing the record that replaces it (vantage_tool vantage_decision_supersede), or, when that record exists, by naming it with superseded_by`);
+    return undefined;
+  }
+  const other = await placedByRef(db, orgId, named, row.registry_id);
+  if (!other) throw badRequest(`record ${named} not found`);
+  if (other.registry_id !== row.registry_id) throw badRequest(`${refOf(other)} is in another registry; a record is superseded by one in its own registry, ${row.prefix}`);
+  if (other.id === row.id) throw badRequest(`${refOf(row)} cannot supersede itself`);
+  const [old, next] = v.supersededBy !== undefined ? [row, other] : [other, row];
+  if (old.superseded_by_id && old.superseded_by_id !== next.id) throw badRequest(`${refOf(old)} is already superseded by ${refOf((await placedById(db, orgId, old.superseded_by_id))!)}; it keeps that successor`);
+  if (next.supersedes_id && next.supersedes_id !== old.id) throw badRequest(`${refOf(next)} already supersedes ${refOf((await placedById(db, orgId, next.supersedes_id))!)}; it keeps that link`);
+  if (old.status !== 'superseded' && !(old.id === row.id && v.status === 'superseded')) {
+    throw badRequest(old.id === row.id ? `${refOf(old)} is ${old.status}; mark it superseded in the same write: status: superseded with superseded_by: ${refOf(next)}` : `${refOf(old)} is ${old.status}, not superseded; mark it on its own record: status: superseded with superseded_by: ${refOf(next)}`);
+  }
+  // No loop: the successor's own line of successors never comes back to the old record.
+  let at: PlacedRow | undefined = next;
+  for (let hops = 0; at?.superseded_by_id && hops < 100; hops += 1) {
+    if (at.superseded_by_id === old.id) throw badRequest(`${refOf(next)} is itself superseded, by a line of records that leads back to ${refOf(old)}`);
+    at = await placedById(db, orgId, at.superseded_by_id);
+  }
+  return { old, next };
 }
 
 /** A pivot: a new record in the same registry supersedes the old one, which keeps its body. The category and the links default to the old record's. */

@@ -1318,6 +1318,13 @@ machine form (`adr:<ULID>`). Both are read-only: a write ignores them. The
 - A reversal is `vantage_decision_supersede`: a new record that takes the
   next number and marks the old one Superseded by it. The old record keeps
   its body. Without `governs`, the new record governs what the old one did.
+- When the record that replaced it already exists, link the two with a
+  patch of either header: `superseded_by: SHOP-2002` on the old record, or
+  `supersedes: SHOP-2001` on its successor. The successor is in the same
+  registry. The old record is Superseded with no successor named, or the
+  same patch marks it: `status: superseded` with `superseded_by:`. The
+  hub sets both ends and keeps a revision of each. A link once set never
+  changes or comes off, and the refusal names the record it keeps.
 - `vantage_decision_discard` takes back a record you wrote by mistake.
   It removes the record and frees its number, so the next record in its
   category takes it when it was the highest there. It works only while
