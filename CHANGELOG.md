@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file.
 
+## [4.17.0](https://github.com/orchard-suite/vantage/compare/v4.16.0...v4.17.0) (2026-11-28)
+
+### Features
+
+* **vantage:** read gitlab and link work trailers ([8dad622](https://github.com/orchard-suite/vantage/commit/8dad62245cfe39f4197660a1f625f7fb42966497))
+* **vantage:** climb the queue's read-first ([c404a8e](https://github.com/orchard-suite/vantage/commit/c404a8e10d51891d4873080a54b669b50ac94baf))
+
 ## [4.16.0](https://github.com/orchard-suite/vantage/compare/v4.15.0...v4.16.0) (2026-11-28)
 
 ### Features
