@@ -2,6 +2,12 @@
 
 All notable changes to this project will be documented in this file.
 
+## [4.15.0](https://github.com/orchard-suite/vantage/compare/v4.14.0...v4.15.0) (2026-11-28)
+
+### Features
+
+* **vantage:** grant exceptions to lines ([0eff4cd](https://github.com/orchard-suite/vantage/commit/0eff4cd05c92554fb39ca015642d464bdfe57ca6))
+
 ## [4.14.0](https://github.com/orchard-suite/vantage/compare/v4.13.1...v4.14.0) (2026-11-28)
 
 ### Features
